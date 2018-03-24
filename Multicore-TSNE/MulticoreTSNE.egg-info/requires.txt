@@ -1,0 +1,6 @@
+numpy
+cffi
+
+[test]
+scikit-learn
+scipy

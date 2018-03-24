@@ -1,6 +1,17 @@
+*.so
+*.pyc
+*__pycache__*
+*.py[cod]
+*$py.class
+
 *.i
 *.ii
 *.gpu
 *.ptx
 *.cubin
 *.fatbin
+
+bhtsne/bh_tsne
+Multicore-TSNE/build/*
+Multicore-TSNE/dist/*
+

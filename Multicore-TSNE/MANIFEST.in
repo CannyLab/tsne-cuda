@@ -1,0 +1,6 @@
+recursive-include   .                 CMakeLists.txt
+recursive-include   multicore_tsne    *.cpp *.h
+recursive-include   torch             *.lua *.rockspec
+
+include   *.txt *.md
+include   tsne-embedding.py

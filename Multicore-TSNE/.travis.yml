@@ -1,0 +1,61 @@
+language: python
+dist: trusty
+sudo: false
+
+cache:
+  apt: true
+  pip: true
+  ccache: true
+
+addons:
+  apt:
+    packages:
+      - cppcheck
+
+matrix:
+  include:
+    - os: osx
+      language: generic
+      compiler: clang
+    - python: 2.7
+    - python: 3.6
+
+before_install:
+  - set -e
+  - if command -v cppcheck >/dev/null; then
+      cppcheck --enable=all --error-exitcode=1 multicore_tsne/*.{h,c,cpp};
+    fi
+
+  # Travis OS X image lacks Python3; download it from homebrew
+  - if [ "$TRAVIS_OS_NAME" = osx ]; then
+      brew update &&
+      brew install python3 &&
+      virtualenv env -p python3 &&
+      source env/bin/activate;
+    fi
+
+  - python setup.py -v bdist_wheel
+  - python setup.py -v sdist --formats=zip
+
+install:
+  # Tag the built wheels according to PEP-425
+  - if [ "$TRAVIS_OS_NAME" = osx ]; then
+      pip install delocate &&
+      delocate-wheel -v --require-archs=x86_64 dist/*.whl;
+    else
+      mv dist/*.whl `python -c 'import sys; parts = sys.argv[1].split("-"); parts[4] = "manylinux1_x86_64.whl"; print("-".join(parts))' dist/*.whl`;
+    fi &&
+    mv dist/*.whl `python -c 'import sys; parts = sys.argv[1].split("-"); parts[2] = "py2.py3"; parts[3] = "none"; print("-".join(parts))' dist/*.whl`
+
+  - pip install .[test]
+  - pip install -U dist/*.whl
+
+script:
+  - cd ..; python -m unittest discover -v MulticoreTSNE.tests; cd -
+
+after_success:
+  # TWINE_USERNAME/TWINE_PASSWORD env vars defined in Travis settings
+  - if [ "$TRAVIS_TAG" ]; then
+      pip install twine &&
+      twine upload --skip-existing dist/*;
+    fi
