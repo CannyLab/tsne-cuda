@@ -7,6 +7,8 @@ tsne_utils
 *.py[cod]
 *$py.class
 
+*.swp
+
 *.i
 *.ii
 *.gpu
