@@ -1,3 +1,6 @@
+tsne_utils
+
+*.o
 *.so
 *.pyc
 *__pycache__*
@@ -15,3 +18,4 @@ bhtsne/bh_tsne
 Multicore-TSNE/build/*
 Multicore-TSNE/dist/*
 
+build/*
