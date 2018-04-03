@@ -84,10 +84,19 @@ __global__ void assemble_final_result(const float * __restrict__ d_norms_x_2, fl
     
 }
 
+void printarray(thrust::device_vector<float> vec, const unsigned int N, const unsigned int M) {
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < M; j++) {
+            std::cout << vec[i + j * N] << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+
 // Performs the operation matrix[i,:] = matrix[i,:] - alpha*vector for each row 0 <= i < N
 // This is in place addition
 __global__ void _add_row_vec(float * __restrict__ matrix, const float * __restrict__ vector, const unsigned int N, const unsigned int M, const float alpha) {
-    const unsigned int TID = threadIdx.x + blockIdx.x * gridDim.x;
+    const unsigned int TID = threadIdx.x + blockIdx.x * blockDim.x;
     const unsigned int i = TID % N;
     const unsigned int j = TID / N;
 
@@ -102,7 +111,7 @@ void add_row_vec(thrust::device_vector<float> &matrix, thrust::device_vector<flo
 
 // Performs the operation matrix[i,:] = alpha*matrix[i,:]*vector for each row 0 <= i < N
 __global__ void _mul_row_vec(float * __restrict__ matrix, const float * __restrict__ vector, const unsigned int N, const unsigned int M, const float alpha) {
-    const unsigned int TID = threadIdx.x + blockIdx.x * gridDim.x;
+    const unsigned int TID = threadIdx.x + blockIdx.x * blockDim.x;
     const unsigned int i = TID % N;
     const unsigned int j = TID / N;
 
@@ -112,17 +121,16 @@ __global__ void _mul_row_vec(float * __restrict__ matrix, const float * __restri
 void mul_row_vec(thrust::device_vector<float> &matrix, thrust::device_vector<float> &vector, const unsigned int N, const unsigned int M, const float alpha) {
     const unsigned int BLOCKSIZE = 32;
     const unsigned int NBLOCKS = iDivUp(N * M, BLOCKSIZE);
+    std::cout << "array should be less than " << BLOCKSIZE * NBLOCKS << std::endl;
     _mul_row_vec<<<NBLOCKS,BLOCKSIZE>>>(thrust::raw_pointer_cast(matrix.data()), thrust::raw_pointer_cast(vector.data()), N, M, alpha);
 }
 
 // Performs the operation matrix[i,:] = alpha*matrix[i,:]/vector for each row 0 <= i < N
 __global__ void _div_row_vec(float * __restrict__ matrix, const float * __restrict__ vector, const unsigned int N, const unsigned int M, const float alpha) {
-    const unsigned int TID = threadIdx.x + blockIdx.x * gridDim.x;
+    const unsigned int TID = threadIdx.x + blockIdx.x * blockDim.x;
     const unsigned int i = TID % N;
     const unsigned int j = TID / N;
-
-    if (j < M) 
-        matrix[j * N + i] = alpha*matrix[j * N + i]/vector[j];
+    if (j < M) matrix[j * N + i] = alpha*matrix[j * N + i]/vector[j];
 }
 
 void div_row_vec(thrust::device_vector<float> &matrix, thrust::device_vector<float> &vector, const unsigned int N, const unsigned int M, const float alpha) {
@@ -182,28 +190,38 @@ thrust::device_vector<float> sqrt(const thrust::device_vector<float> &vec, const
 thrust::device_vector<float> compute_pij(cublasHandle_t &handle, thrust::device_vector<float> &points, thrust::device_vector<float> &sigma, const unsigned int N, const unsigned int NDIMS) {
     thrust::device_vector<float> pij_vals(N * N);
     pairwise_dist(handle, pij_vals, points, N, NDIMS);
+    printarray(pij_vals, N, N);
     auto sigma_squared = square(sigma, N);
+    thrust::device_vector<float> test(N, 0.0f);
 
     printf("pij Min: %0.5f \n", thrust::reduce(pij_vals.begin(), pij_vals.end(), 5000.0f, thrust::minimum<float>()));
     printf("pij Max: %0.5f \n", thrust::reduce(pij_vals.begin(), pij_vals.end(), 0.0f, thrust::maximum<float>()));
-
+    std::cout << "Array Size: " << pij_vals.end() - pij_vals.begin() << std::endl;
+    // printarray(pij_vals, N, N);
     // divide columns by -2*sigma_i^2
     div_row_vec(pij_vals, sigma_squared, N, N, -0.5f);
-
-    printf("pij Min: %0.5f \n", thrust::reduce(pij_vals.begin(), pij_vals.end(), 5000.0f, thrust::minimum<float>()));
-    printf("pij Max: %0.5f \n", thrust::reduce(pij_vals.begin(), pij_vals.end(), 0.0f, thrust::maximum<float>()));
+    // printarray(pij_vals, N, N);
 
     // exponentiate
     thrust::transform(pij_vals.begin(), pij_vals.end(), pij_vals.begin(), func_exp());
+    for (int i = 0; i < N; i++) {
+        std::cout << pij_vals[i * N + i] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "exponentiated_pij sum " << thrust::reduce(pij_vals.begin(), pij_vals.end(), 0.0f, thrust::plus<float>()) << std::endl;
     // reduce_sum over rows (subtract one from result to deal with x_i == x_k)
     thrust::device_vector<float> ones(N, 1.f);
-    thrust::device_vector<float> sums(N, -1.f);
+    thrust::device_vector<float> sums(N, 0.f);
     float alpha = 1.f;
-    float beta = 1.f;
+    float beta = 0.f;
     cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, N, &alpha, thrust::raw_pointer_cast(pij_vals.data()), N,
                                 thrust::raw_pointer_cast(ones.data()), 1, &beta, thrust::raw_pointer_cast(sums.data()), 1));
+    std::cout << "sums min " << thrust::reduce(sums.begin(), sums.end(), 5000.0f, thrust::minimum<float>()) << std::endl;
+    std::cout << "sums max " << thrust::reduce(sums.begin(), sums.end(), 0.0f, thrust::maximum<float>()) << std::endl;
     // divide column by resulting vector
     div_row_vec(pij_vals, sums, N, N, 1.0f);
+    printf("pij Min: %0.5f \n", thrust::reduce(pij_vals.begin(), pij_vals.end(), 5000.0f, thrust::minimum<float>()));
+    printf("pij Max: %0.5f \n", thrust::reduce(pij_vals.begin(), pij_vals.end(), 0.0f, thrust::maximum<float>()));
 
     alpha = 0.5f/N;
     beta = 0.5f/N;
@@ -242,32 +260,32 @@ float compute_gradients(cublasHandle_t &handle,
 
     float loss = thrust::reduce(loss_.begin(), loss_.end(), 5.0f, thrust::minimum<float>());
 
-    printf("dist Min: %0.5f \n", thrust::reduce(dist.begin(), dist.end(), 5000.0f, thrust::minimum<float>()));
-    printf("dist Max: %0.5f \n", thrust::reduce(dist.begin(), dist.end(), 0.0f, thrust::maximum<float>()));
+    // printf("dist Min: %0.5f \n", thrust::reduce(dist.begin(), dist.end(), 5000.0f, thrust::minimum<float>()));
+    // printf("dist Max: %0.5f \n", thrust::reduce(dist.begin(), dist.end(), 0.0f, thrust::maximum<float>()));
 
-    printf("Qij Min: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 5000.0f, thrust::minimum<float>()));
-    printf("Qij Max: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 0.0f, thrust::maximum<float>()));
+    // printf("Qij Min: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 5000.0f, thrust::minimum<float>()));
+    // printf("Qij Max: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 0.0f, thrust::maximum<float>()));
 
-    printf("pij Min: %0.5f \n", thrust::reduce(pij.begin(), pij.end(), 5000.0f, thrust::minimum<float>()));
-    printf("pij Max: %0.5f \n", thrust::reduce(pij.begin(), pij.end(), 0.0f, thrust::maximum<float>()));
+    // printf("pij Min: %0.5f \n", thrust::reduce(pij.begin(), pij.end(), 5000.0f, thrust::minimum<float>()));
+    // printf("pij Max: %0.5f \n", thrust::reduce(pij.begin(), pij.end(), 0.0f, thrust::maximum<float>()));
 
     // qij = pij - qij
     thrust::transform(pij.begin(), pij.end(), qij.begin(), qij.begin(), thrust::minus<float>());
 
-    printf("Qij Min: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 5000.0f, thrust::minimum<float>()));
-    printf("Qij Max: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 0.0f, thrust::maximum<float>()));
+    // printf("Qij Min: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 5000.0f, thrust::minimum<float>()));
+    // printf("Qij Max: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 0.0f, thrust::maximum<float>()));
     
     // qij = (pij - qij) .* (1 + ||y_i - y_j||^2)^-1
     thrust::transform(qij.begin(), qij.end(), dist.begin(), qij.begin(), thrust::multiplies<float>());
 
-    printf("Qij Min: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 5000.0f, thrust::minimum<float>()));
-    printf("Qij Max: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 0.0f, thrust::maximum<float>()));
+    // printf("Qij Min: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 5000.0f, thrust::minimum<float>()));
+    // printf("Qij Max: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 0.0f, thrust::maximum<float>()));
 
     cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, N, &alpha, thrust::raw_pointer_cast(qij.data()), N,
                                 thrust::raw_pointer_cast(ones.data()), 1, &beta, thrust::raw_pointer_cast(forces.data()), 1));
 
-    printf("Qij Min: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 5000.0f, thrust::minimum<float>()));
-    printf("Qij Max: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 0.0f, thrust::maximum<float>()));
+    // printf("Qij Min: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 5000.0f, thrust::minimum<float>()));
+    // printf("Qij Max: %0.5f \n", thrust::reduce(qij.begin(), qij.end(), 0.0f, thrust::maximum<float>()));
 
     // TODO: needs to change for 3 dimensions
     thrust::copy(forces.begin(), forces.begin() + N, forces.begin() + N);
@@ -275,8 +293,8 @@ float compute_gradients(cublasHandle_t &handle,
     // forces = A * ones(N, 1) .* ys
     thrust::transform(forces.begin(), forces.end(), ys.begin(), forces.begin(), thrust::multiplies<float>());
 
-    printf("forces Min: %0.5f \n", thrust::reduce(forces.begin(), forces.end(), 5000.0f, thrust::minimum<float>()));
-    printf("forces Max: %0.5f \n", thrust::reduce(forces.begin(), forces.end(), 0.0f, thrust::maximum<float>()));
+    // printf("forces Min: %0.5f \n", thrust::reduce(forces.begin(), forces.end(), 5000.0f, thrust::minimum<float>()));
+    // printf("forces Max: %0.5f \n", thrust::reduce(forces.begin(), forces.end(), 0.0f, thrust::maximum<float>()));
 
     alpha = -4.0f * eta;
     beta = 4.0f * eta;
@@ -286,8 +304,8 @@ float compute_gradients(cublasHandle_t &handle,
     cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, N, &alpha, thrust::raw_pointer_cast(qij.data()), N,
                                 thrust::raw_pointer_cast(ys.data() + N), 1, &beta, thrust::raw_pointer_cast(forces.data() + N), 1));
 
-    printf("forces Min: %0.5f \n", thrust::reduce(forces.begin(), forces.end(), 5000.0f, thrust::minimum<float>()));
-    printf("forces Max: %0.5f \n", thrust::reduce(forces.begin(), forces.end(), 0.0f, thrust::maximum<float>()));
+    // printf("forces Min: %0.5f \n", thrust::reduce(forces.begin(), forces.end(), 5000.0f, thrust::minimum<float>()));
+    // printf("forces Max: %0.5f \n", thrust::reduce(forces.begin(), forces.end(), 0.0f, thrust::maximum<float>()));
 
     
     return loss;
@@ -347,9 +365,17 @@ thrust::device_vector<float> do_tsne(cublasHandle_t &handle, thrust::device_vect
     return ys;
 }
 
+void test_func(void (*f)(thrust::device_vector<float> &, thrust::device_vector<float> &, const unsigned int, const unsigned int, const float)) {
+    thrust::device_vector<float> matrix(4 * 5, 5.0f);
+    thrust::device_vector<float> twos(5, 2.0f);
+    f(matrix, twos, 4, 5, -0.5);
+    printarray(matrix, 4, 5);
+}
+
+
 int main(int argc, char **argv) {
     const unsigned int NDIMS = 50;
-    const unsigned int N = 1 << 11;
+    const unsigned int N = 1 << 5;
     
     thrust::default_random_engine rng;
     thrust::uniform_int_distribution<int> dist(10, 99);
@@ -374,5 +400,12 @@ int main(int argc, char **argv) {
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
     printf("Elapsed time: %f (ms)\n", milliseconds);
+    return 0;
 }
 
+int run_tests(int argc, char **argv) {
+    test_func(add_row_vec);
+    test_func(mul_row_vec);
+    test_func(div_row_vec);
+    return 0;
+}

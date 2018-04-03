@@ -2,8 +2,8 @@
 # module load cuda
 #
 CC = nvcc
-CFLAGS = -O3 -arch=compute_61 -code=sm_61 -ccbin g++ -std=c++11 -g
-NVCCFLAGS = -O3 -arch=compute_61 -code=sm_61 -ccbin g++ -std=c++11 -g
+CFLAGS = -O3 -arch=compute_61 -code=sm_61 -ccbin g++-6 -std=c++11 -g
+NVCCFLAGS = -O3 -arch=compute_61 -code=sm_61 -ccbin g++-6 -std=c++11 -g
 LIBS = -lcublas
 LDFLAGS = -Wno-deprecated-gpu-targets
 
