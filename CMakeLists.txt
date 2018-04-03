@@ -7,7 +7,6 @@ if (NOT CXX)
 	set(CXX g++)
 endif()
 
-message(${CXX})
 
 # CUDA Configuration
 #-------------------------------------------------------------------------------
