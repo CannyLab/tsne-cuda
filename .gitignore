@@ -20,4 +20,7 @@ bhtsne/bh_tsne
 Multicore-TSNE/build/*
 Multicore-TSNE/dist/*
 
+build
+
+
 build/*

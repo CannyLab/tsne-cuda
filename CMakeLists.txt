@@ -8,7 +8,15 @@ set (cuda-tsne_VERSION_MINOR 1)
 #-------------------------------------------------------------------------------
 find_package(CUDA REQUIRED)
 #-------------------------------------------------------------------------------
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -O3 -arch=compute_61 -code=sm_61 -ccbin g++ -std=c++11 -g)
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
+                    -O3 
+                    -gencode=arch=compute_30,code=sm_30
+                    -gencode=arch=compute_35,code=sm_35
+                    -gencode=arch=compute_50,code=sm_50
+                    -gencode=arch=compute_61,code=sm_61
+                    -ccbin g++
+                    -std=c++11 
+                    -g)
 #-------------------------------------------------------------------------------
 
 include_directories(
