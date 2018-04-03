@@ -19,13 +19,57 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -g)
 #-------------------------------------------------------------------------------
 
+# GTEST Configuration
+#-------------------------------------------------------------------------------
+include(ExternalProject)
+ExternalProject_Add(gtest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG  release-1.8.0
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest
+  INSTALL_COMMAND ""
+)
+ExternalProject_Get_Property(gtest source_dir binary_dir)
+#-------------------------------------------------------------------------------
+
+
+# Utilities Target TODO: Breakout file
+#-------------------------------------------------------------------------------
 include_directories(
     src/include
     ${CUDA_INCLUDE_DIRECTORIES}
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest/googletest/include
 )
 
 cuda_add_executable(
     tsne_utils
     src/tsne_utils.cu
-    src/Utilities.cu)
+    src/Utilities.cu
+)
 target_link_libraries(tsne_utils ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
+#-------------------------------------------------------------------------------
+
+# Test Target
+#-------------------------------------------------------------------------------
+cuda_add_executable(
+    runUnitTests
+    src/test/test.cu
+)
+add_dependencies(runUnitTests gtest)
+target_link_libraries(
+    runUnitTests
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
+    ${CUDA_LIBRARIES} 
+    ${CUDA_CUBLAS_LIBRARIES}
+    pthread
+)
+#-------------------------------------------------------------------------------
+
+# Testing
+#-------------------------------------------------------------------------------
+enable_testing()
+add_test(
+    NAME runUnitTests
+    COMMAND runUnitTests
+)
+#-------------------------------------------------------------------------------
