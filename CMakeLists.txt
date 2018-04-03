@@ -3,6 +3,11 @@ project(cuda-tsne)
 set (cuda-tsne_VERSION_MAJOR 0)
 set (cuda-tsne_VERSION_MINOR 1)
 
+if (NOT CXX)
+	set(CXX g++)
+endif()
+
+message(${CXX})
 
 # CUDA Configuration
 #-------------------------------------------------------------------------------
@@ -14,7 +19,7 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -gencode=arch=compute_35,code=sm_35
                     -gencode=arch=compute_50,code=sm_50
                     -gencode=arch=compute_61,code=sm_61
-                    -ccbin g++
+                    -ccbin ${CXX}
                     -std=c++11 
                     -g)
 #-------------------------------------------------------------------------------
