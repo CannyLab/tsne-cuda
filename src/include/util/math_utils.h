@@ -12,7 +12,6 @@
 
     #include "common.h"
     #include "util/matrix_broadcast_utils.h"
-    #include "util/transform_func_utils.h"
     #include "util/reduce_utils.h"
 
     void gauss_normalize(cublasHandle_t &handle, thrust::device_vector<float> &points, const unsigned int N, const unsigned int NDIMS);

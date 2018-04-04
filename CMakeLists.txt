@@ -12,17 +12,17 @@ endif()
 
 # CUDA Configuration
 #-------------------------------------------------------------------------------
+
 SET(CUDA_SEPARABLE_COMPILATION ON)
-SET(CUDA_HOST_COMPILER ${CXX})
 find_package(CUDA REQUIRED)
 #-------------------------------------------------------------------------------
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
                     -O3 
-                    -gencode=arch=compute_30,code=sm_30
-                    -gencode=arch=compute_35,code=sm_35
-                    -gencode=arch=compute_50,code=sm_50
+                    #-gencode=arch=compute_30,code=sm_30
+                    #-gencode=arch=compute_35,code=sm_35
+                    #-gencode=arch=compute_50,code=sm_50
                     -gencode=arch=compute_61,code=sm_61
-                    -std=c++11 
+                    -std=c++11
                     -g
                     )
 #-------------------------------------------------------------------------------
@@ -50,7 +50,6 @@ include_directories(
 
 
 set(SOURCES
-    src/util/transform_func_utils.cu
     src/naive_tsne.cu
     src/util/cuda_utils.cu
     src/util/distance_utils.cu

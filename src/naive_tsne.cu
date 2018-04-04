@@ -8,6 +8,18 @@
 
  #include "naive_tsne.h"
 
+struct func_inc_inv_ignore_zero {
+    __host__ __device__ double operator()(const float &x) const { return x > 1e-4 ? pow(x + 1, -1.0) : 0; }
+};
+
+struct func_kl {
+    __host__ __device__ double operator()(const float &x, const float &y) const { return y < 1e-4 ? 0 : x * log(x / y); }
+};
+
+struct func_exp_no_zero {
+    __host__ __device__ double operator()(const float &x) const { return x < -1e-4 ? exp(x) : 0; }
+};
+
 thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
                                          thrust::device_vector<float> &points, 
                                          thrust::device_vector<float> &sigma, 
@@ -21,7 +33,7 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
     broadcast_matrix_vector(pij_vals, sigma_squared, N, N, thrust::divides<float>(), 1, -2.0f);
 
     // exponentiate - func_exp_no_zeros() ignores values > -1e-4
-    thrust::transform(pij_vals.begin(), pij_vals.end(), pij_vals.begin(), tfunc::exp_no_zero());
+    thrust::transform(pij_vals.begin(), pij_vals.end(), pij_vals.begin(), func_exp_no_zero());
     // reduce_sum over rows
     auto sums = reduce_sum(handle, pij_vals, N, N, 1);
     // divide column by resulting vector
@@ -47,7 +59,7 @@ float compute_gradients(cublasHandle_t &handle,
 {
     pairwise_dist(handle, dist, ys, N, PROJDIM);
     // dist = (1 + ||y_i - y_j||^2)^-1
-    thrust::transform(dist.begin(), dist.end(), dist.begin(), tfunc::inc_inv_ignore_zero());
+    thrust::transform(dist.begin(), dist.end(), dist.begin(), func_inc_inv_ignore_zero());
     // printarray(dist, N, N);
     auto sums = reduce_sum(handle, dist, N, N, 1);
     // printarray(sums, 1, N);
@@ -57,7 +69,7 @@ float compute_gradients(cublasHandle_t &handle,
     broadcast_matrix_vector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
     // printarray(qij, N, N);
     thrust::device_vector<float> loss_(N * N);
-    thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), tfunc::kl());
+    thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), func_kl());
 
     float loss = thrust::reduce(loss_.begin(), loss_.end(), 5.0f, thrust::minimum<float>());
 

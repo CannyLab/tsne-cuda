@@ -11,7 +11,6 @@
 
 #include "common.h"
 #include "util/cuda_utils.h"
-#include "util/transform_func_utils.h"
 #include "util/math_utils.h"
 #include "util/matrix_broadcast_utils.h"
 #include "util/reduce_utils.h"
