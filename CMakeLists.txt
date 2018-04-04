@@ -15,6 +15,7 @@ endif()
 
 SET(CUDA_SEPARABLE_COMPILATION ON)
 find_package(CUDA REQUIRED)
+SET(CUDA_HOST_COMPILER ${CXX})
 #-------------------------------------------------------------------------------
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
                     -O3 
