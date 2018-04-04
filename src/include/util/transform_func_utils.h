@@ -55,5 +55,5 @@
         struct abs {
             __host__ __device__ double operator()(const float &x) const;
         };
-    }
+    };
 #endif

@@ -11,8 +11,8 @@
 
 __host__ __device__ double tfunc::square::operator()(const float &x) const { return x * x; }
 __host__ __device__ double tfunc::sqrt::operator()(const float &x) const { return pow(x, 0.5); }
-__host__ __device__ double tfunc::exp::operator()(const float &x) const { return exp(x); }
-__host__ __device__ double tfunc::exp_no_zero::operator()(const float &x) const { return x < -1e-4 ? exp(x) : 0; }
+__host__ __device__ double tfunc::exp::operator()(const float &x) const { return expf(x); }
+__host__ __device__ double tfunc::exp_no_zero::operator()(const float &x) const { return x < -1e-4 ? expf(x) : 0; }
 __host__ __device__ double tfunc::inv::operator()(const float &x) const { return pow(x, -1.0); }
 __host__ __device__ double tfunc::inc::operator()(const float &x) const { return x + 1; }
 __host__ __device__ double tfunc::inc_inv::operator()(const float &x) const { return pow(x + 1, -1.0); }

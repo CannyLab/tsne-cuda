@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 2.8)
 project(cuda-tsne)
 set (cuda-tsne_VERSION_MAJOR 0)
 set (cuda-tsne_VERSION_MINOR 1)
+set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
+
 
 if (NOT CXX)
 	set(CXX g++)
@@ -10,6 +12,8 @@ endif()
 
 # CUDA Configuration
 #-------------------------------------------------------------------------------
+SET(CUDA_SEPARABLE_COMPILATION ON)
+SET(CUDA_HOST_COMPILER ${CXX})
 find_package(CUDA REQUIRED)
 #-------------------------------------------------------------------------------
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
@@ -18,9 +22,9 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -gencode=arch=compute_35,code=sm_35
                     -gencode=arch=compute_50,code=sm_50
                     -gencode=arch=compute_61,code=sm_61
-                    -ccbin ${CXX}
                     -std=c++11 
-                    -g)
+                    -g
+                    )
 #-------------------------------------------------------------------------------
 
 # GTEST Configuration
@@ -46,6 +50,7 @@ include_directories(
 
 
 set(SOURCES
+    src/util/transform_func_utils.cu
     src/naive_tsne.cu
     src/util/cuda_utils.cu
     src/util/distance_utils.cu
@@ -53,7 +58,6 @@ set(SOURCES
     src/util/matrix_broadcast_utils.cu
     src/util/random_utils.cu
     src/util/reduce_utils.cu
-    src/util/transform_func_utils.cu
 )
 
 #cuda_add_executable(
@@ -78,11 +82,6 @@ target_link_libraries(
     ${CUDA_LIBRARIES} 
     ${CUDA_CUBLAS_LIBRARIES}
     pthread
-)
-target_compile_options(
-    tsne_test
-    PUBLIC
-    --device-c
 )
 #-------------------------------------------------------------------------------
 

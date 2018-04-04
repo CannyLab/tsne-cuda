@@ -85,3 +85,22 @@ __global__ void _broadcast_col_vec(
                                                      N, M, binary_op, alpha);
      }
  }
+
+
+ // Explicit instantiations of the method
+ template void broadcast_matrix_vector<thrust::divides<float>, float>(
+    thrust::device_vector<float> &matrix, 
+    const thrust::device_vector<float> &vector, 
+    const unsigned int N, 
+    const unsigned int M, 
+    thrust::divides<float> binary_op,
+    const unsigned int axis,
+    const float alpha);
+ template void broadcast_matrix_vector<thrust::minus<float>, float>(
+    thrust::device_vector<float> &matrix, 
+    const thrust::device_vector<float> &vector, 
+    const unsigned int N, 
+    const unsigned int M, 
+    thrust::minus<float> binary_op,
+    const unsigned int axis,
+    const float alpha);
