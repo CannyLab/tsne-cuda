@@ -44,28 +44,45 @@ include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest/googletest/include
 )
 
-cuda_add_executable(
-    tsne_utils
-    src/tsne_utils.cu
-    src/Utilities.cu
+
+set(SOURCES
+    src/naive_tsne.cu
+    src/util/cuda_utils.cu
+    src/util/distance_utils.cu
+    src/util/math_utils.cu
+    src/util/matrix_broadcast_utils.cu
+    src/util/random_utils.cu
+    src/util/reduce_utils.cu
+    src/util/transform_func_utils.cu
 )
-target_link_libraries(tsne_utils ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
+
+#cuda_add_executable(
+#    tsne_utils
+#    ${SOURCES}
+#)
+#target_link_libraries(tsne_utils ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
 #-------------------------------------------------------------------------------
 
 # Test Target
 #-------------------------------------------------------------------------------
 cuda_add_executable(
-    runUnitTests
+    tsne_test
+    ${SOURCES}
     src/test/test.cu
 )
-add_dependencies(runUnitTests gtest)
+add_dependencies(tsne_test gtest)
 target_link_libraries(
-    runUnitTests
+    tsne_test
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
     ${CUDA_LIBRARIES} 
     ${CUDA_CUBLAS_LIBRARIES}
     pthread
+)
+target_compile_options(
+    tsne_test
+    PUBLIC
+    --device-c
 )
 #-------------------------------------------------------------------------------
 
@@ -73,7 +90,7 @@ target_link_libraries(
 #-------------------------------------------------------------------------------
 enable_testing()
 add_test(
-    NAME runUnitTests
-    COMMAND runUnitTests
+    NAME tsne_test
+    COMMAND tsne_test
 )
 #-------------------------------------------------------------------------------

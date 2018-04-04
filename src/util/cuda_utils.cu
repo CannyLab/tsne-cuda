@@ -1,18 +1,11 @@
-#include <stdio.h>
-#include <assert.h>
-//#include <math.h>
+/**
+ * @brief Utility code, Credit to https://github.com/OrangeOwlSolutions
+ * 
+ * @file cuda_utils.cu
+ * @date 2018-04-04
+ */
 
-#include "cuda_runtime.h"
-#include <cuda.h>
-
-#include <cusolverDn.h>
-#include <cublas_v2.h>
-#include <cufft.h>
-
-#include "Utilities.cuh"
-
-#define DEBUG
-
+#include "util/cuda_utils.h"
 #define PI_R         3.14159265358979323846f
 
 /*******************/
@@ -324,47 +317,6 @@ __global__ void Cartesian2PolarKernel(const T * __restrict__ d_x, const T * __re
 
 }
 
-/*******************************************************/
-/* CARTESIAN TO POLAR COORDINATES TRANSFORMATION - GPU */
-/*******************************************************/
-//template <class T>
-//thrust::pair<T *,T *> Cartesian2Polar(const T * __restrict__ d_x, const T * __restrict__ d_y, const int N, const T a) {
-//
-//	T *d_rho;	gpuErrchk(cudaMalloc((void**)&d_rho,   N * sizeof(T)));
-//	T *d_theta; gpuErrchk(cudaMalloc((void**)&d_theta, N * sizeof(T)));
-//
-//	Cartesian2PolarKernel<<<iDivUp(N, BLOCKSIZE_CART2POL), BLOCKSIZE_CART2POL>>>(d_x, d_y, d_rho, d_theta, N, a);
-//#ifdef DEBUG
-//	gpuErrchk(cudaPeekAtLastError());
-//	gpuErrchk(cudaDeviceSynchronize());
-//#endif
-//
-//	return thrust::make_pair(d_rho, d_theta);
-//}
-//
-//template thrust::pair<float  *, float  *>  Cartesian2Polar<float>  (const float  *, const float  *, const int, const float);
-//template thrust::pair<double *, double *>  Cartesian2Polar<double> (const double *, const double *, const int, const double);
-
-/*******************************************************/
-/* CARTESIAN TO POLAR COORDINATES TRANSFORMATION - CPU */
-/*******************************************************/
-//template <class T>
-//thrust::pair<T *,T *> h_Cartesian2Polar(const T * __restrict__ h_x, const T * __restrict__ h_y, const int N, const T a) {
-//
-//	T *h_rho	= (T *)malloc(N * sizeof(T));
-//	T *h_theta	= (T *)malloc(N * sizeof(T));
-//
-//	for (int i = 0; i < N; i++) {
-//		h_rho[i]	= a * hypot(h_x[i], h_y[i]);
-//		h_theta[i]	= atan2(h_y[i], h_x[i]);
-//	}
-//
-//	return thrust::make_pair(h_rho, h_theta);
-//}
-//
-//template thrust::pair<float  *, float  *>  h_Cartesian2Polar<float>  (const float  *, const float  *, const int, const float);
-//template thrust::pair<double *, double *>  h_Cartesian2Polar<double> (const double *, const double *, const int, const double);
-
 /*******************************/
 /* COMPUTE L2 NORM OF A VECTOR */
 /*******************************/
@@ -549,4 +501,13 @@ void cudaMemoryUsage() {
 
 	printf("GPU memory: used = %f, free = %f MB, total available = %f MB\n", used_db / 1024.0 / 1024.0, free_db / 1024.0 / 1024.0, total_db / 1024.0 / 1024.0);
 
+}
+
+void printarray(thrust::device_vector<float> vec, const unsigned int N, const unsigned int M) {
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < M; j++) {
+            std::cout << vec[i + j * N] << " ";
+        }
+        std::cout << std::endl;
+    }
 }
