@@ -18,6 +18,7 @@
 #include <thrust/functional.h>
 #include <thrust/random.h>
 #include <thrust/sequence.h>
+#include <thrust/transform_reduce.h>
 
 #include "tsne_utils.cuh"
 #include "Utilities.cuh"
