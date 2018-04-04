@@ -20,3 +20,8 @@ bhtsne/bh_tsne
 Multicore-TSNE/build/*
 Multicore-TSNE/dist/*
 
+# exclude everything
+build/*
+
+# exception to the rule
+!build/.gitkeep 
