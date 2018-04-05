@@ -26,7 +26,6 @@ void pairwise_dist(cublasHandle_t &handle,
                    const unsigned int NDIMS) 
 {
     const unsigned int BLOCKSIZE = 16;
-
     auto squared_vals = square(points, N * NDIMS);
     auto squared_norms = reduce_sum(handle, squared_vals, N, NDIMS, 1);
     
@@ -39,5 +38,7 @@ void pairwise_dist(cublasHandle_t &handle,
 	dim3 dimBlock(BLOCKSIZE, BLOCKSIZE);
 	dim3 dimGrid(iDivUp(N, BLOCKSIZE), iDivUp(N, BLOCKSIZE));
 	assemble_final_result<<<dimGrid, dimBlock>>>(thrust::raw_pointer_cast(squared_norms.data()), 
-		                                         thrust::raw_pointer_cast(distances.data()), N);
+                                                 thrust::raw_pointer_cast(distances.data()), N);
+                                                 
+    distances = sqrt(distances, N * N);
 }
