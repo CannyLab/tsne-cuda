@@ -4,10 +4,12 @@ set (cuda-tsne_VERSION_MAJOR 0)
 set (cuda-tsne_VERSION_MINOR 1)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 
-
+# Fix for Roshan's Compiler
+#-------------------------------------------------------------------------------
 if (NOT CXX)
 	set(CXX g++)
 endif()
+#-------------------------------------------------------------------------------
 
 
 # CUDA Configuration
@@ -19,12 +21,13 @@ SET(CUDA_HOST_COMPILER ${CXX})
 #-------------------------------------------------------------------------------
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
                     -O3 
-                    #-gencode=arch=compute_30,code=sm_30
-                    #-gencode=arch=compute_35,code=sm_35
-                    #-gencode=arch=compute_50,code=sm_50
+                    -gencode=arch=compute_30,code=sm_30
+                    -gencode=arch=compute_35,code=sm_35
+                    -gencode=arch=compute_50,code=sm_50
                     -gencode=arch=compute_61,code=sm_61
                     -std=c++11
                     -g
+                    -Xcompiler '-fPIC'
                     )
 #-------------------------------------------------------------------------------
 
@@ -41,14 +44,13 @@ ExternalProject_Get_Property(gtest source_dir binary_dir)
 #-------------------------------------------------------------------------------
 
 
-# Utilities Target TODO: Breakout file
+# Project Setup
 #-------------------------------------------------------------------------------
 include_directories(
     src/include
     ${CUDA_INCLUDE_DIRECTORIES}
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest/googletest/include
 )
-
 
 set(SOURCES
     src/naive_tsne.cu
@@ -58,14 +60,26 @@ set(SOURCES
     src/util/matrix_broadcast_utils.cu
     src/util/random_utils.cu
     src/util/reduce_utils.cu
+    src/ext/pymodule_ext.cu
 )
-
-#cuda_add_executable(
-#    tsne_utils
-#    ${SOURCES}
-#)
-#target_link_libraries(tsne_utils ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
 #-------------------------------------------------------------------------------
+
+# Shared Library for Python Binding
+#-------------------------------------------------------------------------------
+cuda_add_library(pyctsne
+                 SHARED
+                 ${SOURCES})
+target_link_libraries(pyctsne ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
+set_target_properties(pyctsne PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+add_custom_command(TARGET pyctsne POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                       ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:pyctsne>/python)
+add_custom_command(TARGET pyctsne POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:pyctsne> $<TARGET_FILE_DIR:pyctsne>/python/pyctsne)
+
+#-------------------------------------------------------------------------------
+
 
 # Test Target
 #-------------------------------------------------------------------------------
