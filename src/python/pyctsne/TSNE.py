@@ -5,8 +5,9 @@
 import numpy as N
 import ctypes
 import os
+import pkg_resources
 
-_path = os.path.dirname('__file__') # Load from current location
+_path = pkg_resources.resource_filename('pyctsne','') # Load from current location
 _lib = N.ctypeslib.load_library('libpyctsne', _path) # Load the ctypes library
 
 _lib.pymodule_e_dist.restype = None

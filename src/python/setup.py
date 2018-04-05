@@ -1,13 +1,12 @@
 from distutils.core import setup
 
-from distutils.core import setup
-
 setup(
     name='PyCTSNE',
     version='0.1.0',
     author='David M. Chan',
     author_email='davidchan@berkeley.edu',
     packages=['pyctsne', 'pyctsne.test'],
+    package_data={'pyctsne': ['libpyctsne.so']},
     scripts=[],
     url='',
     license='LICENSE.txt',
