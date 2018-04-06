@@ -9,13 +9,13 @@
  #include "util/math_utils.h"
 
  struct func_square {
-    __host__ __device__ double operator()(const float &x) const { return x * x; }
+    __host__ __device__ float operator()(const float &x) const { return x * x; }
 };
 struct func_sqrt {
-    __host__ __device__ double operator()(const float &x) const { return pow(x, 0.5); }
+    __host__ __device__ float operator()(const float &x) const { return pow(x, 0.5); }
 };
 struct func_abs {
-    __host__ __device__ double operator()(const float &x) const { return fabs(x); }
+    __host__ __device__ float operator()(const float &x) const { return fabs(x); }
 };
 struct func_nan_or_inf {
     __host__ __device__ bool operator()(const float &x) const { return isnan(x) || isinf(x); }

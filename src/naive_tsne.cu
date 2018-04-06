@@ -9,15 +9,17 @@
  #include "naive_tsne.h"
 
 struct func_inc_inv {
-    __host__ __device__ double operator()(const float &x) const { return 1 / (x + 1); }
+    __host__ __device__ float operator()(const float &x) const { return 1 / (x + 1); }
 };
 
 struct func_kl {
-    __host__ __device__ double operator()(const float &x, const float &y) const { return x * log(x / y); }
+    __host__ __device__ float operator()(const float &x, const float &y) const { 
+        return x == 0.0f ? 0.0f : x * (log(x) - log(y));
+    }
 };
 
 struct func_exp {
-    __host__ __device__ double operator()(const float &x) const { return exp(x); }
+    __host__ __device__ float operator()(const float &x) const { return exp(x); }
 };
 
 thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
@@ -28,18 +30,17 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
 {
     thrust::device_vector<float> pij_vals(N * N);
     squared_pairwise_dist(handle, pij_vals, points, N, NDIMS);
+
     thrust::device_vector<float> sigma_squared(sigma.size());
     square(sigma, sigma_squared);
     
     broadcast_matrix_vector(pij_vals, sigma_squared, N, N, thrust::divides<float>(), 1, -2.0f);
-
     thrust::transform(pij_vals.begin(), pij_vals.end(), pij_vals.begin(), func_exp());
     zero_diagonal(pij_vals, N);
     // reduce_sum over rows
     auto sums = reduce_sum(handle, pij_vals, N, N, 1);
     // divide column by resulting vector
     broadcast_matrix_vector(pij_vals, sums, N, N, thrust::divides<float>(), 0, 1.0f);
-
     float alpha = 0.5f/N;
     float beta = 0.5f/N;
     thrust::device_vector<float> pij_output(N*N);
@@ -66,7 +67,7 @@ float compute_gradients(cublasHandle_t &handle,
                         const unsigned int N,
                         float eta) 
 {
-
+    // std::cout << "pij min" << thrust::reduce(pij.begin(), pij.end(), 5000.0f, thrust::minimum<float>()) << std::endl;
     // dist_ = ||y_i - y_j||^2
     squared_pairwise_dist(handle, dist, ys, N, PROJDIM);
     // dist_ = (1 + ||y_i - y_j||^2)^-1
@@ -77,11 +78,12 @@ float compute_gradients(cublasHandle_t &handle,
     thrust::copy(dist.begin(), dist.end(), qij.begin());
     auto sums = reduce_sum(handle, qij, N, N, 1);
     broadcast_matrix_vector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
-    
     // Compute loss = \sum_ij pij * log(pij / qij)
     thrust::device_vector<float> loss_(N * N);
     thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), func_kl());
     zero_diagonal(loss_, N);
+
+    // printarray(loss_, N, N);
     float loss = thrust::reduce(loss_.begin(), loss_.end(), 0.0f, thrust::plus<float>());
 
     // qij_ = pij - qij
@@ -125,8 +127,8 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     thrust::device_vector<float> ys = random_vector(N * PROJDIM);
     thrust::device_vector<float> qij(N * N);
     thrust::device_vector<float> dist(N * N);
-    float eta = 1e-2f;
-    float loss, prevloss = std::numeric_limits<float>::infinity();
+    float eta = 10.0f;
+    float loss;//, prevloss = std::numeric_limits<float>::infinity();
     for (int i = 0; i < 1000; i++) {
         loss = compute_gradients(handle, forces, dist, ys, pij, qij, N, eta);
         thrust::transform(ys.begin(), ys.end(), forces.begin(), ys.begin(), thrust::plus<float>());
@@ -134,7 +136,7 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
             // eta /= 2.;
         if (i % 10 == 0)
             std::cout << "Iteration: " << i << ", Loss: " << loss << ", ForceMag: " << norm(forces) << std::endl;
-        prevloss = loss;
+        // prevloss = loss;
     }
     return ys;
 }

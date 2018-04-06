@@ -83,10 +83,10 @@ namespace {
         thrust::device_vector<float> d_X(NDIMS * N);
         thrust::copy(h_X.begin(), h_X.end(), d_X.begin());
 
-        for (int i = 0; i < NDIMS * N; i++) {
-            std::cout << d_X[i] << " ";
-        }
-        printf("\n");
+        // for (int i = 0; i < NDIMS * N; i++) {
+        //     std::cout << d_X[i] << " ";
+        // }
+        // printf("\n");
         
         thrust::device_vector<float> sigmas(N, 1.0f);
         cublasHandle_t handle;

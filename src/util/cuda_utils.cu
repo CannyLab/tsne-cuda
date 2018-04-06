@@ -506,7 +506,8 @@ void cudaMemoryUsage() {
 void printarray(thrust::device_vector<float> vec, const unsigned int N, const unsigned int M) {
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
-            std::cout << vec[i + j * N] << " ";
+        	std::cout << vec[i + j * N] << " ";
+            // printf("%0.2f ", vec[i + j * N]);
         }
         std::cout << std::endl;
     }

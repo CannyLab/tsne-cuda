@@ -10,6 +10,7 @@
 #define RANDOM_UTILS_H
 
     #include "common.h"
+	#include "util/cuda_utils.h"
 
     /**
     * @brief Returns a uniform-random float device vector

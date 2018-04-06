@@ -16,20 +16,20 @@
     prg(float _a=-1.f, float _b=1.f) : a(_a), b(_b) {};
 
     __host__ __device__
-        float operator()(const unsigned int n) const
+        float operator()(const int &n) const
         {
             thrust::default_random_engine rng;
             thrust::uniform_real_distribution<float> dist(a, b);
             rng.discard(n);
-
             return dist(rng);
         }
 };
 
+
 thrust::device_vector<float> random_vector(const unsigned int N) {
-    thrust::device_vector<float> vector(N);
-    thrust::counting_iterator<float> first(0.0f);
-    thrust::counting_iterator<float> last = first + N;
-    thrust::transform(first, last, vector.begin(), prg(-10.0f, 10.0f));
-    return vector;
+    thrust::device_vector<float> vec(N);
+    thrust::counting_iterator<int> first(0);
+    thrust::counting_iterator<int> last = first + N;
+    thrust::transform(first, last, vec.begin(), prg(-10.0f, 10.0f));
+    return vec;
 }

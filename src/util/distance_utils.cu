@@ -9,7 +9,7 @@
  #include "util/distance_utils.h"
 
 struct func_sqrt {
-    __host__ __device__ double operator()(const float &x) const { return pow(x, 0.5); }
+    __host__ __device__ float operator()(const float &x) const { return pow(x, 0.5); }
 };
 
 // This really does a simultaneous row/col matrix vector broadcast to compute ||x^2|| + ||y^2|| - 2 x^Ty.
