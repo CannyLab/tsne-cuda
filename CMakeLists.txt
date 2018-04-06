@@ -55,6 +55,7 @@ include_directories(
 set(SOURCES
     src/naive_tsne.cu
     src/util/cuda_utils.cu
+    src/util/thrust_utils.cu
     src/util/distance_utils.cu
     src/util/math_utils.cu
     src/util/matrix_broadcast_utils.cu

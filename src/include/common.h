@@ -26,6 +26,10 @@
 #include <thrust/random.h>
 #include <thrust/sequence.h>
 #include <thrust/transform_reduce.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/permutation_iterator.h>
+#include <thrust/fill.h>
 
 // C Library includes
 #include <stdlib.h>

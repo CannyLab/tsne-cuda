@@ -1,9 +1,7 @@
 #ifndef THRUST_UTILS_H
 #define THRUST_UTILS_H
 
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/transform_iterator.h>
-#include <thrust/iterator/permutation_iterator.h>
+#include "common.h"
 
 // Strided iterator from https://github.com/thrust/thrust/blob/master/examples/strided_range.cu
 template <typename Iterator>
