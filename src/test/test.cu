@@ -66,14 +66,28 @@ namespace {
         const unsigned int NDIMS = 50;
         const unsigned int N = 1 << 5;
         
-        thrust::default_random_engine rng;
-        thrust::uniform_int_distribution<int> dist(10, 99);
+        std::default_random_engine generator;
+        std::normal_distribution<double> distribution1(-10.0, 1.0);
+        std::normal_distribution<double> distribution2(10.0, 1.0);
     
+        thrust::host_vector<float> h_X(NDIMS * N);
+        for (int i = 0; i < NDIMS * N; i ++) {
+            if (i % N < (N / 2)) {
+                h_X[i] = distribution1(generator);
+            } else {
+                h_X[i] = distribution2(generator);
+            }
+        }
+
         // --- Matrices allocation and initialization
         thrust::device_vector<float> d_X(NDIMS * N);
-        for (size_t i = 0; i < d_X.size(); i++) 
-            d_X[i] = (float) dist(rng);
-    
+        thrust::copy(h_X.begin(), h_X.end(), d_X.begin());
+
+        for (int i = 0; i < NDIMS * N; i++) {
+            std::cout << d_X[i] << " ";
+        }
+        printf("\n");
+        
         thrust::device_vector<float> sigmas(N, 1.0f);
         cublasHandle_t handle;
         cublasSafeCall(cublasCreate(&handle));
