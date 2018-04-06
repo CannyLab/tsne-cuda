@@ -64,7 +64,7 @@ namespace {
 
     TEST(NaiveTSNE, 256) {
         const unsigned int NDIMS = 50;
-        const unsigned int N = 1 << 8;
+        const unsigned int N = 1 << 5;
         
         thrust::default_random_engine rng;
         thrust::uniform_int_distribution<int> dist(10, 99);

@@ -15,8 +15,10 @@
     #include "util/reduce_utils.h"
 
     void gauss_normalize(cublasHandle_t &handle, thrust::device_vector<float> &points, const unsigned int N, const unsigned int NDIMS);
-    thrust::device_vector<float> square(const thrust::device_vector<float> &vec, const unsigned int N);
-    thrust::device_vector<float> sqrt(const thrust::device_vector<float> &vec, const unsigned int N);
+    void square(const thrust::device_vector<float> &vec, thrust::device_vector<float> &out);
+    void sqrt(const thrust::device_vector<float> &vec, thrust::device_vector<float> &out);
+    float norm(const thrust::device_vector<float> &vec);
+    bool any_nan_or_inf(const thrust::device_vector<float> &vec);
     void max_norm(thrust::device_vector<float> &vec);
 
 #endif
