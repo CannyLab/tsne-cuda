@@ -16,6 +16,7 @@
 #include "util/reduce_utils.h"
 #include "util/distance_utils.h"
 #include "util/random_utils.h"
+#include "util/thrust_utils.h"
 
 thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
                                          thrust::device_vector<float> &points, 

@@ -50,4 +50,6 @@ class strided_range
         difference_type stride;
 };
 
+void zero_diagonal(thrust::device_vector<float> &vec, const unsigned int N);
+
 #endif

@@ -8,16 +8,16 @@
 
  #include "naive_tsne.h"
 
-struct func_inc_inv_ignore_zero {
-    __host__ __device__ double operator()(const float &x) const { return x > 1e-4 ? pow(x + 1, -1.0) : 0; }
+struct func_inc_inv {
+    __host__ __device__ double operator()(const float &x) const { return 1 / (x + 1); }
 };
 
 struct func_kl {
-    __host__ __device__ double operator()(const float &x, const float &y) const { return y < 1e-4 ? 0 : x * log(x / y); }
+    __host__ __device__ double operator()(const float &x, const float &y) const { return x * log(x / y); }
 };
 
-struct func_exp_no_zero {
-    __host__ __device__ double operator()(const float &x) const { return x < -1e-4 ? exp(x) : 0; }
+struct func_exp {
+    __host__ __device__ double operator()(const float &x) const { return exp(x); }
 };
 
 thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
@@ -33,8 +33,8 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
     
     broadcast_matrix_vector(pij_vals, sigma_squared, N, N, thrust::divides<float>(), 1, -2.0f);
 
-    // exponentiate - func_exp_no_zeros() ignores values > -1e-4
-    thrust::transform(pij_vals.begin(), pij_vals.end(), pij_vals.begin(), func_exp_no_zero());
+    thrust::transform(pij_vals.begin(), pij_vals.end(), pij_vals.begin(), func_exp());
+    zero_diagonal(pij_vals, N);
     // reduce_sum over rows
     auto sums = reduce_sum(handle, pij_vals, N, N, 1);
     // divide column by resulting vector
@@ -48,6 +48,15 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
     return pij_output;
 }
 
+/**
+  * Gradient formula from http://www.jmlr.org/papers/volume9/vandermaaten08a/vandermaaten08a.pdf
+  * 
+  * Given by ->
+  *     forces_i = 4 * \sum_j (pij - qij)(yi - yj)(1 + ||y_i - y_j||^2)^-1
+  * 
+  * Notation below - in comments, actual variables in the code are referred to by <varname>_ to differentiate from the mathematical quantities
+  *                     It's hard to name variables correctly because we don't want to keep allocating more memory. There's probably a better solution than this though.
+  */
 float compute_gradients(cublasHandle_t &handle, 
                         thrust::device_vector<float> &forces,
                         thrust::device_vector<float> &dist, 
@@ -57,38 +66,45 @@ float compute_gradients(cublasHandle_t &handle,
                         const unsigned int N,
                         float eta) 
 {
-    pairwise_dist(handle, dist, ys, N, PROJDIM);
-    thrust::transform(dist.begin(), dist.end(), dist.begin(), func_inc_inv_ignore_zero());
-    auto sums = reduce_sum(handle, dist, N, N, 1);
-    thrust::copy(dist.begin(), dist.end(), qij.begin());
 
-    // qij = (1 + ||y_i - y_j||^2)^-1 / \Sum_{k != i} (1 + ||y_i - y_k||^2)^-1
+    // dist_ = ||y_i - y_j||^2
+    squared_pairwise_dist(handle, dist, ys, N, PROJDIM);
+    // dist_ = (1 + ||y_i - y_j||^2)^-1
+    thrust::transform(dist.begin(), dist.end(), dist.begin(), func_inc_inv());
+    zero_diagonal(dist, N);
+
+    // qij_ = (1 + ||y_i - y_j||^2)^-1 / \Sum_{k != i} (1 + ||y_i - y_k||^2)^-1
+    thrust::copy(dist.begin(), dist.end(), qij.begin());
+    auto sums = reduce_sum(handle, qij, N, N, 1);
     broadcast_matrix_vector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
     
-    // Compute loss
+    // Compute loss = \sum_ij pij * log(pij / qij)
     thrust::device_vector<float> loss_(N * N);
     thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), func_kl());
-
+    zero_diagonal(loss_, N);
     float loss = thrust::reduce(loss_.begin(), loss_.end(), 0.0f, thrust::plus<float>());
 
+    // qij_ = pij - qij
     thrust::transform(pij.begin(), pij.end(), qij.begin(), qij.begin(), thrust::minus<float>());
+    // qij_ = (pij - qij)(1 + ||y_i - y_j||^2)^-1
     thrust::transform(qij.begin(), qij.end(), dist.begin(), qij.begin(), thrust::multiplies<float>());
 
     float alpha = 1.0f;
     float beta = 0.0f;
     thrust::device_vector<float> ones(N, 1.0f);
+    // forces_ = \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1
     cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, N, &alpha, thrust::raw_pointer_cast(qij.data()), N,
                 thrust::raw_pointer_cast(ones.data()), 1, &beta, thrust::raw_pointer_cast(forces.data()), 1));
-
     // TODO: needs to change for 3 dimensions
     thrust::copy(forces.begin(), forces.begin() + N, forces.begin() + N);
 
-    // forces = A * ones(N, 1) .* ys
+    // forces_ = y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1
     thrust::transform(forces.begin(), forces.end(), ys.begin(), forces.begin(), thrust::multiplies<float>());
 
     alpha = -4.0f * eta;
     beta = 4.0f * eta;
     // TODO: needs to change for 3 dimensions
+    // forces_ = 4 * y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1 - 4 * \sum_j y_j(pij - qij)(1 + ||y_i - y_j||^2)^-1
     cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, N, &alpha, thrust::raw_pointer_cast(qij.data()), N,
                 thrust::raw_pointer_cast(ys.data()), 1, &beta, thrust::raw_pointer_cast(forces.data()), 1));
     cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, N, &alpha, thrust::raw_pointer_cast(qij.data()), N,
@@ -119,8 +135,6 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
         if (i % 10 == 0)
             std::cout << "Iteration: " << i << ", Loss: " << loss << ", ForceMag: " << norm(forces) << std::endl;
         prevloss = loss;
-        if (isnan(loss))
-            break;
     }
     return ys;
 }

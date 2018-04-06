@@ -44,10 +44,12 @@ void squared_pairwise_dist(cublasHandle_t &handle,
 	cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, N, N, NDIMS, &alpha,
 		                       thrust::raw_pointer_cast(points.data()), N, thrust::raw_pointer_cast(points.data()), N, &beta,
 							   thrust::raw_pointer_cast(distances.data()), N));
+  
     typedef thrust::device_vector<float>::iterator Iterator;
     strided_range<Iterator> diag(distances.begin(), distances.end(), N + 1);
     thrust::device_vector<float> squared_norms(N);
     thrust::copy(diag.begin(), diag.end(), squared_norms.begin());
+
 	dim3 dimBlock(BLOCKSIZE, BLOCKSIZE);
 	dim3 dimGrid(iDivUp(N, BLOCKSIZE), iDivUp(N, BLOCKSIZE));
 	assemble_final_result<<<dimGrid, dimBlock>>>(thrust::raw_pointer_cast(squared_norms.data()), 
