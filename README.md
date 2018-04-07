@@ -81,8 +81,12 @@ Please cite this repository if it was useful for your research:
 }
 ```
 
-The following work was helpful in building this library: 
+The following work was extremely helpful in building this library: 
+
 [L. Van der Maaten's paper](http://lvdmaaten.github.io/publications/papers/JMLR_2014.pdf)
+
 [Multicore-TSNE](https://github.com/DmitryUlyanov/Multicore-TSNE)
+
 [BHTSNE](https://github.com/lvdmaaten/bhtsne/)
+
 [CUDA Utilities/Pairwise Distance](https://github.com/OrangeOwlSolutions)
