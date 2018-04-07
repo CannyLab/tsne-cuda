@@ -49,6 +49,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 // Additional Macros
 #include "macros.h"

@@ -11,6 +11,7 @@
 #include "util/random_utils.h"
 #include "util/distance_utils.h"
 #include "naive_tsne.h"
+#include "naive_tsne_cpu.h"
 #include <time.h>
 
 // G-Test include
@@ -39,6 +40,9 @@ namespace {
     TEST(Reductions, ReduceAlpha_Col_512x512_neg){test_reduce_alpha_col(512,512,-0.1);}
     TEST(Reductions, ReduceAlpha_Row_512x512_neg){test_reduce_alpha_row(512,512, -0.1);}
 
+    TEST(ComputePIJ, 256x50) {test_compute_pij(256, 50);}
+
     // T-SNE tests
     TEST(NaiveTSNE, 256x50) {test_tsne(256, 50);}
+    
 }
