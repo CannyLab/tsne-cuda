@@ -67,13 +67,14 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
 {
     thrust::device_vector<float> pij_vals(N * N);
     squared_pairwise_dist(handle, pij_vals, points, N, NDIMS);
-
     thrust::device_vector<float> sigma_squared(sigma.size());
     square(sigma, sigma_squared);
     
-    broadcast_matrix_vector(pij_vals, sigma_squared, N, N, thrust::divides<float>(), 1, -2.0f);
+    // divide column by sigmas (matrix[i,:] gets divided by sigma_i^2)
+    broadcast_matrix_vector(pij_vals, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
     thrust::transform(pij_vals.begin(), pij_vals.end(), pij_vals.begin(), func_exp());
     zero_diagonal(pij_vals, N);
+    
     // reduce_sum over rows
     auto sums = reduce_sum(handle, pij_vals, N, N, 1);
     // divide column by resulting vector
@@ -193,7 +194,6 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
         pij = compute_pij(handle, points, sigmas, N, NDIMS);
         iters++;
     } 
-
     pij = compute_pij(handle, points, sigmas, N, NDIMS);
     
     thrust::device_vector<float> forces(N * PROJDIM);
