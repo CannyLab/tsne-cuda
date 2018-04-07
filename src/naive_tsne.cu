@@ -67,7 +67,6 @@ float compute_gradients(cublasHandle_t &handle,
                         const unsigned int N,
                         float eta) 
 {
-    // std::cout << "pij min" << thrust::reduce(pij.begin(), pij.end(), 5000.0f, thrust::minimum<float>()) << std::endl;
     // dist_ = ||y_i - y_j||^2
     squared_pairwise_dist(handle, dist, ys, N, PROJDIM);
     // dist_ = (1 + ||y_i - y_j||^2)^-1
@@ -91,26 +90,22 @@ float compute_gradients(cublasHandle_t &handle,
     // qij_ = (pij - qij)(1 + ||y_i - y_j||^2)^-1
     thrust::transform(qij.begin(), qij.end(), dist.begin(), qij.begin(), thrust::multiplies<float>());
 
+    // forces_ = \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1
     float alpha = 1.0f;
     float beta = 0.0f;
-    thrust::device_vector<float> ones(N, 1.0f);
-    // forces_ = \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1
-    cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, N, &alpha, thrust::raw_pointer_cast(qij.data()), N,
-                thrust::raw_pointer_cast(ones.data()), 1, &beta, thrust::raw_pointer_cast(forces.data()), 1));
-    // TODO: needs to change for 3 dimensions
-    thrust::copy(forces.begin(), forces.begin() + N, forces.begin() + N);
+    thrust::device_vector<float> ones(PROJDIM * N, 1.0f);
+    cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, PROJDIM, N, &alpha, 
+                                thrust::raw_pointer_cast(qij.data()), N, thrust::raw_pointer_cast(ones.data()), N, &beta, 
+                                thrust::raw_pointer_cast(forces.data()), N));
 
     // forces_ = y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1
     thrust::transform(forces.begin(), forces.end(), ys.begin(), forces.begin(), thrust::multiplies<float>());
-
     alpha = -4.0f * eta;
     beta = 4.0f * eta;
-    // TODO: needs to change for 3 dimensions
     // forces_ = 4 * y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1 - 4 * \sum_j y_j(pij - qij)(1 + ||y_i - y_j||^2)^-1
-    cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, N, &alpha, thrust::raw_pointer_cast(qij.data()), N,
-                thrust::raw_pointer_cast(ys.data()), 1, &beta, thrust::raw_pointer_cast(forces.data()), 1));
-    cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, N, &alpha, thrust::raw_pointer_cast(qij.data()), N,
-                thrust::raw_pointer_cast(ys.data() + N), 1, &beta, thrust::raw_pointer_cast(forces.data() + N), 1));
+    cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, PROJDIM, N, &alpha, 
+                                thrust::raw_pointer_cast(qij.data()), N, thrust::raw_pointer_cast(ys.data()), N, &beta, 
+                                thrust::raw_pointer_cast(forces.data()), N));
 
     return loss;
 }
@@ -125,6 +120,7 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     auto pij = compute_pij(handle, points, sigmas, N, NDIMS);
     thrust::device_vector<float> forces(N * PROJDIM);
     thrust::device_vector<float> ys = random_vector(N * PROJDIM);
+    printarray(ys, N, 2);
     thrust::device_vector<float> qij(N * N);
     thrust::device_vector<float> dist(N * N);
     float eta = 10.0f;
