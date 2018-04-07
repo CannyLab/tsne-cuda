@@ -19,5 +19,6 @@
     * @return thrust::device_vector<float> 
     */
     thrust::device_vector<float> random_vector(const unsigned int N);
+    thrust::device_vector<float> rand_in_range(const unsigned int N, float lb, float ub);
 
 #endif

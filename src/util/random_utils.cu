@@ -33,3 +33,16 @@ thrust::device_vector<float> random_vector(const unsigned int N) {
     thrust::transform(first, last, vec.begin(), prg(-10.0f, 10.0f));
     return vec;
 }
+
+thrust::device_vector<float> rand_in_range(const unsigned int N, float lb, float ub) {
+    std::mt19937 eng; 
+    eng.seed(time(NULL));
+    std::uniform_real_distribution<float> dist(lb, ub);  
+    float points[N];
+    for (int i = 0; i < N; i++) points[i] = dist(eng);
+
+    // Copy the matrix to the GPU
+    thrust::device_vector<float> vec(N);
+    thrust::copy(points, points+(N), vec.begin());
+    return vec;
+}

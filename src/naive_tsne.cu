@@ -6,7 +6,7 @@
  * @date 2018-04-04
  */
 
- #include "naive_tsne.h"
+#include "naive_tsne.h"
 
 struct func_inc_inv {
     __host__ __device__ float operator()(const float &x) const { return 1 / (x + 1); }
@@ -23,12 +23,41 @@ struct func_exp {
 };
 
 struct func_entropy_kernel {
-    __host__ __device__ float operator()(const float &x) const { float val = x*log2(x); return val != val ? 0 : val; }
+    __host__ __device__ float operator()(const float &x) const { float val = x*log2(x); return (val != val) ? 0 : val; }
 };
 
 struct func_pow2 {
-    __host__ __device__ float operator()(const float &x) const { return pow(x,2); }
+    __host__ __device__ float operator()(const float &x) const { return pow(2,x); }
 };
+
+__global__ void perplexity_search(float* __restrict__ sigmas, 
+                                    float* __restrict__ lower_bound, 
+                                    float* __restrict__ upper_bound,
+                                    float* __restrict__ perplexity, 
+                                    const float* __restrict__ pij, 
+                                    const float target_perplexity, 
+                                    const int N) 
+{
+    int TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID > N) return;
+
+    // Compute the perplexity for this point
+    float entropy = 0.0f; 
+    for (int i = 0; i < N; i++) {
+        if (i != TID) {
+            entropy += pij[i + TID*N]*log2(pij[i + TID*N]);
+        }
+    }
+    perplexity[TID] = pow(2,-1.0*entropy);
+
+    if (perplexity[TID] > target_perplexity) {
+        upper_bound[TID] = sigmas[TID];
+        
+    } else {
+        lower_bound[TID] = sigmas[TID];
+    }
+    sigmas[TID] = (upper_bound[TID] + lower_bound[TID])/2.0f;
+}
 
 thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
                                          thrust::device_vector<float> &points, 
@@ -54,19 +83,6 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
     thrust::device_vector<float> pij_output(N*N);
     cublasSafeCall(cublasSgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, N, N, &alpha, thrust::raw_pointer_cast(pij_vals.data()), N, 
                                &beta, thrust::raw_pointer_cast(pij_vals.data()), N, thrust::raw_pointer_cast(pij_output.data()), N));
-
-    // Compute the perplexity of the distribution
-    thrust::transform(pij_output.begin(), pij_output.end(), pij_vals.begin(), func_entropy_kernel());
-
-    auto perplexity = reduce_alpha(handle, pij_vals, N, N, -1.0f, 1); // Reduce the sum over the rows
-
-    thrust::transform(perplexity.begin(), perplexity.end(), perplexity.begin(), func_pow2());
-
-    // Print the perplexity
-    for (int i = 0; i < N; i++)
-        std::cout << perplexity[i] << " ";
-    std::cout << std::endl;
-
     return pij_output;
 }
 
@@ -137,10 +153,50 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
                                         const unsigned int NDIMS)
 {
     max_norm(points);
-    thrust::device_vector<float> sigmas(N, 0.5f);
-    auto pij = compute_pij(handle, points, sigmas, N, NDIMS);
-    thrust::device_vector<float> forces(N * PROJDIM);
 
+    // Choose the right sigmas
+    std::cout << "Selecting sigmas to match perplexity..." << std::endl;
+    float perplexity_target = 30.0f;
+    float perplexity_diff = 1;
+
+    thrust::device_vector<float> sigmas = rand_in_range(N, 0.0f, N/2.0f);
+    thrust::device_vector<float> perplexity(N);
+    thrust::device_vector<float> lbs(N, 0.0f);
+    thrust::device_vector<float> ubs(N, 500.0*N);
+
+    auto pij = compute_pij(handle, points, sigmas, N, NDIMS);
+    int iters = 1;
+    while (perplexity_diff > 1e-4 && iters < 500) {
+        
+        dim3 dimBlock(128);
+        dim3 dimGrid(iDivUp(N, 128));
+        perplexity_search<<<dimGrid, dimBlock>>>(thrust::raw_pointer_cast(sigmas.data()), 
+                                                     thrust::raw_pointer_cast(lbs.data()), 
+                                                     thrust::raw_pointer_cast(ubs.data()), 
+                                                     thrust::raw_pointer_cast(perplexity.data()),
+                                                     thrust::raw_pointer_cast(pij.data()), 
+                                                     perplexity_target,
+                                                     N);
+
+        gpuErrchk( cudaPeekAtLastError() );
+        gpuErrchk( cudaDeviceSynchronize() );
+
+        
+        // printarray(sigmas, 1, N);
+        // printarray(lbs, 1, N);
+        // printarray(ubs, 1, N);
+        // printarray(perplexity, 1, N);
+
+        float perplexity_diff = abs(thrust::reduce(perplexity.begin(), perplexity.end())/((float) N) - perplexity_target);
+        printf("Current perplexity delta after %d iterations: %0.5f\n", iters, perplexity_diff);
+
+        pij = compute_pij(handle, points, sigmas, N, NDIMS);
+        iters++;
+    } 
+
+    pij = compute_pij(handle, points, sigmas, N, NDIMS);
+    
+    thrust::device_vector<float> forces(N * PROJDIM);
     thrust::device_vector<float> ys = random_vector(N * PROJDIM);
     
     // Momentum variables
