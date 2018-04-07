@@ -123,8 +123,15 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     printarray(ys, N, 2);
     thrust::device_vector<float> qij(N * N);
     thrust::device_vector<float> dist(N * N);
-    float eta = 10.0f;
+    float eta = 0.10f;
     float loss;//, prevloss = std::numeric_limits<float>::infinity();
+
+    // Create a dump file for the points
+    std::ofstream dump_file;
+    dump_file.open ("dump.txt");
+    float host_ys[N * PROJDIM];
+    dump_file << N << " " << PROJDIM << std::endl;
+
     for (int i = 0; i < 1000; i++) {
         loss = compute_gradients(handle, forces, dist, ys, pij, qij, N, eta);
         thrust::transform(ys.begin(), ys.end(), forces.begin(), ys.begin(), thrust::plus<float>());
@@ -133,7 +140,17 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
         if (i % 10 == 0)
             std::cout << "Iteration: " << i << ", Loss: " << loss << ", ForceMag: " << norm(forces) << std::endl;
         // prevloss = loss;
+
+        // Dump the points
+        thrust::copy(ys.begin(), ys.end(), host_ys);
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < PROJDIM; j++) {
+                dump_file << host_ys[i + j*N] << " ";
+            }
+            dump_file << std::endl;
+        }
     }
+    dump_file.close();
     return ys;
 }
 

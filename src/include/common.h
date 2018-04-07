@@ -41,11 +41,13 @@
 #include <time.h>
 #include <sys/time.h>
 
-
 // C++ Library includes
 #include <random>
 #include <stdexcept>
+#include <iostream>
+#include <fstream>
 
+// Additional Macros
 #include "macros.h"
 
 #endif
