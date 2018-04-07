@@ -22,6 +22,14 @@ struct func_exp {
     __host__ __device__ float operator()(const float &x) const { return exp(x); }
 };
 
+struct func_entropy_kernel {
+    __host__ __device__ float operator()(const float &x) const { float val = x*log2(x); return val != val ? 0 : val; }
+};
+
+struct func_pow2 {
+    __host__ __device__ float operator()(const float &x) const { return pow(x,2); }
+};
+
 thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
                                          thrust::device_vector<float> &points, 
                                          thrust::device_vector<float> &sigma, 
@@ -46,6 +54,19 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
     thrust::device_vector<float> pij_output(N*N);
     cublasSafeCall(cublasSgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, N, N, &alpha, thrust::raw_pointer_cast(pij_vals.data()), N, 
                                &beta, thrust::raw_pointer_cast(pij_vals.data()), N, thrust::raw_pointer_cast(pij_output.data()), N));
+
+    // Compute the perplexity of the distribution
+    thrust::transform(pij_output.begin(), pij_output.end(), pij_vals.begin(), func_entropy_kernel());
+
+    auto perplexity = reduce_alpha(handle, pij_vals, N, N, -1.0f, 1); // Reduce the sum over the rows
+
+    thrust::transform(perplexity.begin(), perplexity.end(), perplexity.begin(), func_pow2());
+
+    // Print the perplexity
+    for (int i = 0; i < N; i++)
+        std::cout << perplexity[i] << " ";
+    std::cout << std::endl;
+
     return pij_output;
 }
 
@@ -128,7 +149,7 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     float momentum_weight = 0.9f;
 
 
-    printarray(ys, N, 2);
+    //printarray(ys, N, 2);
     thrust::device_vector<float> qij(N * N);
     thrust::device_vector<float> dist(N * N);
     float eta = 0.10f;
