@@ -119,12 +119,20 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     thrust::device_vector<float> sigmas(N, 0.5f);
     auto pij = compute_pij(handle, points, sigmas, N, NDIMS);
     thrust::device_vector<float> forces(N * PROJDIM);
+
     thrust::device_vector<float> ys = random_vector(N * PROJDIM);
+    
+    // Momentum variables
+    thrust::device_vector<float> yt_1(N * PROJDIM);
+    thrust::device_vector<float> momentum(N * PROJDIM);
+    float momentum_weight = 0.9f;
+
+
     printarray(ys, N, 2);
     thrust::device_vector<float> qij(N * N);
     thrust::device_vector<float> dist(N * N);
     float eta = 0.10f;
-    float loss;//, prevloss = std::numeric_limits<float>::infinity();
+    float loss = 0.0f;//, prevloss = std::numeric_limits<float>::infinity();
 
     // Create a dump file for the points
     std::ofstream dump_file;
@@ -134,7 +142,17 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
 
     for (int i = 0; i < 1000; i++) {
         loss = compute_gradients(handle, forces, dist, ys, pij, qij, N, eta);
+        
+
+        // Compute the momentum
+        thrust::transform(ys.begin(), ys.end(), yt_1.begin(), momentum.begin(), thrust::minus<float>());
+        thrust::transform(momentum.begin(), momentum.end(), thrust::make_constant_iterator(momentum_weight), momentum.begin(), thrust::multiplies<float>() );
+        thrust::copy(ys.begin(), ys.end(), yt_1.begin());
+
+        // Apply the forces
         thrust::transform(ys.begin(), ys.end(), forces.begin(), ys.begin(), thrust::plus<float>());
+        thrust::transform(ys.begin(), ys.end(), momentum.begin(), ys.begin(), thrust::plus<float>());
+        
         // if (loss > prevloss)
             // eta /= 2.;
         if (i % 10 == 0)
