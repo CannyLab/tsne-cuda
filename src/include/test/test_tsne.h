@@ -62,7 +62,7 @@ void test_tsne(unsigned int N,unsigned int NDIMS) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", N);
     cudaEventRecord(start);
-    naive_tsne(handle, d_X, N, NDIMS);
+    naive_tsne(handle, d_X, N, NDIMS, 2);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;

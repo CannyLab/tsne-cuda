@@ -49,7 +49,7 @@ void pymodule_naive_tsne(float *points, float *result, ssize_t *dims, int proj_d
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the T-SNE
-    auto tsne_result = naive_tsne(handle, d_points, N_POINTS, N_DIMS);
+    auto tsne_result = naive_tsne(handle, d_points, N_POINTS, N_DIMS, proj_dim);
 
     // Copy the data back to the CPU
     thrust::copy(tsne_result.begin(), tsne_result.end(), result);
