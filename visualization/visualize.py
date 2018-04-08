@@ -30,7 +30,7 @@ min_particle = np.amin(particles)
 max_particle = np.amax(particles)
 
 def animate(i):
-    i = i*50 % n_timesteps
+    i = i % n_timesteps
     mat.set_data(particles[i,:,0], particles[i,:,1])
     return mat,
 

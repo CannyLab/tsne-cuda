@@ -44,6 +44,6 @@ namespace {
     TEST(ComputePIJ, GPUisCPU) {test_cpu_is_gpu_pij(16,16);}
 
     // T-SNE tests
-    TEST(NaiveTSNE, 256x50) {test_tsne(64, 50);}
+    TEST(NaiveTSNE, 256x50) {test_tsne(16, 50);}
     
 }

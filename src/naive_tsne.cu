@@ -142,7 +142,7 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
     // std::cout << std::endl << std::endl << "PW-SQ dist:" << std::endl;
     // printarray(pij_vals, N, N);
 
-    broadcast_matrix_vector(pij_vals, sigma_squared, N, N, thrust::divides<float>(), 1, -2.0f);
+    broadcast_matrix_vector(pij_vals, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
 
     // std::cout << std::endl << std::endl << "PW-SQ dist/-2sigma^2:" << std::endl;
     // printarray(pij_vals, N, N);
@@ -157,14 +157,14 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
     // std::cout << std::endl << std::endl << "Zeroed diagonals" << std::endl;
     // printarray(pij_vals, N, N);
     
-    // reduce_sum over rows
+    // reduce_sum over cols
     auto sums = reduce_sum(handle, pij_vals, N, N, 1);
 
     // std::cout << std::endl << std::endl << "Sums" << std::endl;
     // printarray(sums, 1, N);
 
     // divide column by resulting vector
-    broadcast_matrix_vector(pij_vals, sums, N, N, thrust::divides<float>(), 1, 1.0f);
+    broadcast_matrix_vector(pij_vals, sums, N, N, thrust::divides<float>(), 0, 1.0f);
 
     // std::cout << std::endl << std::endl << "Normalized Cols" << std::endl;
     // printarray(pij_vals, N, N);
@@ -203,15 +203,30 @@ float compute_gradients(cublasHandle_t &handle,
 {
     // dist_ = ||y_i - y_j||^2
     squared_pairwise_dist(handle, dist, ys, N, PROJDIM);
+
+    // std::cout << std::endl << std::endl << "Dist" << std::endl;
+    // printarray(dist, N, N);
+
     // dist_ = (1 + ||y_i - y_j||^2)^-1
     thrust::transform(dist.begin(), dist.end(), dist.begin(), func_inc_inv());
     zero_diagonal(dist, N);
 
-    // qij_ = (1 + ||y_i - y_j||^2)^-1 / \Sum_{k != i} (1 + ||y_i - y_k||^2)^-1
-    thrust::copy(dist.begin(), dist.end(), qij.begin());
-    auto sums = reduce_sum(handle, qij, N, N, 1);
-    broadcast_matrix_vector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
+    // std::cout << std::endl << std::endl << "Inc-Inv Dist" << std::endl;
+    // printarray(dist, N, N);
 
+    // qij_ = (1 + ||y_i - y_j||^2)^-1 / \Sum_{k != i} (1 + ||y_i - y_k||^2)^-1
+    float sum = thrust::reduce(dist.begin(), dist.end(), 0.0f, thrust::plus<float>());
+    thrust::transform(dist.begin(), dist.end(), thrust::make_constant_iterator<float>(sum), qij.begin(), thrust::divides<float>());
+
+    // auto sums = reduce_sum(handle, qij, N, N, 1);
+
+    // std::cout << std::endl << std::endl << "Sum-Dist" << std::endl;
+    // printarray(sums, 1, N);
+
+    // broadcast_matrix_vector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
+
+    // std::cout << std::endl << std::endl << "Qij" << std::endl;
+    // printarray(qij, N, N);
 
     // Compute loss = \sum_ij pij * log(pij / qij)
     thrust::device_vector<float> loss_(N * N);
@@ -223,8 +238,15 @@ float compute_gradients(cublasHandle_t &handle,
 
     // qij_ = pij - qij
     thrust::transform(pij.begin(), pij.end(), qij.begin(), qij.begin(), thrust::minus<float>());
+
+    // std::cout << std::endl << std::endl << "Pij-Qij" << std::endl;
+    // printarray(qij, N, N);
+
     // qij_ = (pij - qij)(1 + ||y_i - y_j||^2)^-1
     thrust::transform(qij.begin(), qij.end(), dist.begin(), qij.begin(), thrust::multiplies<float>());
+
+    // std::cout << std::endl << std::endl << "A" << std::endl;
+    // printarray(qij, N, N);
 
     // forces_ = \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1
     float alpha = 1.0f;
@@ -234,6 +256,9 @@ float compute_gradients(cublasHandle_t &handle,
                                 thrust::raw_pointer_cast(qij.data()), N, thrust::raw_pointer_cast(ones.data()), N, &beta, 
                                 thrust::raw_pointer_cast(forces.data()), N));
 
+    // std::cout << std::endl << std::endl << "A * 1" << std::endl;
+    // printarray(forces, 2, N);
+
     // forces_ = y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1
     thrust::transform(forces.begin(), forces.end(), ys.begin(), forces.begin(), thrust::multiplies<float>());
     alpha = 4.0f * eta;
@@ -242,6 +267,9 @@ float compute_gradients(cublasHandle_t &handle,
     cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, PROJDIM, N, &alpha, 
                                 thrust::raw_pointer_cast(qij.data()), N, thrust::raw_pointer_cast(ys.data()), N, &beta, 
                                 thrust::raw_pointer_cast(forces.data()), N));
+
+    // std::cout << std::endl << std::endl << "Final Forces" << std::endl;
+    // printarray(forces, 2, N);
 
     return loss;
 }
@@ -259,35 +287,38 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     float perplexity_target = 16.0f;
     float perplexity_diff = 1;
 
-    thrust::device_vector<float> sigmas = rand_in_range(N, 0.9f, 1.0f);
-    thrust::device_vector<float> best_sigmas(N);
-    thrust::device_vector<float> perplexity(N);
-    thrust::device_vector<float> lbs(N, 0.0f);
-    thrust::device_vector<float> ubs(N, 512.0f);
+    thrust::device_vector<float> sigmas = rand_in_range(N, 0.2f, 0.4f);
+    // thrust::device_vector<float> best_sigmas(N);
+    // thrust::device_vector<float> perplexity(N);
+    // thrust::device_vector<float> lbs(N, 0.0f);
+    // thrust::device_vector<float> ubs(N, 512.0f);
+
+    // auto pij = compute_pij(handle, points, sigmas, N, NDIMS);
+    // int iters = 1;
+    // float best_perplexity = 100000.0f;
+
+    // while (perplexity_diff > 1e-4 && iters < 5000) {
+    //     // printarray(perplexity,1,N);
+    //     // printarray(sigmas,1,N);
+    //     thrust_search_perplexity(handle, sigmas, lbs, ubs, perplexity, pij, perplexity_target, N);
+    //     float perplexity_diff = abs(thrust::reduce(perplexity.begin(), perplexity.end())/((float) N) - perplexity_target);
+    //     //if (iters % 500 == 0)
+    //     //    printf("Current perplexity delta after %d iterations: %0.5f\n", iters, perplexity_diff);
+
+    //     if (perplexity_diff < best_perplexity){
+    //         best_perplexity = perplexity_diff;
+    //         printf("!! Best perplexity found in %d iterations: %0.5f\n", iters, perplexity_diff);
+    //         thrust::copy(sigmas.begin(), sigmas.end(), best_sigmas.begin());
+    //     }
+
+    //     pij = compute_pij(handle, points, sigmas, N, NDIMS);
+    //     iters++;
+    // } // Close perplexity search
 
     auto pij = compute_pij(handle, points, sigmas, N, NDIMS);
-    int iters = 1;
-    float best_perplexity = 100000.0f;
 
-    while (perplexity_diff > 1e-4 && iters < 5000) {
-        // printarray(perplexity,1,N);
-        // printarray(sigmas,1,N);
-        thrust_search_perplexity(handle, sigmas, lbs, ubs, perplexity, pij, perplexity_target, N);
-        float perplexity_diff = abs(thrust::reduce(perplexity.begin(), perplexity.end())/((float) N) - perplexity_target);
-        //if (iters % 500 == 0)
-        //    printf("Current perplexity delta after %d iterations: %0.5f\n", iters, perplexity_diff);
-
-        if (perplexity_diff < best_perplexity){
-            best_perplexity = perplexity_diff;
-            printf("!! Best perplexity found in %d iterations: %0.5f\n", iters, perplexity_diff);
-            thrust::copy(sigmas.begin(), sigmas.end(), best_sigmas.begin());
-        }
-
-        pij = compute_pij(handle, points, sigmas, N, NDIMS);
-        iters++;
-    } // Close perplexity search
-
-    pij = compute_pij(handle, points, best_sigmas, N, NDIMS);
+    std::cout << "Pij" << std::endl;
+    printarray(pij, N, N);
     
     thrust::device_vector<float> forces(N * PROJDIM);
     thrust::device_vector<float> ys = random_vector(N * PROJDIM);
@@ -295,13 +326,13 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     // Momentum variables
     thrust::device_vector<float> yt_1(N * PROJDIM);
     thrust::device_vector<float> momentum(N * PROJDIM);
-    float momentum_weight = 0.9f;
+    float momentum_weight = 0.8f;
 
 
     //printarray(ys, N, 2);
     thrust::device_vector<float> qij(N * N);
     thrust::device_vector<float> dist(N * N);
-    float eta = 10.0f;
+    float eta = 1.00f;
     float loss = 0.0f;//, prevloss = std::numeric_limits<float>::infinity();
 
     // Dump the original points
@@ -349,6 +380,7 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
             }
             dump_file << std::endl;
         }
+        // break;
     }
     dump_file.close();
     return ys;
