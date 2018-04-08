@@ -40,9 +40,10 @@ namespace {
     TEST(Reductions, ReduceAlpha_Col_512x512_neg){test_reduce_alpha_col(512,512,-0.1);}
     TEST(Reductions, ReduceAlpha_Row_512x512_neg){test_reduce_alpha_row(512,512, -0.1);}
 
-    TEST(ComputePIJ, 256x50) {test_compute_pij(256, 50);}
+    // TEST(ComputePIJ, CPU_256x50) {test_cpu_compute_pij(256, 50);}
+    TEST(ComputePIJ, GPUisCPU) {test_cpu_is_gpu_pij(16,16);}
 
     // T-SNE tests
-    TEST(NaiveTSNE, 256x50) {test_tsne(256, 50);}
+    TEST(NaiveTSNE, 256x50) {test_tsne(64, 50);}
     
 }

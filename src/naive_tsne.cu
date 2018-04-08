@@ -50,7 +50,7 @@ __global__ void perplexity_search(float* __restrict__ sigmas,
     }
     perplexity[TID] = pow(2,-1.0*entropy);
 
-    if (perplexity[TID] > target_perplexity) {
+    if (perplexity[TID] < target_perplexity) {
         upper_bound[TID] = sigmas[TID];
         
     } else {
@@ -127,23 +127,58 @@ thrust::device_vector<float> compute_pij(cublasHandle_t &handle,
 {
     thrust::device_vector<float> pij_vals(N * N);
     squared_pairwise_dist(handle, pij_vals, points, N, NDIMS);
+
+    // std::cout << "Sigma:" << std::endl;
+    // printarray(sigma, N, 1);
     thrust::device_vector<float> sigma_squared(sigma.size());
     square(sigma, sigma_squared);
+
+
+    // std::cout << std::endl << std::endl << "Sigma Squared:" << std::endl;
+    // printarray(sigma_squared, 1, N);
     
     // divide column by sigmas (matrix[i,:] gets divided by sigma_i^2)
-    broadcast_matrix_vector(pij_vals, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
+
+    // std::cout << std::endl << std::endl << "PW-SQ dist:" << std::endl;
+    // printarray(pij_vals, N, N);
+
+    broadcast_matrix_vector(pij_vals, sigma_squared, N, N, thrust::divides<float>(), 1, -2.0f);
+
+    // std::cout << std::endl << std::endl << "PW-SQ dist/-2sigma^2:" << std::endl;
+    // printarray(pij_vals, N, N);
+
     thrust::transform(pij_vals.begin(), pij_vals.end(), pij_vals.begin(), func_exp());
+
+    // std::cout << std::endl << std::endl << "Exp of prev..." << std::endl;
+    // printarray(pij_vals, N, N);
+
     zero_diagonal(pij_vals, N);
+
+    // std::cout << std::endl << std::endl << "Zeroed diagonals" << std::endl;
+    // printarray(pij_vals, N, N);
     
     // reduce_sum over rows
     auto sums = reduce_sum(handle, pij_vals, N, N, 1);
+
+    // std::cout << std::endl << std::endl << "Sums" << std::endl;
+    // printarray(sums, 1, N);
+
     // divide column by resulting vector
-    broadcast_matrix_vector(pij_vals, sums, N, N, thrust::divides<float>(), 0, 1.0f);
-    float alpha = 0.5f/N;
-    float beta = 0.5f/N;
+    broadcast_matrix_vector(pij_vals, sums, N, N, thrust::divides<float>(), 1, 1.0f);
+
+    // std::cout << std::endl << std::endl << "Normalized Cols" << std::endl;
+    // printarray(pij_vals, N, N);
+
+    // Do a symmetrization of the distribution
+    float alpha = 0.5f;
+    float beta = 0.5f;
     thrust::device_vector<float> pij_output(N*N);
     cublasSafeCall(cublasSgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, N, N, &alpha, thrust::raw_pointer_cast(pij_vals.data()), N, 
                                &beta, thrust::raw_pointer_cast(pij_vals.data()), N, thrust::raw_pointer_cast(pij_output.data()), N));
+
+    // std::cout << std::endl << std::endl << "Final Output" << std::endl;
+    // printarray(pij_output, N, N);
+    
     return pij_output;
 }
 
@@ -176,6 +211,8 @@ float compute_gradients(cublasHandle_t &handle,
     thrust::copy(dist.begin(), dist.end(), qij.begin());
     auto sums = reduce_sum(handle, qij, N, N, 1);
     broadcast_matrix_vector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
+
+
     // Compute loss = \sum_ij pij * log(pij / qij)
     thrust::device_vector<float> loss_(N * N);
     thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), func_kl());
@@ -199,8 +236,8 @@ float compute_gradients(cublasHandle_t &handle,
 
     // forces_ = y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1
     thrust::transform(forces.begin(), forces.end(), ys.begin(), forces.begin(), thrust::multiplies<float>());
-    alpha = -4.0f * eta;
-    beta = 4.0f * eta;
+    alpha = 4.0f * eta;
+    beta = -4.0f * eta;
     // forces_ = 4 * y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1 - 4 * \sum_j y_j(pij - qij)(1 + ||y_i - y_j||^2)^-1
     cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, PROJDIM, N, &alpha, 
                                 thrust::raw_pointer_cast(qij.data()), N, thrust::raw_pointer_cast(ys.data()), N, &beta, 
@@ -219,45 +256,38 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
 
     // Choose the right sigmas
     std::cout << "Selecting sigmas to match perplexity..." << std::endl;
-    float perplexity_target = 30.0f;
+    float perplexity_target = 16.0f;
     float perplexity_diff = 1;
 
-    thrust::device_vector<float> sigmas = rand_in_range(N, 0.0f, 1.0f);
+    thrust::device_vector<float> sigmas = rand_in_range(N, 0.9f, 1.0f);
+    thrust::device_vector<float> best_sigmas(N);
     thrust::device_vector<float> perplexity(N);
     thrust::device_vector<float> lbs(N, 0.0f);
-    thrust::device_vector<float> ubs(N, 2.0f);
+    thrust::device_vector<float> ubs(N, 512.0f);
 
     auto pij = compute_pij(handle, points, sigmas, N, NDIMS);
     int iters = 1;
-    while (perplexity_diff > 1e-4 && iters < 500) {
-        
-        // dim3 dimBlock(128);
-        // dim3 dimGrid(iDivUp(N, 128));
-        // perplexity_search<<<dimGrid, dimBlock>>>(thrust::raw_pointer_cast(sigmas.data()), 
-                                                     // thrust::raw_pointer_cast(lbs.data()), 
-                                                     // thrust::raw_pointer_cast(ubs.data()), 
-                                                     // thrust::raw_pointer_cast(perplexity.data()),
-                                                     // thrust::raw_pointer_cast(pij.data()), 
-                                                     // perplexity_target,
-                                                     // N);
+    float best_perplexity = 100000.0f;
 
-        // gpuErrchk( cudaPeekAtLastError() );
-        // gpuErrchk( cudaDeviceSynchronize() );
-
-        
-        // printarray(sigmas, 1, N);
-        // printarray(lbs, 1, N);
-        // printarray(ubs, 1, N);
-        // printarray(perplexity, 1, N);
+    while (perplexity_diff > 1e-4 && iters < 5000) {
+        // printarray(perplexity,1,N);
+        // printarray(sigmas,1,N);
         thrust_search_perplexity(handle, sigmas, lbs, ubs, perplexity, pij, perplexity_target, N);
         float perplexity_diff = abs(thrust::reduce(perplexity.begin(), perplexity.end())/((float) N) - perplexity_target);
-        printf("Current perplexity delta after %d iterations: %0.5f\n", iters, perplexity_diff);
+        //if (iters % 500 == 0)
+        //    printf("Current perplexity delta after %d iterations: %0.5f\n", iters, perplexity_diff);
+
+        if (perplexity_diff < best_perplexity){
+            best_perplexity = perplexity_diff;
+            printf("!! Best perplexity found in %d iterations: %0.5f\n", iters, perplexity_diff);
+            thrust::copy(sigmas.begin(), sigmas.end(), best_sigmas.begin());
+        }
 
         pij = compute_pij(handle, points, sigmas, N, NDIMS);
         iters++;
     } // Close perplexity search
 
-    pij = compute_pij(handle, points, sigmas, N, NDIMS);
+    pij = compute_pij(handle, points, best_sigmas, N, NDIMS);
     
     thrust::device_vector<float> forces(N * PROJDIM);
     thrust::device_vector<float> ys = random_vector(N * PROJDIM);
@@ -271,7 +301,7 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     //printarray(ys, N, 2);
     thrust::device_vector<float> qij(N * N);
     thrust::device_vector<float> dist(N * N);
-    float eta = 0.10f;
+    float eta = 10.0f;
     float loss = 0.0f;//, prevloss = std::numeric_limits<float>::infinity();
 
     // Dump the original points
@@ -292,7 +322,7 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     float host_ys[N * PROJDIM];
     dump_file << N << " " << PROJDIM << std::endl;
 
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 5000; i++) {
         loss = compute_gradients(handle, forces, dist, ys, pij, qij, N, PROJDIM, eta);
         
 
