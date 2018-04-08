@@ -40,5 +40,22 @@ def c_naive_tsne(points, proj_dim, learning_rate, perplexity) {
     _lib.pymodule_naive_tsne(points, results, points.ctypes.shape, c_int(proj_dim), c_float(learning_rate), c_float(perplexity))
     return N.transpose(results)
 }
+
+
+# NAIVE COMPUTE PIJ Hook
+_lib.pymodule_compute_pij.restype = None
+_lib.pymodule_compute_pij.argtypes = [ N.ctypeslib.ndpointer(N.float32, ndim=2, flags='aligned, contiguous'), # Input Points
+                                    N.ctypeslib.ndpointer(N.float32, ndim=1, flags='aligned, contiguous'), # Sigmas
+                                    N.ctypeslib.ndpointer(N.float32, ndim=2, flags='aligned, contiguous, writeable'), # PIJ output
+                                    ctypes.POINTER(N.ctypeslib.c_intp) # Input points dimension
+                                    ]
+def c_compute_pij(points, sigmas) {
+    points = N.require(N.transpose(points), N.float32, ['CONTIGUOUS', 'ALIGNED'])
+    sigmas = N.require(sigmas, N.float32, ['CONTIGUOUS', 'ALIGNED'])
+    results = N.empty(shape=(points.shape[0],points.shape[0]))
+    results = N.require(results, N.float32, ['CONTIGUOUS', 'ALIGNED', 'WRITEABLE'])
+    _lib.pymodule_compute_pij(points, sigmas, results,  points.ctypes.shape)
+    return N.transpose(results)
+}
     
 

@@ -13,7 +13,7 @@ max_particle =float("inf")
 
 
 
-with open('../build/dump.txt') as f:
+with open('../build/dump_ys.txt') as f:
     line = f.readline().split()
     n_particles = int(line[0])
     dims = float(line[1])

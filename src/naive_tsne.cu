@@ -193,7 +193,8 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
 
         pij = compute_pij(handle, points, sigmas, N, NDIMS);
         iters++;
-    } 
+    } // Close perplexity search
+
     pij = compute_pij(handle, points, sigmas, N, NDIMS);
     
     thrust::device_vector<float> forces(N * PROJDIM);
@@ -211,9 +212,21 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     float eta = 0.10f;
     float loss = 0.0f;//, prevloss = std::numeric_limits<float>::infinity();
 
+    // Dump the original points
+    std::ofstream dump_points_file;
+    dump_points_file.open ("dump_points.txt");
+    dump_points_file << N << " " << NDIMS << std::endl;
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < NDIMS; j++) {
+            dump_points_file << points[i + j*N] << " ";
+        }
+        dump_points_file << std::endl;
+    }
+    dump_points_file.close();
+
     // Create a dump file for the points
     std::ofstream dump_file;
-    dump_file.open ("dump.txt");
+    dump_file.open("dump_ys.txt");
     float host_ys[N * PROJDIM];
     dump_file << N << " " << PROJDIM << std::endl;
 
