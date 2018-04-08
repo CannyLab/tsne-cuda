@@ -9,7 +9,6 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-    #define PROJDIM 2
-    
+// Nothin here yet!    
 
 #endif

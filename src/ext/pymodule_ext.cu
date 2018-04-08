@@ -49,8 +49,36 @@ void pymodule_naive_tsne(float *points, float *result, ssize_t *dims, int proj_d
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the T-SNE
-    auto tsne_result = naive_tsne(handle, d_points, N_POINTS, N_DIMS);
+    auto tsne_result = naive_tsne(handle, d_points, N_POINTS, N_DIMS, proj_dim);
 
     // Copy the data back to the CPU
     thrust::copy(tsne_result.begin(), tsne_result.end(), result);
+}
+
+void pymodule_compute_pij(float *points, float* sigmas, float *result, ssize_t *dims) {
+
+     // Extract the dimensions of the points array
+     ssize_t N_POINTS = dims[0];
+     ssize_t N_DIMS = dims[1];
+ 
+     // Construct device arrays
+     thrust::device_vector<float> d_points(N_POINTS*N_DIMS);
+ 
+     // Copy the points to the GPU using thrust
+     thrust::copy(points, points+N_DIMS*N_POINTS, d_points.begin());
+ 
+     // Construct the sigmas
+     thrust::device_vector<float> d_sigmas(N_POINTS);
+     thrust::copy(sigmas, sigmas+N_POINTS, d_sigmas.begin());
+ 
+     // Create the CUBLAS handle
+     cublasHandle_t handle;
+     cublasSafeCall(cublasCreate(&handle));
+ 
+     // Do the T-SNE
+     auto pij = compute_pij(handle, d_points, d_sigmas, N_POINTS, N_DIMS);
+ 
+     // Copy the data back to the CPU
+     thrust::copy(pij.begin(), pij.end(), result);
+
 }

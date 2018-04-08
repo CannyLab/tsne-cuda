@@ -68,6 +68,11 @@ set(SOURCES
 
 # Shared Library for Python Binding
 #-------------------------------------------------------------------------------
+
+set(PYTHON_SOURCES 
+    src/python/pyctsne/TSNE.py
+)
+
 cuda_add_library(pyctsne
                  SHARED
                  ${SOURCES})
@@ -79,6 +84,9 @@ add_custom_command(TARGET pyctsne POST_BUILD
                        ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:pyctsne>/python)
 add_custom_command(TARGET pyctsne POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:pyctsne> $<TARGET_FILE_DIR:pyctsne>/python/pyctsne)
+
+ADD_CUSTOM_TARGET(copy_pyctsne DEPENDS ${PYTHON_SOURCES})
+ADD_DEPENDENCIES(pyctsne copy_pyctsne)
 
 #-------------------------------------------------------------------------------
 

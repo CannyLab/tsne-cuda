@@ -34,6 +34,7 @@ float compute_gradients(cublasHandle_t &handle,
 thrust::device_vector<float> naive_tsne(cublasHandle_t &handle, 
                                      thrust::device_vector<float> &points, 
                                      const unsigned int N, 
-                                     const unsigned int NDIMS);
+                                     const unsigned int NDIMS,
+                                     const unsigned int PROJDIM);
 
 #endif

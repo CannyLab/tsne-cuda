@@ -20,8 +20,12 @@ void test_compute_pij(unsigned int N, unsigned int NDIMS) {
     for (int i = 0; i < N; i++) {
         sigmas[i] = distribution1(generator);
     }
-    compute_pij_cpu(h_X, sigmas, N, NDIMS);
-    EXPECT_EQ(0, 0); 
+    std::vector<float> pij = compute_pij_cpu(h_X, sigmas, N, NDIMS);
+    float first_prob = 0.0f;
+    for (int i = 1; i < N; i++) {
+        first_prob += pij[i];
+    }
+    EXPECT_EQ((int) first_prob*1000, 1000); 
 }
 
 void test_tsne(unsigned int N,unsigned int NDIMS) {
@@ -58,7 +62,7 @@ void test_tsne(unsigned int N,unsigned int NDIMS) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", N);
     cudaEventRecord(start);
-    naive_tsne(handle, d_X, N, NDIMS);
+    naive_tsne(handle, d_X, N, NDIMS, 2);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;

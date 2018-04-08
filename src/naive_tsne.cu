@@ -76,7 +76,7 @@ __global__ void upper_lower_assign(float * __restrict__ sigmas,
     sigmas[TID] = (upper_bound[TID] + lower_bound[TID])/2.0f;
 }
 
-void test(cublasHandle_t &handle,
+void thrust_search_perplexity(cublasHandle_t &handle,
                         thrust::device_vector<float> &sigmas,
                         thrust::device_vector<float> &lower_bound,
                         thrust::device_vector<float> &upper_bound,
@@ -85,26 +85,26 @@ void test(cublasHandle_t &handle,
                         const float target_perplexity,
                         const unsigned int N)
 {
-    std::cout << "pij:" << std::endl;
-    printarray(pij, N, N);
-    std::cout << std::endl;
+    // std::cout << "pij:" << std::endl;
+    // printarray(pij, N, N);
+    // std::cout << std::endl;
     thrust::device_vector<float> entropy_(pij.size());
     thrust::transform(pij.begin(), pij.end(), entropy_.begin(), func_entropy_kernel());
     zero_diagonal(entropy_, N);
 
-    std::cout << "entropy:" << std::endl;
-    printarray(entropy_, N, N);
-    std::cout << std::endl;
+    // std::cout << "entropy:" << std::endl;
+    // printarray(entropy_, N, N);
+    // std::cout << std::endl;
 
     auto neg_entropy = reduce_alpha(handle, entropy_, N, N, -1.0f, 1);
 
-    std::cout << "neg_entropy:" << std::endl;
-    printarray(neg_entropy, 1, N);
-    std::cout << std::endl;
+    // std::cout << "neg_entropy:" << std::endl;
+    // printarray(neg_entropy, 1, N);
+    // std::cout << std::endl;
     thrust::transform(neg_entropy.begin(), neg_entropy.end(), perplexity.begin(), func_pow2());
-    std::cout << "perplexity:" << std::endl;
-    printarray(perplexity, 1, N);
-    std::cout << std::endl;
+    // std::cout << "perplexity:" << std::endl;
+    // printarray(perplexity, 1, N);
+    // std::cout << std::endl;
     
     const unsigned int BLOCKSIZE = 32;
     const unsigned int NBLOCKS = iDivUp(N, BLOCKSIZE);
@@ -114,9 +114,9 @@ void test(cublasHandle_t &handle,
                                                 thrust::raw_pointer_cast(perplexity.data()),
                                                 target_perplexity,
                                                 N);
-    std::cout << "sigmas" << std::endl;
-    printarray(sigmas, 1, N);
-    std::cout << std::endl;
+    // std::cout << "sigmas" << std::endl;
+    // printarray(sigmas, 1, N);
+    // std::cout << std::endl;
 
 }
 thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
@@ -163,6 +163,7 @@ float compute_gradients(cublasHandle_t &handle,
                         thrust::device_vector<float> &pij, 
                         thrust::device_vector<float> &qij, 
                         const unsigned int N,
+                        const unsigned int PROJDIM,
                         float eta) 
 {
     // dist_ = ||y_i - y_j||^2
@@ -211,7 +212,8 @@ float compute_gradients(cublasHandle_t &handle,
 thrust::device_vector<float> naive_tsne(cublasHandle_t &handle, 
                                         thrust::device_vector<float> &points, 
                                         const unsigned int N, 
-                                        const unsigned int NDIMS)
+                                        const unsigned int NDIMS,
+                                        const unsigned int PROJDIM)
 {
     max_norm(points);
 
@@ -247,15 +249,14 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
         // printarray(lbs, 1, N);
         // printarray(ubs, 1, N);
         // printarray(perplexity, 1, N);
-        test(handle, sigmas, lbs, ubs, perplexity, pij, perplexity_target, N);
+        thrust_search_perplexity(handle, sigmas, lbs, ubs, perplexity, pij, perplexity_target, N);
         float perplexity_diff = abs(thrust::reduce(perplexity.begin(), perplexity.end())/((float) N) - perplexity_target);
         printf("Current perplexity delta after %d iterations: %0.5f\n", iters, perplexity_diff);
 
         pij = compute_pij(handle, points, sigmas, N, NDIMS);
         iters++;
-        if (iters >= 5)
-            exit(1);
-    } 
+    } // Close perplexity search
+
     pij = compute_pij(handle, points, sigmas, N, NDIMS);
     
     thrust::device_vector<float> forces(N * PROJDIM);
@@ -273,14 +274,26 @@ thrust::device_vector<float> naive_tsne(cublasHandle_t &handle,
     float eta = 0.10f;
     float loss = 0.0f;//, prevloss = std::numeric_limits<float>::infinity();
 
+    // Dump the original points
+    std::ofstream dump_points_file;
+    dump_points_file.open ("dump_points.txt");
+    dump_points_file << N << " " << NDIMS << std::endl;
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < NDIMS; j++) {
+            dump_points_file << points[i + j*N] << " ";
+        }
+        dump_points_file << std::endl;
+    }
+    dump_points_file.close();
+
     // Create a dump file for the points
     std::ofstream dump_file;
-    dump_file.open ("dump.txt");
+    dump_file.open("dump_ys.txt");
     float host_ys[N * PROJDIM];
     dump_file << N << " " << PROJDIM << std::endl;
 
     for (int i = 0; i < 1000; i++) {
-        loss = compute_gradients(handle, forces, dist, ys, pij, qij, N, eta);
+        loss = compute_gradients(handle, forces, dist, ys, pij, qij, N, PROJDIM, eta);
         
 
         // Compute the momentum
