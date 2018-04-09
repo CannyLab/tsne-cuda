@@ -7,7 +7,9 @@ std::vector<float> squared_pairwise_dist(std::vector<float> &points, const unsig
 			for(int k = 0; k < NDIMS; k++) {
 				squared_pairwise_dist[i * N + j] = (points[i + k * N] - points[j + k * N]) * (points[i + k * N] - points[j + k * N]); 
 			}
+            std::cout << squared_pairwise_dist[i * N + j] << " ";
 		}
+        printf("\n");
 	}
 	return squared_pairwise_dist;
 }
@@ -16,19 +18,23 @@ std::vector<float> compute_pij_cpu(std::vector<float> &points,
 	                           std::vector<float> &sigma, 
 	                           const unsigned int N, 
 	                           const unsigned int NDIMS) {
-	std::vector<float> pij_out(N * N);
+	std::vector<float> pij_out(N * N, 0.0f);
 	std::vector<float> dists = squared_pairwise_dist(points, N, NDIMS);
 
 	for (int i = 0; i < N; i++) {
-		for (int j = 0; j < N; j++){
+		for (int j = 0; j < N; j++) {
 			float denom = 0;
 			for (int k = 0; k < N; k++) {
 				if (k != i) {
 					denom += std::exp(-(dists[i * N + k] / (2 * sigma[i] * sigma[i])));
 				}
 			}
-			pij_out[i * N + j] = std::exp(-dists[i * N + j] / (2 * sigma[i] * sigma[i])) / denom;
-		}
+            if (i != j) {
+			    pij_out[i * N + j] = std::exp(-dists[i * N + j] / (2 * sigma[i] * sigma[i])) / denom;
+            }
+            std::cout << pij_out[i * N + j] << " ";
+        }
+        printf("\n");
 	}
 
 	return pij_out;
