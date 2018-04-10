@@ -40,7 +40,7 @@ void test_cpu_sigmas_search(unsigned int N, unsigned int NDIMS) {
             h_X[i] = distribution2(generator);
         }
     }
-    std::vector<float> sigmas = sigmas_search_cpu(h_X, N, NDIMS);
+    std::vector<float> sigmas = sigmas_search_cpu(h_X, N, NDIMS, 8.0);
     for (int i = 0; i < N; i++) {
         std::cout << sigmas[i] << " ";
     }

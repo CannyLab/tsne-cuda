@@ -147,11 +147,11 @@ float compute_gradients_cpu(std::vector<float> &forces,
 
 std::vector<float> sigmas_search_cpu(std::vector<float> &points,  
 	                           const unsigned int N, 
-	                           const unsigned int NDIMS) {
+	                           const unsigned int NDIMS,
+	                           float target_perplexity) {
 	const float max_sigma = 1000.0f;
 	const float delta = 0.1f;
 	std::vector<float> sigmas(N, max_sigma/2);
-	float target_perplexity = 8.0f;
 	std::vector<float> pij = compute_pij_cpu(points, sigmas, N, NDIMS);
 	for (int i = 0; i < N; i++) {
 		bool found = false;

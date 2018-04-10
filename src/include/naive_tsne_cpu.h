@@ -22,7 +22,8 @@ std::vector<float> squared_pairwise_dist(std::vector<float> &points, const unsig
 
 std::vector<float> sigmas_search_cpu(std::vector<float> &points,  
                              const unsigned int N, 
-                             const unsigned int NDIMS);
+                             const unsigned int NDIMS,
+                             float target_perplexity);
 
 bool perplexity_equal(const float delta, float perplexity, float target_perplexity);
 
