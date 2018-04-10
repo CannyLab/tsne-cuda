@@ -43,6 +43,8 @@ namespace {
     // TEST(ComputePIJ, CPU_256x50) {test_cpu_compute_pij(256, 50);}
     TEST(ComputePIJ, GPUisCPU) {test_cpu_is_gpu_pij(16,16);}
 
+    TEST(ComputeSigma, GPUisCPU) {test_cpu_sigmas_search(16,16);}
+
     // T-SNE tests
     TEST(NaiveTSNE, 256x50) {test_tsne(16, 50);}
     

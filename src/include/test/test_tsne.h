@@ -28,6 +28,26 @@ void test_cpu_compute_pij(unsigned int N, unsigned int NDIMS) {
     ASSERT_EQ((int) (first_prob*1000), 1000); 
 }
 
+void test_cpu_sigmas_search(unsigned int N, unsigned int NDIMS) {
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution1(-5.0, 1.0);
+    std::normal_distribution<double> distribution2(5.0, 1.0);
+    std::vector<float> h_X(NDIMS * N);
+    for (int i = 0; i < NDIMS * N; i ++) {
+        if (i % N < (N / 2)) {
+            h_X[i] = distribution1(generator);
+        } else {
+            h_X[i] = distribution2(generator);
+        }
+    }
+    std::vector<float> sigmas = sigmas_search_cpu(h_X, N, NDIMS);
+    for (int i = 0; i < N; i++) {
+        std::cout << sigmas[i] << " ";
+    }
+    printf("\n");
+    ASSERT_EQ(0, 0);
+}
+
 
 void test_cpu_is_gpu_pij(unsigned int N, unsigned int NDIMS) {
 
@@ -46,7 +66,8 @@ void test_cpu_is_gpu_pij(unsigned int N, unsigned int NDIMS) {
     std::vector<float> sigmas(N);
     std::uniform_real_distribution<double> udist(10.0, 20.0);
     for (int i = 0; i < N; i++) {
-        sigmas[i] = udist(generator);
+        // sigmas[i] = udist(generator);
+        sigmas[i] = 1.0;
     }
 
     // Copy points to GPU
