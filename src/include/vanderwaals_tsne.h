@@ -19,25 +19,26 @@
 #include "util/thrust_utils.h"
 #include "naive_tsne.h"
 
-namespace vws {
-    thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
-                                            thrust::device_vector<float> &points, 
-                                            thrust::device_vector<float> &sigma, 
-                                            const unsigned int N, 
-                                            const unsigned int NDIMS);
-    float compute_gradients(cublasHandle_t &handle, 
-                            thrust::device_vector<float> &forces,
-                            thrust::device_vector<float> &dist, 
-                            thrust::device_vector<float> &ys, 
-                            thrust::device_vector<float> &pij, 
-                            thrust::device_vector<float> &qij, 
-                            const unsigned int N,
-                            float eta);
-    thrust::device_vector<float> naive_tsne(cublasHandle_t &handle, 
-                                        thrust::device_vector<float> &points, 
-                                        const unsigned int N, 
-                                        const unsigned int NDIMS,
-                                        const unsigned int PROJDIM);
+namespace VWS {
+    /**
+     * @brief Project points into the lower-dimensional space by doing a simple cutoff-based
+     * particle simulation. 
+     * 
+     * @param handle CUBLAS handle
+     * @param points The points to project, Column-Major (NxNDIM)
+     * @param N The number of points
+     * @param NDIMS The number of dimensions in the original space
+     * @param PROJDIM The number of dimensions to project to
+     * @return thrust::device_vector<float> The projected points
+     */
+    thrust::device_vector<float> tsne(cublasHandle_t &handle, 
+                                    thrust::device_vector<float> &points, 
+                                    const unsigned int N, 
+                                    const unsigned int NDIMS,
+                                    const unsigned int PROJDIM);
+
+
+
 }
 
 #endif
