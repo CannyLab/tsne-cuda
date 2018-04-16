@@ -25,3 +25,6 @@ build/*
 
 # exception to the rule
 !build/.gitkeep 
+
+# Ignore animation
+visualization/animation.gif
