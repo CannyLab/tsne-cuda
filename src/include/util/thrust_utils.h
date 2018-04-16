@@ -48,6 +48,37 @@ class strided_range
         difference_type stride;
 };
 
+template <typename T>
+struct pair_t
+{
+    T first;
+    T second;
+};
+
+template <typename T>
+struct minmax_unary_op : public thrust::unary_function< T, pair_t<T> >
+{
+    __host__ __device__ pair_t<T> operator()(const T& x) const {
+        pair_t<T> result;
+        result.first = x;
+        result.second = x;
+        return result;
+    }
+};
+
+template <typename T>
+struct minmax_binary_op : public thrust::binary_function< pair_t<T>, pair_t<T>, pair_t<T> >
+{
+  __host__ __device__ pair_t<T> operator()(const pair_t<T>& x, const pair_t<T>& y) const {
+        pair_t<T> result;
+        result.first = thrust::min(x.first, y.first);
+        result.first = thrust::max(x.first, y.first);
+        return result;
+    }
+};
+
 void zero_diagonal(thrust::device_vector<float> &vec, const unsigned int N);
+
+
 
 #endif
