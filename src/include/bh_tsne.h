@@ -18,6 +18,13 @@
 #include "util/random_utils.h"
 #include "util/thrust_utils.h"
 
+struct bounding_box {
+    float xmin;
+    float xmax;
+    float ymin;
+    float ymax;
+} bounding_box_t;
+
 void compute_bounding_box(thrust::device_vector<float> &ys, const unsigned int N, float *xmin, float *xmax, float *ymin, float *ymax);
 
 thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
