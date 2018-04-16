@@ -10,7 +10,7 @@
 
  // Performs the operation matrix[i, :] = binary_op(matrix[i, :], alpha * vector) for each row i in the matrix
 template<typename BinaryFunction, typename T>
-__global__ void _broadcast_row_vec(
+__global__ void Broadcast::_broadcast_row_vec(
                                     T * __restrict__ matrix, 
                                     const T * __restrict__ vector, 
                                     const unsigned int N, 
@@ -27,7 +27,7 @@ __global__ void _broadcast_row_vec(
 
 // Performs the operation matrix[:, j] = binary_op(matrix[:, j], alpha * vector) for each col i in the matrix
 template<typename BinaryFunction, typename T>
-__global__ void _broadcast_col_vec(
+__global__ void Broadcast::_broadcast_col_vec(
                                     T * __restrict__ matrix, 
                                     const T * __restrict__ vector, 
                                     const unsigned int N, 
@@ -42,25 +42,8 @@ __global__ void _broadcast_col_vec(
      if (j < M) matrix[j * N + i] = binary_op(matrix[j * N + i], alpha * vector[i]);
 }
 
- /**
-  * @brief 
-  * 
-  * @tparam BinaryFunction 
-  * @tparam T Matrix format
-  * @param matrix (N x M) matrix stored in column major order
-  * @param vector Length N vector if axis == 0, length M vector if axis == 1
-  * @param N,M dimensions of matrix
-  * @param binary_op an operation that takes in two arguments of type T and returns a type T
-  * @param axis 0 or 1, controlls whether this runs a column or row broadcast
-  * @param alpha scalar multiple for vector
-  * 
-  * @note 
-  * should axis == 0 be row or column broadcasting? and vice versa for axis == 1?
-  *
-  *
-  */
  template<typename BinaryFunction, typename T>
- void broadcast_matrix_vector(
+ void Broadcast::broadcast_matrix_vector(
                              thrust::device_vector<T> &matrix, 
                              const thrust::device_vector<T> &vector, 
                              const unsigned int N, 
@@ -76,11 +59,11 @@ __global__ void _broadcast_col_vec(
      const unsigned int BLOCKSIZE = 32;
      const unsigned int NBLOCKS = iDivUp(N * M, BLOCKSIZE);
      if (axis == 0) {
-         _broadcast_col_vec<<<NBLOCKS,BLOCKSIZE>>>(thrust::raw_pointer_cast(matrix.data()),
+        Broadcast::_broadcast_col_vec<<<NBLOCKS,BLOCKSIZE>>>(thrust::raw_pointer_cast(matrix.data()),
                                                      thrust::raw_pointer_cast(vector.data()), 
                                                      N, M, binary_op, alpha);
      } else {
-         _broadcast_row_vec<<<NBLOCKS,BLOCKSIZE>>>(thrust::raw_pointer_cast(matrix.data()),
+        Broadcast::_broadcast_row_vec<<<NBLOCKS,BLOCKSIZE>>>(thrust::raw_pointer_cast(matrix.data()),
                                                      thrust::raw_pointer_cast(vector.data()), 
                                                      N, M, binary_op, alpha);
      }
@@ -88,7 +71,7 @@ __global__ void _broadcast_col_vec(
 
 
  // Explicit instantiations of the method
- template void broadcast_matrix_vector<thrust::divides<float>, float>(
+ template void Broadcast::broadcast_matrix_vector<thrust::divides<float>, float>(
     thrust::device_vector<float> &matrix, 
     const thrust::device_vector<float> &vector, 
     const unsigned int N, 
@@ -96,7 +79,7 @@ __global__ void _broadcast_col_vec(
     thrust::divides<float> binary_op,
     const unsigned int axis,
     const float alpha);
- template void broadcast_matrix_vector<thrust::minus<float>, float>(
+ template void Broadcast::broadcast_matrix_vector<thrust::minus<float>, float>(
     thrust::device_vector<float> &matrix, 
     const thrust::device_vector<float> &vector, 
     const unsigned int N, 

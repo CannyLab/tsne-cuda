@@ -2,8 +2,8 @@
  * @brief Naive implementation of T-SNE O(n^2) on CPU
  * 
  * @file naive_tsne_cpu.h
- * @author David Chan
- * @date 2018-04-04
+ * @author Forrest Huang
+ * @date 2018-04-11
  */
 
 #ifndef NAIVE_TSNE_CPU_H

@@ -71,7 +71,7 @@ Inherited from [original repo's license](https://github.com/lvdmaaten/bhtsne).
 Please cite this repository if it was useful for your research:
 
 ```
-@misc{Ulyanov2016,
+@misc{cudatsne2018,
   author = {Chan, D. and Rao, R. and Huang, Z.},
   title = {TSNE-CUDA},
   year = {2018},

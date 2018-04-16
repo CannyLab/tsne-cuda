@@ -1,9 +1,9 @@
 /**
- * @brief Naive implementation of T-SNE O(n^2)
- * 
- * @file naive_tsne.h
+ * @brief Barnes-Hut T-SNE implementation O(Nlog(N))
+  * 
+ * @file bh_tsne.h
  * @author David Chan
- * @date 2018-04-04
+ * @date 2018-04-15
  */
 
 #ifndef BH_TSNE_H

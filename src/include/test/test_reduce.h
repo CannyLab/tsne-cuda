@@ -1,6 +1,10 @@
 /**
-* Tests for the reduce functions
-*/
+ * @brief Unit Tests for the reduce functions
+ * 
+ * @file test_reduce.h
+ * @author David Chan
+ * @date 2018-04-11
+ */
 
 void test_reduce_sum_col(int N, int M) {
 
@@ -20,7 +24,7 @@ void test_reduce_sum_col(int N, int M) {
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
-    auto d_sums = reduce_sum(handle, d_points, N, M, 0);
+    auto d_sums = Reduce::reduce_sum(handle, d_points, N, M, 0);
 
     // Copy the data back to the cpu
     float gpu_result[M];
@@ -58,7 +62,7 @@ void test_reduce_sum_row(int N, int M) {
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
-    auto d_sums = reduce_sum(handle, d_points, N, M, 1);
+    auto d_sums = Reduce::reduce_sum(handle, d_points, N, M, 1);
 
     // Copy the data back to the cpu
     float gpu_result[N];
@@ -96,7 +100,7 @@ void test_reduce_mean_col(int N, int M) {
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
-    auto d_sums = reduce_mean(handle, d_points, N, M, 0);
+    auto d_sums = Reduce::reduce_mean(handle, d_points, N, M, 0);
 
     // Copy the data back to the cpu
     float gpu_result[M];
@@ -134,7 +138,7 @@ void test_reduce_mean_row(int N, int M) {
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
-    auto d_sums = reduce_mean(handle, d_points, N, M, 1);
+    auto d_sums = Reduce::reduce_mean(handle, d_points, N, M, 1);
 
     // Copy the data back to the cpu
     float gpu_result[N];
@@ -172,7 +176,7 @@ void test_reduce_alpha_col(int N, int M, float alpha) {
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
-    auto d_sums = reduce_alpha(handle, d_points, N, M, alpha, 0);
+    auto d_sums = Reduce::reduce_alpha(handle, d_points, N, M, alpha, 0);
 
     // Copy the data back to the cpu
     float gpu_result[M];
@@ -210,7 +214,7 @@ void test_reduce_alpha_row(int N, int M, float alpha) {
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
-    auto d_sums = reduce_alpha(handle, d_points, N, M, alpha, 1);
+    auto d_sums = Reduce::reduce_alpha(handle, d_points, N, M, alpha, 1);
 
     // Copy the data back to the cpu
     float gpu_result[N];

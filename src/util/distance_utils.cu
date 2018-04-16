@@ -14,7 +14,7 @@ struct func_sqrt {
 
 // This really does a simultaneous row/col matrix vector broadcast to compute ||x^2|| + ||y^2|| - 2 x^Ty.
 // Added fabs to deal with numerical instabilities. I think this is a reasonable solution
- __global__ void assemble_final_result(const float * __restrict__ d_norms_x_2, 
+ __global__ void Distance::assemble_final_result(const float * __restrict__ d_norms_x_2, 
                                        float * __restrict__ d_dots,
                                        const int N)
     {
@@ -27,7 +27,7 @@ struct func_sqrt {
 // Code from https://github.com/OrangeOwlSolutions/cuBLAS/blob/master/All_pairs_distances.cu
 // Expects N x NDIMS matrix in points
 // Squared norms taken from diagnoal of dot product which should be faster and result in actually zeroing out the diagonal in assemble_final_result
-void squared_pairwise_dist(cublasHandle_t &handle, 
+void Distance::squared_pairwise_dist(cublasHandle_t &handle, 
                    thrust::device_vector<float> &distances, 
                    const thrust::device_vector<float> &points, 
                    const unsigned int N, 
@@ -36,7 +36,7 @@ void squared_pairwise_dist(cublasHandle_t &handle,
     const unsigned int BLOCKSIZE = 16;
     // thrust::device_vector<float> squared_vals(points.size());
     // square(points, squared_vals);
-    // auto squared_norms = reduce_sum(handle, squared_vals, N, NDIMS, 1);
+    // auto squared_norms = Reduce::reduce_sum(handle, squared_vals, N, NDIMS, 1);
     
     float alpha = 1.f;
     float beta = 0.f;
@@ -52,17 +52,17 @@ void squared_pairwise_dist(cublasHandle_t &handle,
 
 	dim3 dimBlock(BLOCKSIZE, BLOCKSIZE);
 	dim3 dimGrid(iDivUp(N, BLOCKSIZE), iDivUp(N, BLOCKSIZE));
-	assemble_final_result<<<dimGrid, dimBlock>>>(thrust::raw_pointer_cast(squared_norms.data()), 
+	Distance::assemble_final_result<<<dimGrid, dimBlock>>>(thrust::raw_pointer_cast(squared_norms.data()), 
                                                  thrust::raw_pointer_cast(distances.data()), N);
                                                  
 }
 
-void pairwise_dist(cublasHandle_t &handle, 
+void Distance::pairwise_dist(cublasHandle_t &handle, 
                    thrust::device_vector<float> &distances, 
                    const thrust::device_vector<float> &points, 
                    const unsigned int N, 
                    const unsigned int NDIMS) 
 {
-    squared_pairwise_dist(handle, distances, points, N, NDIMS);
-    sqrt(distances, distances);
+    Distance::squared_pairwise_dist(handle, distances, points, N, NDIMS);
+    Math::sqrt(distances, distances);
 }

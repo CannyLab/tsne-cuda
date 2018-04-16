@@ -19,7 +19,7 @@ void pymodule_e_dist(float *points, float *dist, ssize_t *dims) {
     // Create the handle, and construct the points
     cublasHandle_t handle;
     cublasSafeCall(cublasCreate(&handle));
-    pairwise_dist(handle, d_distances, d_points, N_POINTS, N_DIMS);
+    Distance::pairwise_dist(handle, d_distances, d_points, N_POINTS, N_DIMS);
 
     // Copy the data back to the CPU
     thrust::copy(d_distances.begin(), d_distances.end(), dist);
@@ -49,7 +49,7 @@ void pymodule_naive_tsne(float *points, float *result, ssize_t *dims, int proj_d
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the T-SNE
-    auto tsne_result = naive_tsne(handle, d_points, N_POINTS, N_DIMS, proj_dim);
+    auto tsne_result = NaiveTSNE::tsne(handle, d_points, N_POINTS, N_DIMS, proj_dim);
 
     // Copy the data back to the CPU
     thrust::copy(tsne_result.begin(), tsne_result.end(), result);
@@ -76,7 +76,7 @@ void pymodule_compute_pij(float *points, float* sigmas, float *result, ssize_t *
      cublasSafeCall(cublasCreate(&handle));
  
      // Do the T-SNE
-     auto pij = compute_pij(handle, d_points, d_sigmas, N_POINTS, N_DIMS);
+     auto pij = NaiveTSNE::compute_pij(handle, d_points, d_sigmas, N_POINTS, N_DIMS);
  
      // Copy the data back to the CPU
      thrust::copy(pij.begin(), pij.end(), result);

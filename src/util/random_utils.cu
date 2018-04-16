@@ -26,7 +26,7 @@
 };
 
 
-thrust::device_vector<float> random_vector(const unsigned int N) {
+thrust::device_vector<float> Random::random_vector(const unsigned int N) {
     thrust::device_vector<float> vec(N);
     thrust::counting_iterator<int> first(0);
     thrust::counting_iterator<int> last = first + N;
@@ -34,7 +34,7 @@ thrust::device_vector<float> random_vector(const unsigned int N) {
     return vec;
 }
 
-thrust::device_vector<float> rand_in_range(const unsigned int N, float lb, float ub) {
+thrust::device_vector<float> Random::rand_in_range(const unsigned int N, float lb, float ub) {
     std::mt19937 eng; 
     eng.seed(time(NULL));
     std::uniform_real_distribution<float> dist(lb, ub);  

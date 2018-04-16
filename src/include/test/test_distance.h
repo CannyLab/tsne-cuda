@@ -1,6 +1,10 @@
 /**
-* Tests for the distance functions
-*/
+ * @brief Unit Tests for the distance functions
+ * 
+ * @file test_distance.h
+ * @author David Chan
+ * @date 2018-04-11
+ */
 
 void test_pairwise_distance(int N, int NDIM) {
     srand (time(NULL));
@@ -21,7 +25,7 @@ void test_pairwise_distance(int N, int NDIM) {
     // Construct the CUBLAS handle
     cublasHandle_t handle;
     cublasSafeCall(cublasCreate(&handle));
-    pairwise_dist(handle, d_distances, d_points, N, NDIM);
+    Distance::pairwise_dist(handle, d_distances, d_points, N, NDIM);
 
     thrust::host_vector<float> h_distances(N*N);
     thrust::copy(d_distances.begin(), d_distances.end(), h_distances.begin());

@@ -9,7 +9,7 @@
  #include "util/reduce_utils.h"
 
 // expects matrix of size N x M
-thrust::device_vector<float> reduce_alpha(cublasHandle_t &handle, 
+thrust::device_vector<float> Reduce::reduce_alpha(cublasHandle_t &handle, 
                                           const thrust::device_vector<float> &matrix, 
                                           const unsigned int N, 
                                           const unsigned int M, 
@@ -37,23 +37,23 @@ thrust::device_vector<float> reduce_alpha(cublasHandle_t &handle,
     }
 }
 
-thrust::device_vector<float> reduce_mean(cublasHandle_t &handle, 
+thrust::device_vector<float> Reduce::reduce_mean(cublasHandle_t &handle, 
                                          const thrust::device_vector<float> &matrix, 
                                          const unsigned int N, 
                                          const unsigned int M, 
                                          const int axis) 
 {
     float alpha = 1.f / N;
-    return reduce_alpha(handle, matrix, N, M, alpha, axis);
+    return Reduce::reduce_alpha(handle, matrix, N, M, alpha, axis);
 }
 
 
-thrust::device_vector<float> reduce_sum(cublasHandle_t &handle, 
+thrust::device_vector<float> Reduce::reduce_sum(cublasHandle_t &handle, 
                                         const thrust::device_vector<float> &matrix, 
                                         const unsigned int N, 
                                         const unsigned int M, 
                                         const int axis) 
 {
     float alpha = 1.f;
-    return reduce_alpha(handle, matrix, N, M, alpha, axis);
+    return Reduce::reduce_alpha(handle, matrix, N, M, alpha, axis);
 }

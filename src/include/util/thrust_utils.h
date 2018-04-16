@@ -1,3 +1,11 @@
+/**
+ * @brief Assorted Thrust utilities
+ * 
+ * @file test_tsne.h
+ * @date 2018-04-11
+ */
+
+
 #ifndef THRUST_UTILS_H
 #define THRUST_UTILS_H
 

@@ -1,3 +1,11 @@
+/**
+ * @brief Assorted CUDA utilities borrowed from https://github.com/OrangeOwlSolutions
+ * 
+ * @file test_tsne.h
+ * @date 2018-04-11
+ */
+
+
 #ifndef UTILITIES_CUH
 #define UTILITIES_CUH
 

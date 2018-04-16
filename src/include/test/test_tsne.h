@@ -1,6 +1,10 @@
 /**
-* Tests for the TSNE functions
-*/
+ * @brief Unit Tests for the T-SNE functions
+ * 
+ * @file test_tsne.h
+ * @author David Chan
+ * @date 2018-04-11
+ */
 
 void test_cpu_compute_pij(unsigned int N, unsigned int NDIMS) {
 
@@ -82,7 +86,7 @@ void test_cpu_is_gpu_pij(unsigned int N, unsigned int NDIMS) {
     // Compute the GPU Pij
     cublasHandle_t handle;
     cublasSafeCall(cublasCreate(&handle));
-    auto d_gpu_pij = compute_pij(handle, d_X, d_sigmas, N, NDIMS);
+    auto d_gpu_pij = NaiveTSNE::compute_pij(handle, d_X, d_sigmas, N, NDIMS);
     cudaDeviceSynchronize();
     float gpu_pij[N*N];
     thrust::copy(d_gpu_pij.begin(), d_gpu_pij.end(), gpu_pij);
@@ -128,7 +132,7 @@ void test_tsne(unsigned int N,unsigned int NDIMS) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", N);
     cudaEventRecord(start);
-    naive_tsne(handle, d_X, N, NDIMS, 2);
+    NaiveTSNE::tsne(handle, d_X, N, NDIMS, 2);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;
