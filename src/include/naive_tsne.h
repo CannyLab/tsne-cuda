@@ -20,20 +20,59 @@
 
 namespace NaiveTSNE {
     /**
-     * @brief Compute the P(i|j) distribution O(n^2)
+     * @brief Compute the Pij distribution O(n^2)
      * 
      * @param handle CUBLAS handle
      * @param points The points in an NxNDIM column-major array
      * @param sigma The list of sigmas for each point
      * @param N The number of points
      * @param NDIMS The number of dimensions for each point
-     * @return thrust::device_vector<float> The computer P(i|j) distribution (symmetrized)
+     * @return thrust::device_vector<float> The computed Pij distribution (symmetrized)
      */
     thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
                                          thrust::device_vector<float> &points, 
                                          thrust::device_vector<float> &sigma, 
                                          const unsigned int N, 
                                          const unsigned int NDIMS);
+    /**
+     * @brief Compute the Pij based on P(i|j) using Pij = P(i|j) + P(j|i)/2N O(n^2)
+     * 
+     * @param handle CUBLAS handle
+     * @param pij_vals Computed P(i|j) values
+     * @param N The number of points
+     * @return thrust::device_vector<float> The computed Pij distribution (symmetrized)
+     */
+    thrust::device_vector<float> symmetrize_pij(cublasHandle_t &handle, 
+                                         thrust::device_vector<float> &pij_vals, 
+                                         const unsigned int N);
+
+    /**
+     * @brief Searches the right sigmas for computing pij
+     * 
+     * @param handle CUBLAS handle
+     * @param points Original Points
+     * @param perplexity_target Target perplexity for the Search
+     * @param eps Error tolerance for the perplexity search
+     * @param N The number of points
+     * @param NDIMS Number of Dimensions of points
+     * @return thrust::device_vector<float> Computed Sigmas based on the perplexity target
+     */
+    thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
+                        thrust::device_vector<float> &points,
+                        const float perplexity_target,
+                        const float eps,
+                        const unsigned int N,
+                        const unsigned int NDIMS);
+
+    ///@private
+    void thrust_search_perplexity(cublasHandle_t &handle,
+                        thrust::device_vector<float> &sigmas,
+                        thrust::device_vector<float> &lower_bound,
+                        thrust::device_vector<float> &upper_bound,
+                        thrust::device_vector<float> &perplexity,
+                        const thrust::device_vector<float> &pij,
+                        const float target_perplexity,
+                        const unsigned int N);
 
     /**
      * @brief Compute the T-SNE gradients 

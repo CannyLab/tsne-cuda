@@ -30,35 +30,6 @@ struct func_pow2 {
     __host__ __device__ float operator()(const float &x) const { return pow(2,x); }
 };
 
-__global__ void perplexity_search(float* __restrict__ sigmas, 
-                                    float* __restrict__ lower_bound, 
-                                    float* __restrict__ upper_bound,
-                                    float* __restrict__ perplexity, 
-                                    const float* __restrict__ pij, 
-                                    const float target_perplexity, 
-                                    const int N) 
-{
-    int TID = threadIdx.x + blockIdx.x * blockDim.x;
-    if (TID > N) return;
-
-    // Compute the perplexity for this point
-    float entropy = 0.0f; 
-    for (int i = 0; i < N; i++) {
-        if (i != TID) {
-            entropy += pij[i + TID*N]*log2(pij[i + TID*N]);
-        }
-    }
-    perplexity[TID] = pow(2,-1.0*entropy);
-
-    if (perplexity[TID] < target_perplexity) {
-        upper_bound[TID] = sigmas[TID];
-        
-    } else {
-        lower_bound[TID] = sigmas[TID];
-    }
-    sigmas[TID] = (upper_bound[TID] + lower_bound[TID])/2.0f;
-}
-
 __global__ void upper_lower_assign(float * __restrict__ sigmas,
                                     float * __restrict__ lower_bound,
                                     float * __restrict__ upper_bound,
@@ -76,7 +47,7 @@ __global__ void upper_lower_assign(float * __restrict__ sigmas,
     sigmas[TID] = (upper_bound[TID] + lower_bound[TID])/2.0f;
 }
 
-void thrust_search_perplexity(cublasHandle_t &handle,
+void NaiveTSNE::thrust_search_perplexity(cublasHandle_t &handle,
                         thrust::device_vector<float> &sigmas,
                         thrust::device_vector<float> &lower_bound,
                         thrust::device_vector<float> &upper_bound,
@@ -119,6 +90,44 @@ void thrust_search_perplexity(cublasHandle_t &handle,
     // std::cout << std::endl;
 
 }
+
+thrust::device_vector<float> NaiveTSNE::search_perplexity(cublasHandle_t &handle,
+                        thrust::device_vector<float> &points,
+                        const float perplexity_target,
+                        const float eps,
+                        const unsigned int N,
+                        const unsigned int NDIMS) {
+
+    thrust::device_vector<float> sigmas(N, 500.0f);
+    thrust::device_vector<float> best_sigmas(N);
+    thrust::device_vector<float> perplexity(N);
+    thrust::device_vector<float> lbs(N, 0.0f);
+    thrust::device_vector<float> ubs(N, 1000.0f);
+
+    thrust::device_vector<float> pij = NaiveTSNE::compute_pij(handle, points, sigmas, N, NDIMS);
+    float best_perplexity = 1000.0f;
+    float perplexity_diff = 50.0f;
+    int iters = 0;
+    while (perplexity_diff > eps) {
+         NaiveTSNE::thrust_search_perplexity(handle, sigmas, lbs, ubs, perplexity, pij, perplexity_target, N);
+         perplexity_diff = abs(thrust::reduce(perplexity.begin(), perplexity.end())/((float) N) - perplexity_target);
+         if (iters % 500 == 0) {
+             printf("Current perplexity delta after %d iterations: %0.5f\n", iters, perplexity_diff);
+            std::cout << (perplexity_diff > 1e-2) << "\n";
+         }
+
+         if (perplexity_diff < best_perplexity){
+             best_perplexity = perplexity_diff;
+             printf("!! Best perplexity found in %d iterations: %0.5f\n", iters, perplexity_diff);
+             thrust::copy(sigmas.begin(), sigmas.end(), best_sigmas.begin());
+         }
+         pij = NaiveTSNE::compute_pij(handle, points, sigmas, N, NDIMS);
+         iters++;
+    } // Close perplexity search
+
+    return best_sigmas;
+}
+
 thrust::device_vector<float> NaiveTSNE::compute_pij(cublasHandle_t &handle, 
                                          thrust::device_vector<float> &points, 
                                          thrust::device_vector<float> &sigma, 
@@ -127,6 +136,7 @@ thrust::device_vector<float> NaiveTSNE::compute_pij(cublasHandle_t &handle,
 {
     thrust::device_vector<float> pij_vals(N * N);
     Distance::squared_pairwise_dist(handle, pij_vals, points, N, NDIMS);
+
 
     // std::cout << "Sigma:" << std::endl;
     // printarray(sigma, N, 1);
@@ -169,18 +179,25 @@ thrust::device_vector<float> NaiveTSNE::compute_pij(cublasHandle_t &handle,
     // std::cout << std::endl << std::endl << "Normalized Cols" << std::endl;
     // printarray(pij_vals, N, N);
 
-    // Do a symmetrization of the distribution
+    // std::cout << std::endl << std::endl << "Final Output" << std::endl;
+    // printarray(pij_output, N, N);
+    
+    return pij_vals;
+}
+
+thrust::device_vector<float> NaiveTSNE::symmetrize_pij(cublasHandle_t &handle, 
+                                         thrust::device_vector<float> &pij_vals, 
+                                         const unsigned int N)
+{
     float alpha = 0.5f;
     float beta = 0.5f;
     thrust::device_vector<float> pij_output(N*N);
     cublasSafeCall(cublasSgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, N, N, &alpha, thrust::raw_pointer_cast(pij_vals.data()), N, 
                                &beta, thrust::raw_pointer_cast(pij_vals.data()), N, thrust::raw_pointer_cast(pij_output.data()), N));
-
-    // std::cout << std::endl << std::endl << "Final Output" << std::endl;
-    // printarray(pij_output, N, N);
-    
     return pij_output;
+
 }
+
 
 /**
   * Gradient formula from http://www.jmlr.org/papers/volume9/vandermaaten08a/vandermaaten08a.pdf
@@ -287,38 +304,12 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
 
     //TODO: Fix perplexity search
 
-    // float perplexity_target = 16.0f;
-    // float perplexity_diff = 1;
+    float perplexity_target = 8.0f;
+    float eps = 1e-2;
 
-    thrust::device_vector<float> sigmas = Random::rand_in_range(N, 0.2f, 0.4f);
-    // thrust::device_vector<float> best_sigmas(N);
-    // thrust::device_vector<float> perplexity(N);
-    // thrust::device_vector<float> lbs(N, 0.0f);
-    // thrust::device_vector<float> ubs(N, 512.0f);
-
-    // auto pij = compute_pij(handle, points, sigmas, N, NDIMS);
-    // int iters = 1;
-    // float best_perplexity = 100000.0f;
-
-    // while (perplexity_diff > 1e-4 && iters < 5000) {
-    //     // printarray(perplexity,1,N);
-    //     // printarray(sigmas,1,N);
-    //     thrust_search_perplexity(handle, sigmas, lbs, ubs, perplexity, pij, perplexity_target, N);
-    //     float perplexity_diff = abs(thrust::reduce(perplexity.begin(), perplexity.end())/((float) N) - perplexity_target);
-    //     //if (iters % 500 == 0)
-    //     //    printf("Current perplexity delta after %d iterations: %0.5f\n", iters, perplexity_diff);
-
-    //     if (perplexity_diff < best_perplexity){
-    //         best_perplexity = perplexity_diff;
-    //         printf("!! Best perplexity found in %d iterations: %0.5f\n", iters, perplexity_diff);
-    //         thrust::copy(sigmas.begin(), sigmas.end(), best_sigmas.begin());
-    //     }
-
-    //     pij = compute_pij(handle, points, sigmas, N, NDIMS);
-    //     iters++;
-    // } // Close perplexity search
-
+    thrust::device_vector<float> sigmas = NaiveTSNE::search_perplexity(handle, points, perplexity_target, eps, N, NDIMS);
     auto pij = NaiveTSNE::compute_pij(handle, points, sigmas, N, NDIMS);
+    pij = NaiveTSNE::symmetrize_pij(handle, pij, N);
 
     //std::cout << "Pij" << std::endl;
     //printarray(pij, N, N);
