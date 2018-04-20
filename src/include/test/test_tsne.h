@@ -157,10 +157,10 @@ void test_cpu_is_gpu_pij(unsigned int N, unsigned int NDIMS) {
     //     printf("\n");
     // }
 
-
-    for (int i = 0; i < N*N; i++){
-        ASSERT_EQ((int) (cpu_pij[i]*1e4), (int) (gpu_pij[i]*1e4) );
-    }
+    for (int j = 0; j < N; j++)
+        for (int i = 0; i < N; i++){
+            ASSERT_EQ((int) (cpu_pij[i + j*N]*1e4), (int) (gpu_pij[i*N + j]*1e4) );
+        }
          
 }
 
