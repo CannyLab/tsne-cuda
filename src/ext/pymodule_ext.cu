@@ -76,7 +76,8 @@ void pymodule_compute_pij(float *points, float* sigmas, float *result, ssize_t *
      cublasSafeCall(cublasCreate(&handle));
  
      // Do the T-SNE
-     auto pij = NaiveTSNE::compute_pij(handle, d_points, d_sigmas, N_POINTS, N_DIMS);
+     thrust::device_vector<float> pij(N_POINTS*N_POINTS);
+     NaiveTSNE::compute_pij(handle, pij, d_points, d_sigmas, N_POINTS, N_DIMS);
  
      // Copy the data back to the CPU
      thrust::copy(pij.begin(), pij.end(), result);

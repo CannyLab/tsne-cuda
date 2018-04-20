@@ -46,10 +46,10 @@ void test_cpu_sigmas_search(unsigned int N, unsigned int NDIMS) {
         }
     }
     std::vector<float> sigmas = sigmas_search_cpu(h_X, N, NDIMS, 8.0);
-    for (int i = 0; i < N; i++) {
-        std::cout << sigmas[i] << " ";
-    }
-    printf("\n");
+    // for (int i = 0; i < N; i++) {
+    //     std::cout << sigmas[i] << " ";
+    // }
+    // printf("\n");
     ASSERT_EQ(0, 0);
 }
 
@@ -89,13 +89,14 @@ void test_cpu_is_gpu_perplexity(unsigned int N, unsigned int NDIMS) {
     // Compute the GPU Pij
     cublasHandle_t handle;
     cublasSafeCall(cublasCreate(&handle));
-    auto d_gpu_pij = NaiveTSNE::compute_pij(handle, d_X, d_sigmas, N, NDIMS);
+    thrust::device_vector<float> d_gpu_pij(N*N);
+    NaiveTSNE::compute_pij(handle, d_gpu_pij, d_X, d_sigmas, N, NDIMS);
     NaiveTSNE::thrust_search_perplexity(handle, d_sigmas, lbs, ubs, d_perp, d_gpu_pij, 8.0, N);
 
     cudaDeviceSynchronize();
     float gpu_perp[N];
     thrust::copy(d_perp.begin(), d_perp.end(), gpu_perp);
-    std::cout << h_perp << ", " << gpu_perp[0] << "\n";
+    // std::cout << h_perp << ", " << gpu_perp[0] << "\n";
 
     ASSERT_EQ((int) (gpu_perp[0]*1e4), (int) (h_perp*1e4));
 }
@@ -132,28 +133,29 @@ void test_cpu_is_gpu_pij(unsigned int N, unsigned int NDIMS) {
     // Compute the GPU Pij
     cublasHandle_t handle;
     cublasSafeCall(cublasCreate(&handle));
-    auto d_gpu_pij = NaiveTSNE::compute_pij(handle, d_X, d_sigmas, N, NDIMS);
+    thrust::device_vector<float> d_gpu_pij(N*N);
+    NaiveTSNE::compute_pij(handle, d_gpu_pij, d_X, d_sigmas, N, NDIMS);
     cudaDeviceSynchronize();
     float gpu_pij[N*N];
     thrust::copy(d_gpu_pij.begin(), d_gpu_pij.end(), gpu_pij);
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < NDIMS; j++) {
-             std::cout << h_X[i + j * N] << ", ";
-        }
-        printf("\n");
-    }
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-             std::cout << cpu_pij[i * N + j] << " ";
-        }
-        printf("\n");
-    }
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-             std::cout << gpu_pij[i * N + j] << " ";
-        }
-        printf("\n");
-    }
+    // for (int i = 0; i < N; i++) {
+    //     for (int j = 0; j < NDIMS; j++) {
+    //          std::cout << h_X[i + j * N] << ", ";
+    //     }
+    //     printf("\n");
+    // }
+    // for (int i = 0; i < N; i++) {
+    //     for (int j = 0; j < N; j++) {
+    //          std::cout << cpu_pij[i * N + j] << " ";
+    //     }
+    //     printf("\n");
+    // }
+    // for (int i = 0; i < N; i++) {
+    //     for (int j = 0; j < N; j++) {
+    //          std::cout << gpu_pij[i * N + j] << " ";
+    //     }
+    //     printf("\n");
+    // }
 
 
     for (int i = 0; i < N*N; i++){
@@ -185,14 +187,14 @@ void test_sigmas_search(unsigned int N, unsigned int NDIMS) {
     cublasSafeCall(cublasCreate(&handle));
     auto d_sigmas = NaiveTSNE::search_perplexity(handle, d_X, perplexity_target, eps, N, NDIMS);
     std::vector<float> sigmas = sigmas_search_cpu(h_X, N, NDIMS, perplexity_target);
-    for (int i = 0; i < N; i++) {
-       std::cout << sigmas[i] << " ";
-    }
-    printf("\n");
-    for (int i = 0; i < N; i++) {
-       std::cout << d_sigmas[i] << " ";
-    }
-    printf("\n");
+    // for (int i = 0; i < N; i++) {
+    //    std::cout << sigmas[i] << " ";
+    // }
+    // printf("\n");
+    // for (int i = 0; i < N; i++) {
+    //    std::cout << d_sigmas[i] << " ";
+    // }
+    // printf("\n");
     
     cudaDeviceSynchronize();
     ASSERT_EQ(0, 0);    

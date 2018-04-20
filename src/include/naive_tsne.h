@@ -25,26 +25,26 @@ namespace NaiveTSNE {
      * @param handle CUBLAS handle
      * @param points The points in an NxNDIM column-major array
      * @param sigma The list of sigmas for each point
+     * @param pij The computed pij value
      * @param N The number of points
      * @param NDIMS The number of dimensions for each point
-     * @return thrust::device_vector<float> The computed Pij distribution (symmetrized)
      */
-    thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
-                                         thrust::device_vector<float> &points, 
-                                         thrust::device_vector<float> &sigma, 
-                                         const unsigned int N, 
-                                         const unsigned int NDIMS);
+    void compute_pij(cublasHandle_t &handle, 
+                thrust::device_vector<float> &pij,  
+                const thrust::device_vector<float> &points, 
+                const thrust::device_vector<float> &sigma,
+                const unsigned int N, 
+                const unsigned int NDIMS);
     /**
      * @brief Compute the Pij based on P(i|j) using Pij = P(i|j) + P(j|i)/2N O(n^2)
      * 
      * @param handle CUBLAS handle
      * @param pij_vals Computed P(i|j) values
      * @param N The number of points
-     * @return thrust::device_vector<float> The computed Pij distribution (symmetrized)
      */
-    thrust::device_vector<float> symmetrize_pij(cublasHandle_t &handle, 
-                                         thrust::device_vector<float> &pij_vals, 
-                                         const unsigned int N);
+    void symmetrize_pij(cublasHandle_t &handle, 
+                            thrust::device_vector<float> &pij, 
+                            const unsigned int N);
 
     /**
      * @brief Searches the right sigmas for computing pij
