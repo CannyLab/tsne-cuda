@@ -49,3 +49,25 @@ void test_pairwise_distance(int N, int NDIM) {
         EXPECT_TRUE(h_distances[i] >= 0);
     }
 }
+
+void test_pairwise_distance_speed(int N, int NDIM) {
+    srand (time(NULL));
+
+    // Create some random points in 2 dimensions
+    float points[N * NDIM];
+    for (int i = 0; i < N*NDIM; i++) {
+        points[i] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+    }
+    // Construct the thrust vector
+    thrust::host_vector<float> h_points(N*NDIM);
+    for (int i = 0; i < N*NDIM; i++) 
+        h_points[i] = points[i]; 
+    thrust::device_vector<float> d_points(N*NDIM);
+    thrust::copy(h_points.begin(), h_points.end(), d_points.begin());
+    thrust::device_vector<float> d_distances(N*N);
+
+    // Construct the CUBLAS handle
+    cublasHandle_t handle;
+    cublasSafeCall(cublasCreate(&handle));
+    Distance::pairwise_dist(handle, d_distances, d_points, N, NDIM);
+}
