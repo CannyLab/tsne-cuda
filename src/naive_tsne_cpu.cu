@@ -1,11 +1,11 @@
 #include "common.h"
 
 std::vector<float> squared_pairwise_dist(std::vector<float> &points, const unsigned int N, const unsigned int NDIMS) {
-	std::vector<float> squared_pairwise_dist(N * N);
+	std::vector<float> squared_pairwise_dist(N * N, 0);
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
 			for(int k = 0; k < NDIMS; k++) {
-				squared_pairwise_dist[i * N + j] = (points[i + k * N] - points[j + k * N]) * (points[i + k * N] - points[j + k * N]); 
+				squared_pairwise_dist[i * N + j] += (points[i + k * N] - points[j + k * N]) * (points[i + k * N] - points[j + k * N]); 
 			}
 		}
     }
@@ -58,7 +58,6 @@ void recompute_pij_row_cpu(std::vector<float> &points,
 	                           const unsigned int N, 
 	                           const unsigned int NDIMS) {
 	std::vector<float> dists = squared_pairwise_dist(points, N, NDIMS);
-
 	for (int j = 0; j < N; j++) {
 		float denom = 0;
 		for (int k = 0; k < N; k++) {
@@ -91,11 +90,9 @@ std::vector<float> compute_pij_cpu(std::vector<float> &points,
             if (i != j) {
 			    pij_out[i * N + j] = std::exp(-dists[i * N + j] / (2 * sigma[i] * sigma[i])) / denom;
             }
-            std::cout << pij_out[i * N + j] << " ";
+           
         }
-        printf("\n");
 	}
-
 	return pij_out;
 
 }
@@ -161,7 +158,7 @@ std::vector<float> sigmas_search_cpu(std::vector<float> &points,
 		while (!found) {
 			found = compare_perplexity(pij, lo, mid, hi, i, N, delta, target_perplexity);
 			recompute_pij_row_cpu(points, pij, mid, i, N, NDIMS);
-		}
+        }
 		sigmas[i] = mid;
 	}
 	return sigmas;
