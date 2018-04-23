@@ -48,11 +48,11 @@ class NaiveTSNE(object):
                                                 iterations so this value is rounded to the next multiple of 50. (default: {300})
             min_grad_norm {float} -- If the gradient norm is below this threshold, the optimization will be stopped. (default: {1e-7})
             metric {str} -- TODO: Implement this feature. Currently only the euclidean metric (L2) is supported. (default: {'euclidean'})
-            init {str} -- Initialization of embedding. Possible options are ‘random’, ‘pca’, and a numpy array of shape 
+            init {str} -- TODO: Initialization of embedding. Possible options are ‘random’, ‘pca’, and a numpy array of shape 
                                 (n_samples, n_components). PCA initialization cannot be used with precomputed distances
                                  and is usually more globally stable than random initialization. (default: {'random'})
-            verbose {int} -- Verbosity level. (default: {0})
-            random_seed {int} -- [The seed used by the random number generator. (default: {None})
+            verbose {int} -- TODO: Verbosity level. (default: {0})
+            random_seed {int} -- TODO: [The seed used by the random number generator. (default: {None})
         """
 
         # Initialize the variables
@@ -87,8 +87,12 @@ class NaiveTSNE(object):
                                   N.ctypeslib.ndpointer(N.float32, ndim=2, flags='ALIGNED, F_CONTIGUOUS, WRITEABLE'), # Output points
                                   ctypes.POINTER(N.ctypeslib.c_intp), # Input points dimension
                                   ctypes.c_int, # Projected Dimension
+                                  ctypes.c_float, # Perplexity
+                                  ctypes.c_float, # Early exagg
                                   ctypes.c_float, # Learning Rate
-                                  ctypes.c_float # Perplexity
+                                  ctypes.c_int, # n_iter
+                                  ctypes.c_int, # n_iter w/o progress
+                                  ctypres.c_float # min_norm
                                 ]
 
         # Set up the attributed
@@ -109,7 +113,14 @@ class NaiveTSNE(object):
         X = N.require(X, N.float32, ['F_CONTIGUOUS', 'ALIGNED'])
         self.embedding_ = N.empty(shape=(X.shape[0],self.n_components))
         self.embedding_ = N.require(results, N.float32, ['F_CONTIGUOUS', 'ALIGNED', 'WRITEABLE'])
-        self._lib.pymodule_naive_tsne(X, self.embedding_, X.ctypes.shape, c_int(self.n_components), c_float(self.learning_rate), c_float(self.perplexity))
+        self._lib.pymodule_naive_tsne(X, self.embedding_, X.ctypes.shape, 
+                                        c_int(self.n_components), 
+                                        c_float(self.perplexity), 
+                                        c_float(self.early_exaggeration),
+                                        c_float(self.learning_rate), 
+                                        c_int(self.n_iter),
+                                        c_int(self.n_iter_without_progress),
+                                        c_float(self.min_grad_norm))
         return self.embedding_
 
 

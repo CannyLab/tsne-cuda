@@ -6,7 +6,6 @@
  * @date 2018-04-16
  */
 
-
 thrust::device_vector<float> VWS::tsne(cublasHandle_t &handle, thrust::device_vector<float> &points, 
                                         const unsigned int N, const unsigned int NDIMS, 
                                         const unsigned int PROJDIM) {

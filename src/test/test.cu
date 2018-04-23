@@ -29,6 +29,7 @@ namespace {
     TEST(PairwiseDist, 64x2) {test_pairwise_distance(64,2);}
     TEST(PairwiseDist, 64x64) {test_pairwise_distance(64,64);}
     TEST(PairwiseDist, 64x128) {test_pairwise_distance(64,128);}
+    TEST(PairwiseDist, 20000x128) {test_pairwise_distance_speed(20000,128);}
 
     // Reduction Tests
     TEST(Reductions, ReduceSum_Col_512x512){test_reduce_sum_col(512,512);}
@@ -48,6 +49,8 @@ namespace {
 
     TEST(ComputePerplexity, 16x16) {test_sigmas_search(16, 16);}
     // T-SNE tests
-    TEST(NaiveTSNE, 256x50) {test_tsne(16, 16);}
+    TEST(NaiveTSNE, 256x50) {test_tsne(256, 50);}
+    TEST(NaiveTSNE, 512x50) {test_tsne(512, 50);}
+    TEST(NaiveTSNE, 1024x50) {test_tsne(1024, 50);}
     
 }
