@@ -34,10 +34,17 @@
          * @param result The result array
          * @param dimsm The dimensions of the points array
          * @param proj_dim The number of dimensions to project to
-         * @param learning_rate The learning rate of the gradient ascent
          * @param perplexity The target perplexity
+         * @param early_ex The early learning rate exaggeration factor
+         * @param learning_rate The learning rate of the gradient ascent
+         * @param n_iter The number of iterations to run for
+         * @param n_iter_np The number of iterations to run for with no progress
+         * @param min_g_norm The minimum gradient norm for termination
          */
-        void pymodule_naive_tsne(float *points, float *result, ssize_t *dimsm, int proj_dim, float learning_rate, float perplexity);
+        void pymodule_naive_tsne(float *points, float *result, ssize_t *dimsm, 
+                                    int proj_dim, float perplexity, float early_ex, 
+                                    float learning_rate, int n_iter,  int n_iter_np, 
+                                    float min_g_norm);
     }
 
 #endif

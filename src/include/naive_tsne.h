@@ -113,6 +113,35 @@ namespace NaiveTSNE {
                                         const unsigned int N, 
                                         const unsigned int NDIMS,
                                         const unsigned int PROJDIM);
+
+    /**
+     * @brief Perform T-SNE using the naive O(n^2) forces method with some
+     * additional parameters
+     * 
+     * @param handle The CUBLAS handle to use
+     * @param d_points  The array of points in coloumn-major NxNDIM matrix
+     * @param N_POINTS  The number of points that we're using
+     * @param N_DIMS  The number of dimensions that the original points are in
+     * @param proj_dim  The number of dimensions we're projecting to
+     * @param perplexity The perplexity that we're shooting for in our distribution
+     * @param early_ex The amount of early exaggeration to use
+     * @param learning_rate The learning rate to use
+     * @param n_iter The number of iterations to perform
+     * @param n_iter_np The number of iterations to go without progress before early termination 
+     * @param min_g_norm  The norm of the forces to keep above
+     * @return thrust::device_vector<float> The projected points
+     */
+    thrust::device_vector<float> tsne(cublasHandle_t &handle, 
+                                        thrust::device_vector<float> &d_points, 
+                                        unsigned int N_POINTS, 
+                                        unsigned int N_DIMS, 
+                                        unsigned int proj_dim, 
+                                        float perplexity, 
+                                        float early_ex, 
+                                        float learning_rate, 
+                                        unsigned int n_iter, 
+                                        unsigned int n_iter_np, 
+                                        float min_g_norm);
 }
 
 #endif

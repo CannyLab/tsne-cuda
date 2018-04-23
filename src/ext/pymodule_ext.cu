@@ -25,7 +25,8 @@ void pymodule_e_dist(float *points, float *dist, ssize_t *dims) {
     thrust::copy(d_distances.begin(), d_distances.end(), dist);
 }
 
-void pymodule_naive_tsne(float *points, float *result, ssize_t *dims, int proj_dim, float learning_rate, float perplexity) {
+void pymodule_naive_tsne(float *points, float *result, ssize_t *dims, int proj_dim, float perplexity, float early_ex, 
+                            float learning_rate, int n_iter,  int n_iter_np, float min_g_norm) {
     
     // Extract the dimensions of the points array
     ssize_t N_POINTS = dims[0];
@@ -40,16 +41,13 @@ void pymodule_naive_tsne(float *points, float *result, ssize_t *dims, int proj_d
     // Construct the sigmas
     thrust::device_vector<float> sigmas(N_POINTS, 1.0f);
 
-    /*
-        RIGHT NOW, WE IGNORE THE PROJECTED DIMENSION, THE LEARNING RATE, and the PERPLEXITY
-    */
-
     // Create the CUBLAS handle
     cublasHandle_t handle;
     cublasSafeCall(cublasCreate(&handle));
 
     // Do the T-SNE
-    auto tsne_result = NaiveTSNE::tsne(handle, d_points, N_POINTS, N_DIMS, proj_dim);
+    auto tsne_result = NaiveTSNE::tsne(handle, d_points, N_POINTS, N_DIMS, proj_dim, perplexity, 
+                                            early_ex, learning_rate, n_iter, n_iter_np, min_g_norm);
 
     // Copy the data back to the CPU
     thrust::copy(tsne_result.begin(), tsne_result.end(), result);

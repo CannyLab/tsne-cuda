@@ -260,8 +260,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
                                         thrust::device_vector<float> &points, 
                                         const unsigned int N, 
                                         const unsigned int NDIMS,
-                                        const unsigned int PROJDIM)
-{
+                                        const unsigned int PROJDIM) {
     Math::max_norm(points);
 
     // Choose the right sigmas
@@ -350,6 +349,84 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
     #ifdef DEBUG
         dump_file.close();
     #endif
+    return ys;
+}
+
+thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle, 
+                                                thrust::device_vector<float> &d_points, 
+                                                unsigned int N_POINTS, 
+                                                unsigned int N_DIMS, 
+                                                unsigned int PROJDIM, 
+                                                float perplexity, 
+                                                float early_ex, 
+                                                float learning_rate, 
+                                                unsigned int n_iter, 
+                                                unsigned int n_iter_np, 
+                                                float min_g_norm){
+    
+    // Compute a max-norm on the points
+    Math::max_norm(d_points);
+
+    // Choose the right sigmas
+    std::cout << "Selecting sigmas to match perplexity..." << std::endl;
+    float eps = 1e-2;
+    thrust::device_vector<float> sigmas = NaiveTSNE::search_perplexity(handle, d_points, perplexity, eps, N_POINTS, N_DIMS);
+    thrust::device_vector<float> pij(N_POINTS*N_POINTS);
+    NaiveTSNE::compute_pij(handle, pij, d_points, sigmas, N_POINTS, N_DIMS);
+    NaiveTSNE::symmetrize_pij(handle, pij, N_POINTS);
+
+    // Allocate some memory for the foces and such
+    thrust::device_vector<float> forces(N_POINTS * PROJDIM);
+    thrust::device_vector<float> ys = Random::random_vector(N_POINTS * PROJDIM);
+    
+    // Momentum variables
+    thrust::device_vector<float> yt_1(N_POINTS * PROJDIM);
+    thrust::device_vector<float> momentum(N_POINTS * PROJDIM);
+    
+
+    // Qij and distance vector allocations
+    thrust::device_vector<float> qij(N_POINTS * N_POINTS);
+    thrust::device_vector<float> dist(N_POINTS * N_POINTS);
+
+    // Setup the learning rate
+    float eta = learning_rate*early_ex;
+    float momentum_weight = 0.5f;
+    float loss = 0.0f;
+    bool using_early = true;
+
+    float best_error = 0.0;
+    int best_iter = 0;
+
+    for (int i = 0; i < n_iter; i++) {
+
+        // Check for and turn off early exaggeration
+        if (using_early) { if (i > 250) {
+            using_early = false;
+            eta /= early_ex;
+            momentum_weight = 0.8;
+        }}
+        
+        // Compute the loss/gradients
+        loss = NaiveTSNE::compute_gradients(handle, forces, dist, ys, pij, qij, N_POINTS, PROJDIM, eta);
+        
+        // Compute the momentum
+        thrust::transform(ys.begin(), ys.end(), yt_1.begin(), momentum.begin(), thrust::minus<float>());
+        thrust::transform(momentum.begin(), momentum.end(), thrust::make_constant_iterator(momentum_weight), momentum.begin(), thrust::multiplies<float>() );
+        thrust::copy(ys.begin(), ys.end(), yt_1.begin());
+
+        // Apply the forces
+        thrust::transform(ys.begin(), ys.end(), forces.begin(), ys.begin(), thrust::plus<float>());
+        thrust::transform(ys.begin(), ys.end(), momentum.begin(), ys.begin(), thrust::plus<float>());
+
+        // Terminate if we're not changing loss much
+        if (loss < best_error || i == 0) {
+            best_error = loss;
+            best_iter = i;
+        } else {if (i - best_iter > n_iter_np) break;}
+
+        // Terminate if we're less than the minimum gradient norm
+        if (Math::norm(forces) < min_g_norm) break;
+    }
     return ys;
 }
 
