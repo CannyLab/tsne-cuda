@@ -56,6 +56,21 @@
                         const thrust::device_vector<float> &points, 
                         const unsigned int N, 
                         const unsigned int NDIMS);
+
+        /**
+         * @brief Copmute the pairwise euclidean distance between the given points even
+         * under large memory conditions
+         * 
+         * @param handle CUBLAS handle
+         * @param points The array handle to the points on host memory
+         * @param distances The array handle to the distance output on host memory
+         * @param N_POINTS The number of points that are going to be calculated
+         * @param N_DIMS The number of dimensions that the points are in
+         */
+        void host_pairwise_dist(cublasHandle_t &handle, float* points,
+                             float* distances, 
+                             const unsigned int N_POINTS, 
+                             const unsigned int N_DIMS);
     }
 
    
