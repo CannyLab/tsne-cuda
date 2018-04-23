@@ -80,7 +80,7 @@ struct minmax_binary_op : public thrust::binary_function< pair_t<T>, pair_t<T>, 
   __host__ __device__ pair_t<T> operator()(const pair_t<T>& x, const pair_t<T>& y) const {
         pair_t<T> result;
         result.first = thrust::min(x.first, y.first);
-        result.first = thrust::max(x.first, y.first);
+        result.second = thrust::max(x.second, y.second);
         return result;
     }
 };
