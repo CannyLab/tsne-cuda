@@ -4,6 +4,8 @@
 #include <random>
 #include <cuda.h>
 #include <iomanip>
+#include <stdlib.h>    
+#include <time.h>      
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
@@ -58,8 +60,8 @@ __global__ void pairwise_similarity(ulong2* hashes_x, ulong2* hashes_y, float* m
 int main(int argc, char** argv) {
 
     // Generate random uniform points
-    std::default_random_engine generator;
-    std::uniform_real_distribution<float> distribution(0.0,100.0);
+    std::default_random_engine generator(time(NULL));
+    std::uniform_real_distribution<float> distribution(0.0,1.0);
 
     // Allocate memory for our points array
     const int N_POINTS = 16;
@@ -187,25 +189,39 @@ int main(int argc, char** argv) {
 
     for (int j = 0; j < N_POINTS; j++) {
         for (int i = 0; i < N_POINTS; i++) {
-            std::cout << std::fixed << std::setprecision(3) << point_rel_distances[i + j*N_POINTS] << " ";
+            std::cout << std::fixed << std::setprecision(3) << 1 - point_rel_distances[i + j*N_POINTS]/3.1415926525 << " ";
         }
         std::cout << std::endl;
     }
 
-    std::cout << std::endl << std::endl;;
-
+    std::cout << std::endl << std::endl; std::cout << std::endl << std::endl;;
+    float* diff = new float[N_POINTS * N_POINTS];
     for (int j = 0; j < N_POINTS; j++) {
         for (int i = 0; i < N_POINTS; i++) {
 
             // Compute the true distance between i and j
             float val = 0.0;
+            float mag_a = 0.0;
+            float mag_b = 0.0;
             for (int k = 0; k < N_DIM; k++) {
-                val += (input_point_data[i*N_DIM + k] - input_point_data[j*N_DIM + k]) * (input_point_data[i*N_DIM + k] - input_point_data[j*N_DIM + k]);
+                val += (input_point_data[i*N_DIM + k] * input_point_data[j*N_DIM + k]);
+                mag_a += input_point_data[i*N_DIM + k] * input_point_data[i*N_DIM + k];
+                mag_b += input_point_data[j*N_DIM + k] * input_point_data[j*N_DIM + k];
             }
-            std::cout << std::fixed << std::setprecision(3) << sqrt(val) << " ";
+            diff[i + j*N_POINTS] = abs((1 - point_rel_distances[i + j*N_POINTS]/3.1415926525) - (val/(sqrt(mag_a)*sqrt(mag_b))));
+            std::cout << std::fixed << std::setprecision(3) << val/(sqrt(mag_a)*sqrt(mag_b)) << " ";
         }
         std::cout << std::endl;
     }
+
+    std::cout << std::endl << std::endl;
+    for (int j = 0; j < N_POINTS; j++) {
+        for (int i = 0; i < N_POINTS; i++) {
+            std::cout << std::fixed << std::setprecision(3) << diff[i + j*N_POINTS] << " ";
+        }
+        std::cout << std::endl;
+    }
+    
 
 
     
