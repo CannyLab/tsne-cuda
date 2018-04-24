@@ -3,11 +3,15 @@ project(cuda-tsne)
 set (cuda-tsne_VERSION_MAJOR 0)
 set (cuda-tsne_VERSION_MINOR 1)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 # Fix for Roshan's Compiler
 #-------------------------------------------------------------------------------
 if (NOT CXX)
 	set(CXX g++)
+endif()
+if (NOT NTHREADS)
+    set(NTHREADS 6)
 endif()
 #-------------------------------------------------------------------------------
 
@@ -21,14 +25,37 @@ SET(CUDA_HOST_COMPILER ${CXX})
 #-------------------------------------------------------------------------------
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
                     -O3 
-                    -gencode=arch=compute_30,code=sm_30
-                    -gencode=arch=compute_35,code=sm_35
+                    #-gencode=arch=compute_30,code=sm_30
+                    #-gencode=arch=compute_35,code=sm_35
                     -gencode=arch=compute_50,code=sm_50
                     -gencode=arch=compute_61,code=sm_61
                     -std=c++11
                     -g
                     -Xcompiler '-fPIC'
+                    -Xcompiler '-fopenmp'
+                    -Xcompiler '-msse4'
+                    -Xcompiler '-m64'
+                    -Xcompiler '-mpopcnt'
                     )
+#-------------------------------------------------------------------------------
+
+# OpenMP configuration
+#-------------------------------------------------------------------------------
+find_package(OpenMP REQUIRED)
+#-------------------------------------------------------------------------------
+
+# BLAS configuration
+#-------------------------------------------------------------------------------
+option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" ON)
+if(WITH_MKL)
+    find_package(MKL REQUIRED)
+    include_directories(${MKL_INCLUDE_DIRS})
+    set(BLAS_LIB ${MKL_LIBRARIES})
+else()
+    find_package(OpenBLAS REQUIRED)
+    include_directories(${OpenBLAS_INCLUDE_DIR})
+    set(BLAS_LIB ${OpenBLAS_LIB})
+endif()
 #-------------------------------------------------------------------------------
 
 # GTEST Configuration
@@ -43,6 +70,18 @@ ExternalProject_Add(gtest
 ExternalProject_Get_Property(gtest source_dir binary_dir)
 #-------------------------------------------------------------------------------
 
+# FAISS Configuration
+#-------------------------------------------------------------------------------
+ExternalProject_Add(faiss
+  GIT_REPOSITORY https://github.com/facebookresearch/faiss.git
+  GIT_TAG  v1.2.1
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third_party/faiss
+  BUILD_COMMAND make faiss -j${NTHREADS} && make gpufaiss -j${NTHREADS}
+  INSTALL_COMMAND ""
+)
+#-------------------------------------------------------------------------------
+
+
 
 # Project Setup
 #-------------------------------------------------------------------------------
@@ -50,6 +89,11 @@ include_directories(
     src/include
     ${CUDA_INCLUDE_DIRECTORIES}
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest/googletest/include
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/faiss/src/
+)
+
+link_directories(
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/faiss/src/faiss-build/lib/
 )
 
 set(SOURCES
@@ -99,13 +143,18 @@ cuda_add_executable(
     src/test/test.cu
 )
 add_dependencies(tsne_test gtest)
+add_dependencies(tsne_test faiss)
 target_link_libraries(
     tsne_test
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-    ${CUDA_LIBRARIES} 
+    ${CUDA_LIBRARIES}
+    ${OpenMP_CXX_FLAGS}
     ${CUDA_CUBLAS_LIBRARIES}
+    libfaiss.a
+    libgpufaiss.a
     pthread
+    ${BLAS_LIB}
 )
 #-------------------------------------------------------------------------------
 

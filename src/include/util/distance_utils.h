@@ -15,6 +15,11 @@
     #include "util/math_utils.h"
     #include "util/thrust_utils.h"
 
+    // FAISS includes
+    #include <faiss/IndexFlat.h>
+    #include <faiss/IndexIVFFlat.h>
+    #include <faiss/IndexIVFPQ.h>
+
     namespace Distance {
         /**
          * @brief Kernel for assembling distance results from the norms and dot product vectors
@@ -57,21 +62,8 @@
                         const unsigned int N, 
                         const unsigned int NDIMS);
 
-        /**
-         * @brief Copmute the pairwise euclidean distance between the given points even
-         * under large memory conditions
-         * 
-         * @param handle CUBLAS handle
-         * @param points The array handle to the points on host memory
-         * @param distances The array handle to the distance output on host memory
-         * @param N_POINTS The number of points that are going to be calculated
-         * @param N_DIMS The number of dimensions that the points are in
-         */
-        void host_pairwise_dist(cublasHandle_t &handle, float* points,
-                             float* distances, 
-                             const unsigned int N_POINTS, 
-                             const unsigned int N_DIMS);
-    }
 
-   
+        void knn(float* points, long* I, float* D, const unsigned int N_DIM, const unsigned int N_POINTS, const unsigned int K);
+
+   }
 #endif

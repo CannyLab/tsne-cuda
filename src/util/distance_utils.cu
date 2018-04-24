@@ -66,3 +66,18 @@ void Distance::pairwise_dist(cublasHandle_t &handle,
     Distance::squared_pairwise_dist(handle, distances, points, N, NDIMS);
     Math::sqrt(distances, distances);
 }
+
+void Distance::knn(float* points, long* I, float* D, const unsigned int N_DIM, const unsigned int N_POINTS, const unsigned int K) {
+    const int nlist = 400;
+    const int nprobe = 5;
+
+    // Construct the index table
+    faiss::IndexFlatL2 quantizer(N_DIM);
+    faiss::IndexIVFFlat index(&quantizer, N_DIM, nlist, faiss::METRIC_L2); // We can probably change the metric later
+    index.train(N_POINTS, points);
+    index.add(N_POINTS, points);
+
+    // Perform the KNN query
+    index.nprobe = nprobe;
+    index.search(N_POINTS, points, K, D, I);
+}
