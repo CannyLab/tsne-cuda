@@ -34,6 +34,7 @@
 #include <thrust/functional.h>
 #include <thrust/fill.h>
 #include <thrust/gather.h>
+#include <thrust/sort.h>
 
 // C Library includes
 #include <stdlib.h>
