@@ -89,7 +89,7 @@ Please cite this repository if it was useful for your research:
 }
 ```
 
-The following work was extremely helpful in building this library: 
+This library is built on top of the following technology, without this tech, none of this would be possible!
 
 [L. Van der Maaten's paper](http://lvdmaaten.github.io/publications/papers/JMLR_2014.pdf)
 
@@ -98,3 +98,7 @@ The following work was extremely helpful in building this library:
 [BHTSNE](https://github.com/lvdmaaten/bhtsne/)
 
 [CUDA Utilities/Pairwise Distance](https://github.com/OrangeOwlSolutions)
+
+[FAISS](https://github.com/facebookresearch/faiss)
+
+[GTest](https://github.com/google/googletest)
