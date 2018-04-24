@@ -33,6 +33,7 @@
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/functional.h>
 #include <thrust/fill.h>
+#include <thrust/gather.h>
 
 // C Library includes
 #include <stdlib.h>

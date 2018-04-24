@@ -156,6 +156,18 @@ target_link_libraries(
     pthread
     ${BLAS_LIB}
 )
+
+cuda_add_executable(
+    bh_tsne
+    ${SOURCES}
+    src/bh_tsne.cu
+)
+target_link_libraries(
+    bh_tsne
+    ${CUDA_LIBRARIES}
+    ${CUDA_CUBLAS_LIBRARIES}
+    pthread
+)
 #-------------------------------------------------------------------------------
 
 # Testing
