@@ -20,8 +20,10 @@ To build the C++ portion of the library:
 git clone https://github.com/rmrao/tsne-cuda.git
 cd tsne-cuda/build/
 cmake ..
-make
+make -j6
 ```
+
+Please for the love of god, use parallel compilation. Otherwise between our library and FAISS it will take you hours to build.
 
 To install the python package, do the above steps, then run:
 ```
@@ -29,7 +31,9 @@ cd python/
 python setup.py install
 ```
 
-This is tested working on Ubuntu 16.04 with Python 3. 
+#### Known good build configurations
+
+- Ubuntu 16.04, Python 3.5.2, GCC 5.4.0, CUDA 8.0.61, Intel MKL 18.0.1
 
 ### Run
 
@@ -65,6 +69,10 @@ Inherited from [original repo's license](https://github.com/lvdmaaten/bhtsne).
 - Allow for double precision
 - Expand FMM methods
 - Add multi-threaded CPU version for those without a GPU
+
+# Known Bugs
+
+- Tests seg-fault when run with not enough stack space. Use 'ulimit -s unlimited' as a temporary workaround.
 
 # Citation
 
