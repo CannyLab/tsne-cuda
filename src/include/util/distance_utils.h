@@ -19,6 +19,9 @@
     #include <faiss/IndexFlat.h>
     #include <faiss/IndexIVFFlat.h>
     #include <faiss/IndexIVFPQ.h>
+    #include <faiss/gpu/GpuIndexFlat.h>
+    #include <faiss/gpu/GpuIndexIVFFlat.h>
+    #include <faiss/gpu/StandardGpuResources.h>
 
     namespace Distance {
         /**
@@ -63,6 +66,16 @@
                         const unsigned int NDIMS);
 
 
+        /**
+         * @brief Use FAISS to compute the k-nearest neighbors for the given points
+         * 
+         * @param points The points of which you want the k nearest neighbors (N_POINTSxN_DIMS) row-major (so points[N_DIM*i + j] gives the j'th dim of the i'th point)
+         * @param I The index array that goes with the distance array (N_POINTSxK) row-major (so I[K*i + j] gives the j'th nearest neighbor of the i'th point)
+         * @param D The euclidean distance array (true euclidean distance, not squared) (N_POINTSxK) row-major
+         * @param N_DIM The number of dimensions of the input points
+         * @param N_POINTS The number of input points
+         * @param K The number of nearest neighbors to return. If >=1024, this function uses the CPU instead of the GPU
+         */
         void knn(float* points, long* I, float* D, const unsigned int N_DIM, const unsigned int N_POINTS, const unsigned int K);
 
    }

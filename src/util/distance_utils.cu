@@ -68,16 +68,37 @@ void Distance::pairwise_dist(cublasHandle_t &handle,
 }
 
 void Distance::knn(float* points, long* I, float* D, const unsigned int N_DIM, const unsigned int N_POINTS, const unsigned int K) {
-    const int nlist = 400;
+    const int nlist = (int) std::sqrt((float)N_POINTS);
     const int nprobe = 5;
+    
+    if (K < 1024) {
+        // Construct the GPU resources necessary
+        faiss::gpu::StandardGpuResources res;
+        res.noTempMemory();
 
-    // Construct the index table
-    faiss::IndexFlatL2 quantizer(N_DIM);
-    faiss::IndexIVFFlat index(&quantizer, N_DIM, nlist, faiss::METRIC_L2); // We can probably change the metric later
-    index.train(N_POINTS, points);
-    index.add(N_POINTS, points);
+        // Construct the GPU configuration object
+        faiss::gpu::GpuIndexIVFFlatConfig config;
+        config.device = 0;
+        config.indicesOptions = faiss::gpu::INDICES_32_BIT;
+        config.flatConfig.useFloat16 = true;
+        config.useFloat16IVFStorage = true;
 
-    // Perform the KNN query
-    index.nprobe = nprobe;
-    index.search(N_POINTS, points, K, D, I);
+        faiss::gpu::GpuIndexIVFFlat index(&res, N_DIM, nlist, faiss::METRIC_L2, config);
+        index.setNumProbes(nprobe);
+        index.train(N_POINTS, points);
+        index.add(N_POINTS, points);
+
+        // Perform the KNN query
+        index.search(N_POINTS, points, K, D, I);
+    } else {
+        // Construct the index table on the CPU (since the GPU can only handle 1023 neighbors)
+        faiss::IndexFlatL2 quantizer(N_DIM);
+        faiss::IndexIVFFlat index(&quantizer, N_DIM, nlist, faiss::METRIC_L2); // We can probably change the metric later
+        index.train(N_POINTS, points);
+        index.add(N_POINTS, points);
+
+        // Perform the KNN query
+        index.nprobe = nprobe;
+        index.search(N_POINTS, points, K, D, I);
+    }
 }
