@@ -693,6 +693,90 @@ void IntegrationKernel(int nbodiesd,
 
 
 /******************************************************************************/
+/*** compute attractive force *************************************************/
+/******************************************************************************/
+__global__
+void computePijxQij(int N, 
+                    int L, 
+                    volatile float * __restrict pij,
+                    volatile int   * __restrict pijInds,
+                    volatile float * __restrict forceProd,
+                    volatile float * __restrict pts)
+{
+    register int TID, i, j;
+    register float ix, iy, jx, jy, dx, dy, tmp;
+    TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID > N * L) return;
+    
+
+    i = TID / L;
+    j = TID % L;
+    j = pijInds[i*L + j];
+    
+    ix = pts[i]; iy = pts[N + i];
+    jx = pts[j]; jy = pts[N + j];
+    dx = ix - jx;
+    dy = iy - jy;
+    tmp = 1 / (1 + dx*dx + dy*dy);
+    forceProd[TID] = pij[TID] * tmp;
+
+}
+
+// computes unnormalized attractive forces
+void computeAttrForce(int N,
+                        int L,
+                        cusparseHandle_t &handle,
+                        cusparseMatDescr_t &descr,
+                        thrust::device_vector<float> &sparsePij,
+                        thrust::device_vector<int>   &pijRowPtr, // (N + 1)-D vector, should be constant L
+                        thrust::device_vector<int>   &pijColInd, // NxL matrix (same shape as sparsePij)
+                        thrust::device_vector<float> &forceProd, // NxL matrix
+                        thrust::device_vector<float> &pts,
+                        thrust::device_vector<float> &forces)
+{
+    assert(N * L == sparsePij.size());
+    assert(pijRowPtr.size() == N + 1);
+    assert(pijColInd.size() == sparsePij.size());
+    assert(forceProd.size() == sparsePij.size());
+
+    const int BLOCKSIZE = 128;
+    const int NBLOCKS = iDivUp(N * L, BLOCKSIZE);
+    computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, L,
+                                            thrust::raw_pointer_cast(sparsePij.data()),
+                                            thrust::raw_pointer_cast(pijColInd.data()),
+                                            thrust::raw_pointer_cast(forceProd.data()),
+                                            thrust::raw_pointer_cast(pts.data()));
+
+    // compute forces_i = sum_j pij*qij*normalization*yi
+    float alpha = 4.0f;
+    float beta = 0.0f;
+    thrust::device_vector<float> ones(N*2);
+    cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                            N, 2, N, N * L, &alpha, descr,
+                            thrust::raw_pointer_cast(forceProd.data()),
+                            thrust::raw_pointer_cast(pijRowPtr.data()),
+                            thrust::raw_pointer_cast(pijColInd.data()),
+                            thrust::raw_pointer_cast(ones.data()),
+                            N, &beta, thrust::raw_pointer_cast(forces.data()),
+                            N));
+    thrust::transform(forces.begin(), forces.end(), pts.begin(), forces.begin(), thrust::multiply<float>());
+
+    // compute forces_i = forces_i - sum_j pij*qij*normalization*yj
+    alpha = -4.0f;
+    beta = 1.0f;
+    cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                            N, 2, N, N * L, &alpha, descr,
+                            thrust::raw_pointer_cast(forceProd.data()),
+                            thrust::raw_pointer_cast(pijRowPtr.data()),
+                            thrust::raw_pointer_cast(pijColInd.data()),
+                            thrust::raw_pointer_cast(pts.data()),
+                            N, &beta, thrust::raw_pointer_cast(forces.data()),
+                            N));
+    
+
+}
+
+/******************************************************************************/
 
 static void CudaTest(const char *msg)
 {

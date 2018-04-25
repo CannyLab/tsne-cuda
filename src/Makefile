@@ -6,7 +6,10 @@ CC := $(GCC)
 
 .PHONY: all
 
-all: bh
+all: bh sparse
 
 bh : bh.cu
 	$(NVCC) $(FLAGS) -DVARIANT=0 -o $@ $<
+
+sparse : sparse.cu
+	$(NVCC) $(FLAGS) -lcusparse -o $@ $<
