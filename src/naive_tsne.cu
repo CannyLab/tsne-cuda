@@ -144,7 +144,7 @@ void NaiveTSNE::compute_pij(
     thrust::transform(pij.begin(), pij.end(), pij.begin(), func_exp());
     zero_diagonal(pij, N);
     
-    // Reduce::reduce_sum over cols
+    // Reduce::reduce_sum over cols? rows? Fuck if I know. 
     auto sums = Reduce::reduce_sum(handle, pij, N, N, 1);
 
     // divide column by resulting vector
