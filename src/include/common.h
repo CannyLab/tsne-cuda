@@ -52,6 +52,10 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <numeric>
+#include <algorithm>
+#include <random>
+#include <iomanip>
 
 // Additional Macros
 #include "macros.h"
