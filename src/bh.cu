@@ -551,7 +551,6 @@ __launch_bounds__(THREADS5, FACTOR5)
 void ForceCalculationKernel(int nnodesd, 
                             int nbodiesd, 
                             volatile int * __restrict errd, 
-                            float dthfd, 
                             float itolsqd, 
                             float epssqd, 
                             volatile int * __restrict sortd, 
@@ -1064,7 +1063,7 @@ int main(int argc, char *argv[])
       CudaTest("kernel 4 launch failed");
 
       cudaEventRecord(start, 0);
-      ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, nbodies, errl, dthf, itolsq, epssq, sortl, childl, massl, posxl, posyl, velxl, velyl, norml);
+      ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, nbodies, errl, itolsq, epssq, sortl, childl, massl, posxl, posyl, velxl, velyl, norml);
       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
       timing[5] += time;
       CudaTest("kernel 5 launch failed");
@@ -1157,6 +1156,17 @@ void compute_pij(cublasHandle_t &handle,
     Broadcast::broadcast_matrix_vector(pij, sums, K, N, thrust::divides<float>(), 1, 1.0f);
 }
 
+struct saxpy_functor : public thrust::binary_function<float,float,float>
+{
+    const float a;
+
+    saxpy_functor(float _a) : a(_a) {}
+    __host__ __device__
+        float operator()(const float& x, const float& y) const { 
+            return a * x + y;
+        }
+};
+
 thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle, 
                                           cusparseHandle_t &sparse_handle,
                                             float* points, 
@@ -1218,13 +1228,19 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     while ((nnodes & (WARPSIZE-1)) != 0) nnodes++;
     nnodes--;
 
+    thrust::device_vector<int> errl(1);
     thrust::device_vector<int> startl(nnodes + 1);
     thrust::device_vector<int> childl((nnodes + 1) * 4);
-    thrust::device_vector<float> massl(nnodes + 1); // TODO: probably don't need massl
+    thrust::device_vector<float> massl(nnodes + 1, 1); // TODO: probably don't need massl
     thrust::device_vector<int> countl(nnodes + 1);
     thrust::device_vector<int> startl(nnodes + 1);
     thrust::device_vector<int> sortl(nnodes + 1);
     thrust::device_vector<float> norml(nnodes + 1);
+    float eta = 10.0f;
+    float norm;
+    // These variables currently govern the tolerance (whether it recurses on a cell)
+    float epssq = 0.05 * 0.05;
+    float itolsq = 1.0f / (0.5 * 0.5);
 
     for (int step = 0; step < n_iter; step++) {
         // compute attractive forces
@@ -1243,89 +1259,39 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                                           thrust::raw_pointer_cast(maxyl.data()), 
                                                           thrust::raw_pointer_cast(minxl.data()), 
                                                           thrust::raw_pointer_cast(minyl.data()));
-        ClearKernel1<<<blocks * 1, 1024>>>(nnodes, nbodies, thrust::raw_pointer_cast(childl.data()));
-        TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, nbodies, errl, thrust::raw_pointer_cast(childl.data()), 
-                                                                                  thrust::raw_pointer_cast(pts.data()), 
-                                                                                  thrust::raw_pointer_cast(pts.data() + N_POINTS));
-        ClearKernel2<<<blocks * 1, 1024>>>(nnodes, startl, thrust::raw_pointer_cast(massl.data()));
-        SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, nbodies, countl, thrust::raw_pointer_cast(childl.data()), 
+        ClearKernel1<<<blocks * 1, 1024>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(childl.data()));
+        TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
+                                                                             thrust::raw_pointer_cast(childl.data()), 
+                                                                             thrust::raw_pointer_cast(pts.data()), 
+                                                                             thrust::raw_pointer_cast(pts.data() + N_POINTS));
+        ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
+        SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(countl.data()), 
+                                                                                      thrust::raw_pointer_cast(childl.data()), 
                                                                                       thrust::raw_pointer_cast(massl.data()),
                                                                                       thrust::raw_pointer_cast(pts.data()),
                                                                                       thrust::raw_pointer_cast(pts.data() + N_POINTS));
-        SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, nbodies, sortl, countl, startl, thrust::raw_pointer_cast(childl.data()));
-        ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, nbodies, errl, dthf, itolsq, epssq, sortl, thrust::raw_pointer_cast(childl.data()), massl, posxl, posyl, velxl, velyl, norml);
+        SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(sortl.data()), 
+                                                                     thrust::raw_pointer_cast(countl.data()), 
+                                                                     thrust::raw_pointer_cast(startl.data()), 
+                                                                     thrust::raw_pointer_cast(childl.data()));
+        ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
+                                                                    itolsq, epssq, // Should these by changed? 
+                                                                    thrust::raw_pointer_cast(sortl.data()), 
+                                                                    thrust::raw_pointer_cast(childl.data()), 
+                                                                    thrust::raw_pointer_cast(massl.data()), 
+                                                                    thrust::raw_pointer_cast(pts.data()),
+                                                                    thrust::raw_pointer_cast(pts.data() + N_POINTS),
+                                                                    thrust::raw_pointer_cast(forces.data()),
+                                                                    thrust::raw_pointer_cast(forces.data() + N_POINTS),
+                                                                    thrust::raw_pointer_cast(norml.data()));
         // non-normalized xrep stored in velxl, yrep stored in velyl, norm_i stored in norml
-        float norm = thrust::reduce(norml.begin(), norml.end(), 0.0f, thrust::plus<float>());
-        
-        // Finally, normalize the result (Need to check exactly where normalization happens... probably look at bh_tsne code)
+        norm = thrust::reduce(norml.begin(), norml.end(), 0.0f, thrust::plus<float>());
+         
+        // Add resulting force vector to positions w/ normalization, mul by 4 and learning rate
+        thrust::transform(forces.begin(), forces.end(), pts.begin(), pts.begin(), saxpy_functor(eta * 4.0f / norm));
 
-        // Add resulting force vector to positions
-
-        // Done
+        // Done (check progress, etc.)
 
 
     }
-
-
-    // Choose the right sigmas
-    std::cout << "Selecting sigmas to match perplexity..." << std::endl;
-    float eps = 1e-2;
-    thrust::device_vector<float> sigmas = NaiveTSNE::search_perplexity(handle, d_points, perplexity, eps, N_POINTS, N_DIMS);
-    thrust::device_vector<float> pij(N_POINTS*N_POINTS);
-    NaiveTSNE::compute_pij(handle, pij, d_points, sigmas, N_POINTS, N_DIMS);
-    NaiveTSNE::symmetrize_pij(handle, pij, N_POINTS);
-
-    // Allocate some memory for the foces and such
-    thrust::device_vector<float> forces(N_POINTS * PROJDIM);
-    thrust::device_vector<float> ys = Random::random_vector(N_POINTS * PROJDIM);
-
-    // Momentum variables
-    thrust::device_vector<float> yt_1(N_POINTS * PROJDIM);
-    thrust::device_vector<float> momentum(N_POINTS * PROJDIM);
-
-
-    // Qij and distance vector allocations
-    thrust::device_vector<float> qij(N_POINTS * N_POINTS);
-    thrust::device_vector<float> dist(N_POINTS * N_POINTS);
-
-    // Setup the learning rate
-    float eta = learning_rate*early_ex;
-    float momentum_weight = 0.5f;
-    float loss = 0.0f;
-    bool using_early = true;
-
-    float best_error = 0.0;
-    int best_iter = 0;
-
-    for (int i = 0; i < n_iter; i++) {
-
-    // Check for and turn off early exaggeration
-    if (using_early) { if (i > 250) {
-    using_early = false;
-    eta /= early_ex;
-    momentum_weight = 0.8;
-    }}
-
-    // Compute the loss/gradients
-    loss = NaiveTSNE::compute_gradients(handle, forces, dist, ys, pij, qij, N_POINTS, PROJDIM, eta);
-
-    // Compute the momentum
-    thrust::transform(ys.begin(), ys.end(), yt_1.begin(), momentum.begin(), thrust::minus<float>());
-    thrust::transform(momentum.begin(), momentum.end(), thrust::make_constant_iterator(momentum_weight), momentum.begin(), thrust::multiplies<float>() );
-    thrust::copy(ys.begin(), ys.end(), yt_1.begin());
-
-    // Apply the forces
-    thrust::transform(ys.begin(), ys.end(), forces.begin(), ys.begin(), thrust::plus<float>());
-    thrust::transform(ys.begin(), ys.end(), momentum.begin(), ys.begin(), thrust::plus<float>());
-
-    // Terminate if we're not changing loss much
-    if (loss < best_error || i == 0) {
-    best_error = loss;
-    best_iter = i;
-    } else {if (i - best_iter > n_iter_np) break;}
-
-    // Terminate if we're less than the minimum gradient norm
-    if (Math::norm(forces) < min_g_norm) break;
-    }
-    return ys;
 }
