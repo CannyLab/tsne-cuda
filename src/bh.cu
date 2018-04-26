@@ -697,21 +697,29 @@ void IntegrationKernel(int nbodiesd,
 /******************************************************************************/
 __global__
 void computePijxQij(int N, 
-                    int L, 
+                    int nnz, 
                     volatile float * __restrict pij,
-                    volatile int   * __restrict pijInds,
+                    volatile int   * __restrict pijRowPtr,
+                    volatile int   * __restrict pijColInd,
                     volatile float * __restrict forceProd,
                     volatile float * __restrict pts)
 {
-    register int TID, i, j;
+    register int TID, i, j, start, end;
     register float ix, iy, jx, jy, dx, dy, tmp;
     TID = threadIdx.x + blockIdx.x * blockDim.x;
-    if (TID > N * L) return;
+    if (TID > nnz) return;
+    start = 0; end = N + 1;
+    i = (N + 1) >> 1;
+    while (!(pijRowPtr[i] <= TID && pijRowPtr[i+1] > TID)) {
+      if (pijRowPtr[i] > TID) {
+        end = i;
+      } else {
+        start = i;
+      }
+      i = (start + end) >> 1;
+    }
     
-
-    i = TID / L;
-    j = TID % L;
-    j = pijInds[i*L + j];
+    j = pijColInd[TID - i];
     
     ix = pts[i]; iy = pts[N + i];
     jx = pts[j]; jy = pts[N + j];
@@ -719,12 +727,11 @@ void computePijxQij(int N,
     dy = iy - jy;
     tmp = 1 / (1 + dx*dx + dy*dy);
     forceProd[TID] = pij[TID] * tmp;
-
 }
 
 // computes unnormalized attractive forces
 void computeAttrForce(int N,
-                        int L,
+                        int nnz,
                         cusparseHandle_t &handle,
                         cusparseMatDescr_t &descr,
                         thrust::device_vector<float> &sparsePij,
@@ -734,25 +741,26 @@ void computeAttrForce(int N,
                         thrust::device_vector<float> &pts,
                         thrust::device_vector<float> &forces)
 {
-    assert(N * L == sparsePij.size());
+    assert(nnz == sparsePij.size());
     assert(pijRowPtr.size() == N + 1);
     assert(pijColInd.size() == sparsePij.size());
     assert(forceProd.size() == sparsePij.size());
 
     const int BLOCKSIZE = 128;
-    const int NBLOCKS = iDivUp(N * L, BLOCKSIZE);
-    computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, L,
+    const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
+    computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, nnz,
                                             thrust::raw_pointer_cast(sparsePij.data()),
+                                            thrust::raw_pointer_cast(pijRowPtr.data()),
                                             thrust::raw_pointer_cast(pijColInd.data()),
                                             thrust::raw_pointer_cast(forceProd.data()),
                                             thrust::raw_pointer_cast(pts.data()));
 
     // compute forces_i = sum_j pij*qij*normalization*yi
-    float alpha = 4.0f;
+    float alpha = 1.0f;
     float beta = 0.0f;
     thrust::device_vector<float> ones(N*2);
     cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                            N, 2, N, N * L, &alpha, descr,
+                            N, 2, N, nnz, &alpha, descr,
                             thrust::raw_pointer_cast(forceProd.data()),
                             thrust::raw_pointer_cast(pijRowPtr.data()),
                             thrust::raw_pointer_cast(pijColInd.data()),
@@ -762,10 +770,10 @@ void computeAttrForce(int N,
     thrust::transform(forces.begin(), forces.end(), pts.begin(), forces.begin(), thrust::multiply<float>());
 
     // compute forces_i = forces_i - sum_j pij*qij*normalization*yj
-    alpha = -4.0f;
+    alpha = -1.0f;
     beta = 1.0f;
     cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                            N, 2, N, N * L, &alpha, descr,
+                            N, 2, N, nnz, &alpha, descr,
                             thrust::raw_pointer_cast(forceProd.data()),
                             thrust::raw_pointer_cast(pijRowPtr.data()),
                             thrust::raw_pointer_cast(pijColInd.data()),
@@ -961,7 +969,7 @@ int main(int argc, char *argv[])
       if (vely == NULL) {fprintf(stderr, "cannot allocate vely\n");  exit(-1);}
 
       if (cudaSuccess != cudaMalloc((void **)&errl, sizeof(int))) fprintf(stderr, "could not allocate errd\n");  CudaTest("couldn't allocate errd");
-      if (cudaSuccess != cudaMalloc((void **)&childl, sizeof(int) * (nnodes+1) * 8)) fprintf(stderr, "could not allocate childd\n");  CudaTest("couldn't allocate childd");
+      if (cudaSuccess != cudaMalloc((void **)&childl, sizeof(int) * (nnodes+1) * 4)) fprintf(stderr, "could not allocate childd\n");  CudaTest("couldn't allocate childd");
       if (cudaSuccess != cudaMalloc((void **)&massl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate massd\n");  CudaTest("couldn't allocate massd");
       if (cudaSuccess != cudaMalloc((void **)&posxl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate posxd\n");  CudaTest("couldn't allocate posxd");
       if (cudaSuccess != cudaMalloc((void **)&posyl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate posyd\n");  CudaTest("couldn't allocate posyd");
@@ -1149,28 +1157,8 @@ void compute_pij(cublasHandle_t &handle,
     Broadcast::broadcast_matrix_vector(pij, sums, K, N, thrust::divides<float>(), 1, 1.0f);
 }
 
-void NaiveTSNE::symmetrize_pij(cusaprseHandle_t &handle, 
-    thrust::device_vector<float> &pij, 
-    const unsigned int N,
-    const unsigned int K)
-{
-    int baseC, nnzC;
-    int *nnzTotalDevHostPtr = &nnzC;
-    cusparseSetPointerMode(handle, CUSPARSE_POINTER_MODE_HOST);
-    thrust::device_vector<int> csrRowPtrPij(N + 1);
-    thrust::device_vector<int> csrRowPtrPij_init(N + 1);
-    thrust::sequence(csrRowPtrPij_init.begin(), csrRowPtrPij_init.end(), 0, K);
-    cusparseXcsrgeamNnz(handle, N, K, 
-                        descrA, N * K, thrust::raw_pointer_cast(csrRowPtrPij_init.data()), )
-    float alpha = 0.5f;
-    float beta = 0.5f;
-    thrust::device_vector<float> pij_out(N*N);
-    cublasSafeCall(cublasSgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, N, N, &alpha, thrust::raw_pointer_cast(pij.data()), N, 
-    &beta, thrust::raw_pointer_cast(pij.data()), N, thrust::raw_pointer_cast(pij_out.data()), N));
-    pij = pij_out;
-}
-
-thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &handle, 
+thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle, 
+                                          cusparseHandle_t &sparse_handle,
                                             float* points, 
                                             unsigned int N_POINTS, 
                                             unsigned int N_DIMS, 
@@ -1191,8 +1179,6 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &handle,
     thrust::device_vector<float> d_knn_distances(N_POINTS*K);
     thrust::copy(knn_distances, knn_distances + N_POINTS*K, d_knn_distances.begin());
 
-    cusparseHandle_t handle;
-    cusparseCreate(&handle);
     cusparseMatDescr_t descr;
     cusparseCreateMatDescr(&descr);
     cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
@@ -1203,27 +1189,73 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &handle,
     Math::max_norm(d_knn_distances);
 
     // Compute the perplexity/pij of the KNN distribution
-
-    // TODO: make sure pij calc works with sparse matrix (should work now?)
+    thrust::device_vector<float> sigmas(N_POINTS, 1.0);
+    thrust::device_vector<float> d_pij(N_POINTS*K);
+    compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N, K, N_DIMS);
 
     // TODO: symmetrize pij so that it is stored in sparse csr format
+    thrust::device_vector<float> sparsePij; // Device
+    thrust::device_vector<int> pijRowPtr; // Device
+    thrust::device_vector<int> pijColInd; // Device
+
+    Sparse::sym_mat_gpu(knn_distances, knn_indices, sparsePij, pijColInd, pijRowPtr, N_POINTS, K);
+    thrust::device_vector<float> forceProd(sparsePij.size());
+
+    thrust::device_vector<float> pts(N * 2); // TODO: Initialize with random points
+    thrust::device_vector<float> forces(N * 2);
+
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, dev);
+    if (deviceProp.warpSize != WARPSIZE) {
+      fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
+      exit(-1);
+    }
+
+    blocks = deviceProp.multiProcessorCount;
+
+    int nnodes = N_POINTS * 2;
+    if (nnodes < 1024*blocks) nnodes = 1024*blocks;
+    while ((nnodes & (WARPSIZE-1)) != 0) nnodes++;
+    nnodes--;
+
+    thrust::device_vector<int> startl(nnodes + 1);
+    thrust::device_vector<int> childl((nnodes + 1) * 4);
+    thrust::device_vector<float> massl(nnodes + 1); // TODO: probably don't need massl
+    thrust::device_vector<int> countl(nnodes + 1);
+    thrust::device_vector<int> startl(nnodes + 1);
+    thrust::device_vector<int> sortl(nnodes + 1);
+    thrust::device_vector<float> norml(nnodes + 1);
 
     for (int step = 0; step < n_iter; step++) {
+        // compute attractive forces
+        // TODO: add device synchronization in computeAttrForce
+        computeAttrForce(N_POINTS, sparsePij.size(), sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, forces);
         // compute repulsive forces and normalization
         // TODO: allocate all these things
-        BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, nbodies, startl, childl, massl, posxl, posyl, maxxl, maxyl, minxl, minyl);
-        ClearKernel1<<<blocks * 1, 1024>>>(nnodes, nbodies, childl);
-        TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, nbodies, errl, childl, posxl, posyl);
-        ClearKernel2<<<blocks * 1, 1024>>>(nnodes, startl, massl);
-        SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, nbodies, countl, childl, massl, posxl, posyl);
-        SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, nbodies, sortl, countl, startl, childl);
-        ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, nbodies, errl, dthf, itolsq, epssq, sortl, childl, massl, posxl, posyl, velxl, velyl, norml);
+        BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
+                                                          N_POINTS, 
+                                                          thrust::raw_pointer_cast(startl.data()), 
+                                                          thrust::raw_pointer_cast(childl.data()), 
+                                                          thrust::raw_pointer_cast(massl.data()), 
+                                                          thrust::raw_pointer_cast(pts.data()), 
+                                                          thrust::raw_pointer_cast(pts.data() + N_POINTS), 
+                                                          thrust::raw_pointer_cast(maxxl.data()), 
+                                                          thrust::raw_pointer_cast(maxyl.data()), 
+                                                          thrust::raw_pointer_cast(minxl.data()), 
+                                                          thrust::raw_pointer_cast(minyl.data()));
+        ClearKernel1<<<blocks * 1, 1024>>>(nnodes, nbodies, thrust::raw_pointer_cast(childl.data()));
+        TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, nbodies, errl, thrust::raw_pointer_cast(childl.data()), 
+                                                                                  thrust::raw_pointer_cast(pts.data()), 
+                                                                                  thrust::raw_pointer_cast(pts.data() + N_POINTS));
+        ClearKernel2<<<blocks * 1, 1024>>>(nnodes, startl, thrust::raw_pointer_cast(massl.data()));
+        SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, nbodies, countl, thrust::raw_pointer_cast(childl.data()), 
+                                                                                      thrust::raw_pointer_cast(massl.data()),
+                                                                                      thrust::raw_pointer_cast(pts.data()),
+                                                                                      thrust::raw_pointer_cast(pts.data() + N_POINTS));
+        SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, nbodies, sortl, countl, startl, thrust::raw_pointer_cast(childl.data()));
+        ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, nbodies, errl, dthf, itolsq, epssq, sortl, thrust::raw_pointer_cast(childl.data()), massl, posxl, posyl, velxl, velyl, norml);
         // non-normalized xrep stored in velxl, yrep stored in velyl, norm_i stored in norml
         float norm = thrust::reduce(norml.begin(), norml.end(), 0.0f, thrust::plus<float>());
-
-        // TODO: Write a kernel that does elementwise multiplication of qij * pij * (point_i - point_j)
-        // This is O(N) because pij is sparse so if we iterate over pij, get i and j, compute qij etc., this could be written as a thrust transform?
-        // Should result in an N x 2 force vector (possibly, we could do it inplace with velxl and velyl and just sum into those)
         
         // Finally, normalize the result (Need to check exactly where normalization happens... probably look at bh_tsne code)
 
