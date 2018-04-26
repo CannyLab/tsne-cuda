@@ -8,17 +8,14 @@
 
 
 void test_sym_mat(int N, int K) {
+
     // Construct a random matrix
     float* mat_val = new float[N*K];
     int* indices = new int[N*K];
-
     std::random_device rd;
     std::mt19937 e2(rd());
     std::uniform_real_distribution<float> dist(0, 1.0);
-
-
     for (int i = 0; i < N; i++) {
-        
         // Get a random subset of rows to fill
         std::vector<unsigned int> idx(N);
         std::iota(idx.begin(), idx.end(), 0);
