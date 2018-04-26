@@ -43,14 +43,17 @@ namespace {
 
     // TEST(ComputePIJ, CPU_256x50) {test_cpu_compute_pij(256, 50);}
     TEST(ComputePIJ, GPUisCPU) {test_cpu_is_gpu_pij(16,16);}
-
     TEST(ComputePerplexity, GPUisCPU) {test_cpu_is_gpu_perplexity(16,16);}
     TEST(ComputeSigma, GPUisCPU) {test_cpu_sigmas_search(16,16);}
-
     TEST(ComputePerplexity, 16x16) {test_sigmas_search(16, 16);}
+
     // T-SNE tests
     TEST(NaiveTSNE, 256x50) {test_tsne(256, 50);}
     TEST(NaiveTSNE, 512x50) {test_tsne(512, 50);}
     TEST(NaiveTSNE, 1024x50) {test_tsne(1024, 50);}
+
+    // Test Symmetrization
+    TEST(MatrixSymmetry, 70000x784) {test_sym_mat(70000,784);}
+
     
 }

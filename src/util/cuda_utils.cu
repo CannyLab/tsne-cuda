@@ -512,3 +512,49 @@ void printarray(thrust::device_vector<float> vec, const unsigned int N, const un
         std::cout << std::endl;
     }
 }
+
+// convert a linear index to a linear index in the transpose 
+struct transpose_index : public thrust::unary_function<size_t,size_t>
+{
+    size_t m, n;
+
+    __host__ __device__
+    transpose_index(size_t _m, size_t _n) : m(_m), n(_n) {}
+
+    __host__ __device__
+    size_t operator()(size_t linear_index)
+    {
+        size_t i = linear_index / n;
+        size_t j = linear_index % n;
+
+        return m * j + i;
+    }
+};
+
+// convert a linear index to a row index
+struct row_index : public thrust::unary_function<size_t,size_t>
+{
+    size_t n;
+
+    __host__ __device__
+    row_index(size_t _n) : n(_n) {}
+
+    __host__ __device__
+
+    size_t operator()(size_t i)
+    {
+        return i / n;
+    }
+};
+
+// transpose an M-by-N array
+template <typename T>
+void transpose(size_t m, size_t n, thrust::device_vector<T>& src, thrust::device_vector<T>& dst)
+{
+    thrust::counting_iterator<size_t> indices(0);
+
+    thrust::gather
+    (thrust::make_transform_iterator(indices, transpose_index(n, m)),
+    thrust::make_transform_iterator(indices, transpose_index(n, m)) + dst.size(),
+    src.begin(),dst.begin());
+}

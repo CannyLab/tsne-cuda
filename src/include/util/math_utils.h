@@ -65,4 +65,26 @@
         void max_norm(thrust::device_vector<float> &vec);
     }
 
+    namespace Sparse {
+
+        /**
+         * @brief Symmetrize a sparse-built pij matrix by taking the sum and dividing. Note that all of the
+         * sym_* values should be declared but not allocated with the exception of sym_nnz which shhould be the
+         * address of an integer to return into (probably allocated on the stack). 
+         * 
+         * @param values The values of the FAISS-constructed pij matrix to symmetrize (HOST FLOAT MATRIX)
+         * @param indices The indices of the FAISS matrix to symmetrize (HOST INDICES MATRIX)
+         * @param sym_values DO NOT ALLOCATE (the function does this for you) The returned sparse matrix values (CSR format, DEVICE)
+         * @param sym_colind DO NOT ALLOCATE (the function does this for you) The returned sparse matrix column indices (CSR format, DEVICE)
+         * @param sym_rowptr DO NOT ALLOCATE (the function does this for you) The returned sparse matrix row pointers (CSR format, DEVICE)
+         * @param sym_nnz The returned sparse matrix number of non-zeros (CSR format, HOST)
+         * @param N_POINTS The number of points
+         * @param K The number of nearest neighbors
+         */
+        void sym_mat_gpu(float* values, int* indices, 
+            float** sym_values, int** sym_colind, int** sym_rowptr, 
+            int* sym_nnz, unsigned int N_POINTS, unsigned int K);
+
+    }
+
 #endif
