@@ -82,6 +82,10 @@ void test_sym_mat(int N, int K) {
     cudaFree(gpu_col_idx);
     cudaFree(gpu_row_idx);
 
+    delete host_col_idx;
+    deltee host_row_idx;
+    delete host_data;
+
     delete mat_val;
     delete indices;
     delete mat_val_sim;
