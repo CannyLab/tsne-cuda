@@ -237,3 +237,40 @@ void test_tsne(unsigned int N,unsigned int NDIMS) {
     printf("Elapsed time: %f (ms)\n", milliseconds);
     EXPECT_EQ(0, 0);
 }
+
+
+void test_bhtsne(int N, int NDIMS) {
+    srand (time(NULL));
+
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution1(-10.0, 1.0);
+    std::normal_distribution<double> distribution2(10.0, 1.0);
+
+    thrust::host_vector<float> h_X(NDIMS * N);
+    for (int i = 0; i < NDIMS * N; i ++) {
+        if (i % N < (N / 2)) {
+            h_X[i] = distribution1(generator);
+        } else {
+            h_X[i] = distribution2(generator);
+        }
+    }
+
+    // --- Matrices allocation and initialization
+    cublasHandle_t dense_handle;
+    cublasSafeCall(cublasCreate(&dense_handle));
+    cusparseHandle_t sparse_handle;
+    cusparseSafeCall(cusparseCreate(&sparse_handle));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    printf("Starting TSNE calculation with %u points.\n", N);
+    cudaEventRecord(start);
+    BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()), N, NDIMS, 2, 2, 1.0, 0.0, 10.0, 1000, 0.0);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Elapsed time: %f (ms)\n", milliseconds);
+    EXPECT_EQ(0, 0);
+}

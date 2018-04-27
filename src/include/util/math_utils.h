@@ -81,9 +81,9 @@
          * @param N_POINTS The number of points
          * @param K The number of nearest neighbors
          */
-        void sym_mat_gpu(float* values, int* indices, 
-            float** sym_values, int** sym_colind, int** sym_rowptr, 
-            int* sym_nnz, unsigned int N_POINTS, unsigned int K);
+        void sym_mat_gpu(float* values, long* indices, thrust::device_vector<float> &sym_values,  
+                                thrust::device_vector<int> &sym_colind, thrust::device_vector<int> &sym_rowptr, int* sym_nnz, 
+                                unsigned int N_POINTS, unsigned int K);
 
     }
 

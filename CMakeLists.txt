@@ -36,6 +36,7 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -Xcompiler '-msse4'
                     -Xcompiler '-m64'
                     -Xcompiler '-mpopcnt'
+                    -rdc=true
                     )
 #-------------------------------------------------------------------------------
 
@@ -105,6 +106,8 @@ set(SOURCES
     src/util/random_utils.cu
     src/util/reduce_utils.cu
     src/ext/pymodule_ext.cu
+    src/bh.cu
+    src/bh_tsne.cu
 )
 #-------------------------------------------------------------------------------
 
@@ -147,6 +150,7 @@ target_link_libraries(tsne_test
     ${CUDA_LIBRARIES}
     ${OpenMP_CXX_FLAGS}
     ${CUDA_CUBLAS_LIBRARIES}
+    ${CUDA_cusparse_LIBRARY}
     libfaiss.a
     libgpufaiss.a
     pthread
@@ -157,41 +161,41 @@ target_link_libraries(tsne_test
 # Barnes Hut Testing Targets (For Roshan)
 #-------------------------------------------------------------------------------
 
-cuda_add_executable(bh_test
-    ${SOURCES}
-    src/bh.cu
-)
-add_dependencies(bh_test faiss)
-target_link_libraries(bh_test
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-    ${CUDA_LIBRARIES}
-    ${OpenMP_CXX_FLAGS}
-    ${CUDA_CUBLAS_LIBRARIES}
-    libfaiss.a
-    libgpufaiss.a
-    pthread
-    ${BLAS_LIB}
-)
-
-
-
-cuda_add_executable(bh_tsne
-    ${SOURCES}
-    src/bh_tsne.cu
-)
-add_dependencies(bh_tsne faiss)
-target_link_libraries(bh_tsne
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-    ${CUDA_LIBRARIES}
-    ${OpenMP_CXX_FLAGS}
-    ${CUDA_CUBLAS_LIBRARIES}
-    libfaiss.a
-    libgpufaiss.a
-    pthread
-    ${BLAS_LIB}
-)
+# cuda_add_executable(bh_test
+#    ${SOURCES}
+#    src/bh.cu
+#)
+#add_dependencies(bh_test faiss)
+#target_link_libraries(bh_test
+#    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
+#    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
+#    ${CUDA_LIBRARIES}
+#    ${OpenMP_CXX_FLAGS}
+#    ${CUDA_CUBLAS_LIBRARIES}
+#    libfaiss.a
+#    libgpufaiss.a
+#    pthread
+#    ${BLAS_LIB}
+#)
+#
+#
+#
+#cuda_add_executable(bh_tsne
+#    ${SOURCES}
+#    src/bh_tsne.cu
+#)
+#add_dependencies(bh_tsne faiss)
+#target_link_libraries(bh_tsne
+#    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
+#    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
+#    ${CUDA_LIBRARIES}
+#    ${OpenMP_CXX_FLAGS}
+#    ${CUDA_CUBLAS_LIBRARIES}
+#    libfaiss.a
+#    libgpufaiss.a
+#    pthread
+#    ${BLAS_LIB}
+#)
 #-------------------------------------------------------------------------------
 
 

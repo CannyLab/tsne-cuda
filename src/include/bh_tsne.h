@@ -18,32 +18,51 @@
 #include "util/random_utils.h"
 #include "util/thrust_utils.h"
 
-struct bounding_box_t {
-    float xmin;
-    float xmax;
-    float ymin;
-    float ymax;
-};
+// struct bounding_box_t {
+//     float xmin;
+//     float xmax;
+//     float ymin;
+//     float ymax;
+// };
 
-void compute_bounding_box(thrust::device_vector<float> &ys, const unsigned int N, float *xmin, float *xmax, float *ymin, float *ymax);
+// namespace shit {
+//     void compute_bounding_box(thrust::device_vector<float> &ys, const unsigned int N, float *xmin, float *xmax, float *ymin, float *ymax);
 
-thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
-                                         thrust::device_vector<float> &points, 
-                                         thrust::device_vector<float> &sigma, 
-                                         const unsigned int N, 
-                                         const unsigned int NDIMS);
-float compute_gradients(cublasHandle_t &handle, 
-                        thrust::device_vector<float> &forces,
-                        thrust::device_vector<float> &dist, 
-                        thrust::device_vector<float> &ys, 
-                        thrust::device_vector<float> &pij, 
-                        thrust::device_vector<float> &qij, 
-                        const unsigned int N,
-                        float eta);
-thrust::device_vector<float> bh_tsne(cublasHandle_t &handle, 
-                                     thrust::device_vector<float> &points, 
-                                     const unsigned int N, 
-                                     const unsigned int NDIMS,
-                                     const unsigned int PROJDIM);
+// thrust::device_vector<float> compute_pij(cublasHandle_t &handle, 
+//                                          thrust::device_vector<float> &points, 
+//                                          thrust::device_vector<float> &sigma, 
+//                                          const unsigned int N, 
+//                                          const unsigned int NDIMS);
+// float compute_gradients(cublasHandle_t &handle, 
+//                         thrust::device_vector<float> &forces,
+//                         thrust::device_vector<float> &dist, 
+//                         thrust::device_vector<float> &ys, 
+//                         thrust::device_vector<float> &pij, 
+//                         thrust::device_vector<float> &qij, 
+//                         const unsigned int N,
+//                         float eta);
+// thrust::device_vector<float> bh_tsne(cublasHandle_t &handle, 
+//                                      thrust::device_vector<float> &points, 
+//                                      const unsigned int N, 
+//                                      const unsigned int NDIMS,
+//                                      const unsigned int PROJDIM);
+    
+// }
+
+
+namespace BHTSNE {
+    thrust::device_vector<float> tsne(cublasHandle_t &dense_handle, 
+                                          cusparseHandle_t &sparse_handle,
+                                            float* points, 
+                                            unsigned int N_POINTS, 
+                                            unsigned int N_DIMS, 
+                                            unsigned int PROJDIM, 
+                                            float perplexity, 
+                                            float early_ex, 
+                                            float learning_rate, 
+                                            unsigned int n_iter, 
+                                            unsigned int n_iter_np, 
+                                            float min_g_norm);
+}
 
 #endif

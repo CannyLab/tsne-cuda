@@ -20,6 +20,9 @@ struct func_abs {
 struct func_nan_or_inf {
     __host__ __device__ bool operator()(const float &x) const { return isnan(x) || isinf(x); }
 };
+struct func_cast_to_int {
+    __host__ __device__ int operator()(const long &x) const { return (int) x; }
+};
 
 void Math::gauss_normalize(cublasHandle_t &handle, thrust::device_vector<float> &points, const unsigned int N, const unsigned int NDIMS) {
     auto means = Reduce::reduce_mean(handle, points, N, NDIMS, 0);
@@ -60,7 +63,9 @@ void Math::max_norm(thrust::device_vector<float> &vec) {
     thrust::transform(vec.begin(), vec.end(), div_iter, vec.begin(), thrust::divides<float>());
 }
 
-void Sparse::sym_mat_gpu(float* values, int* indices, float** sym_values, int** sym_colind, int** sym_rowptr, int* sym_nnz, unsigned int N_POINTS, unsigned int K) {
+void Sparse::sym_mat_gpu(float* values, long* indices, thrust::device_vector<float> &sym_values,  
+                                thrust::device_vector<int> &sym_colind, thrust::device_vector<int> &sym_rowptr, int* sym_nnz, 
+                                unsigned int N_POINTS, unsigned int K) {
     // Allocate memory
     // std::cout << "Allocating initial memory on GPU..." << std::endl;
     int* csrRowPtrA = nullptr;
@@ -69,10 +74,16 @@ void Sparse::sym_mat_gpu(float* values, int* indices, float** sym_values, int** 
     cudaMalloc((void**)& csrColPtrA, (N_POINTS*K)*sizeof(int));
     float* csrValA = nullptr;
     cudaMalloc((void**)& csrValA, (N_POINTS*K)*sizeof(float));
+    float* csrColPtrA_long = nullptr;
+    cudaMalloc((void**)& csrColPtrA_long, (N_POINTS*K)*sizeof(long));
 
     // Copy the data
+    cudaMemcpy(csrColPtrA_long, indices, N_POINTS*K*sizeof(long), cudaMemcpyHostToDevice);
+    thrust::transform(csrColPtrA_long, csrColPtrA_long + N_POINTS*K, csrColPtrA, func_cast_to_int());
+    cudaFree(csrColPtrA_long);
     cudaMemcpy(csrValA, values, N_POINTS*K*sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(csrColPtrA, indices, N_POINTS*K*sizeof(float), cudaMemcpyHostToDevice);
+
+
     thrust::device_vector<int> vx(csrRowPtrA, csrRowPtrA+N_POINTS+1);
     thrust::sequence(vx.begin(), vx.end(), 0,(int) K);
     thrust::copy(vx.begin(), vx.end(), csrRowPtrA);
@@ -137,24 +148,27 @@ void Sparse::sym_mat_gpu(float* values, int* indices, float** sym_values, int** 
     // Now compute the output size of the matrix
     int baseC, nnzC;
     cusparseSetPointerMode(handle, CUSPARSE_POINTER_MODE_HOST);
-    cudaMalloc((void**) sym_rowptr, sizeof(int)*(N_POINTS+1));
+    sym_rowptr.resize(N_POINTS+1);
+    // cudaMalloc((void**) sym_rowptr, sizeof(int)*(N_POINTS+1));
     cusparseXcsrgeamNnz(handle, N_POINTS, N_POINTS,
                             descr, N_POINTS*K, csrRowPtrA, csrColPtrA,
                             descr, N_POINTS*K, cscColPtrAT, cscRowIndAT,
-                            descr, *sym_rowptr, sym_nnz
+                            descr, thrust::raw_pointer_cast(sym_rowptr.data()), sym_nnz
                         );
     cudaDeviceSynchronize();
 
     if (-1 != *sym_nnz) {
         nnzC = *sym_nnz;
     } else {
-        cudaMemcpy(&nnzC, sym_rowptr+N_POINTS,sizeof(int), cudaMemcpyDeviceToHost);
-        cudaMemcpy(&baseC, sym_rowptr, sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&nnzC, thrust::raw_pointer_cast(sym_rowptr.data())+N_POINTS,sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&baseC, thrust::raw_pointer_cast(sym_rowptr.data()), sizeof(int), cudaMemcpyDeviceToHost);
     }
 
     // Allocate memory for the new summed array
-    cudaMalloc((void**) sym_colind, sizeof(int)*nnzC);
-    cudaMalloc((void**) sym_values, sizeof(float)*nnzC);
+    sym_colind.resize(nnzC);
+    sym_values.resize(nnzC);
+    // cudaMalloc((void**) sym_colind, sizeof(int)*nnzC);
+    // cudaMalloc((void**) sym_values, sizeof(float)*nnzC);
 
     // Sum the arrays
     // std::cout << "Symmetrizing..." << std::endl;
@@ -163,7 +177,9 @@ void Sparse::sym_mat_gpu(float* values, int* indices, float** sym_values, int** 
     cusparseScsrgeam(handle, N_POINTS, N_POINTS, 
        &alpha, descr, N_POINTS*K, csrValA, csrRowPtrA, csrColPtrA,
         &beta, descr, N_POINTS*K, cscValAT, cscColPtrAT, cscRowIndAT,
-        descr, *sym_values, *sym_rowptr, *sym_colind
+        descr, thrust::raw_pointer_cast(sym_values.data()), 
+                thrust::raw_pointer_cast(sym_rowptr.data()), 
+                thrust::raw_pointer_cast(sym_colind.data())
     );
     cudaDeviceSynchronize();
 

@@ -40,6 +40,7 @@ Author: Martin Burtscher <burtscher@txstate.edu>
 #include <math.h>
 #include <sys/time.h>
 #include <cuda.h>
+#include "bh_tsne.h"
 
 #ifdef __KEPLER__
 
@@ -671,24 +672,24 @@ void ForceCalculationKernel(int nnodesd,
 /*** advance bodies ***********************************************************/
 /******************************************************************************/
 // Probably should just do this with thrust
-__global__
-__launch_bounds__(THREADS6, FACTOR6)
-void IntegrationKernel(int nbodiesd,
-                        float eta,
-                        volatile float * __restrict posxd, 
-                        volatile float * __restrict posyd, 
-                        volatile float * __restrict velxd, 
-                        volatile float * __restrict velyd) 
-{
-  register int i, inc;
+// __global__
+// __launch_bounds__(THREADS6, FACTOR6)
+// void IntegrationKernel(int nbodiesd,
+//                         float eta,
+//                         volatile float * __restrict posxd, 
+//                         volatile float * __restrict posyd, 
+//                         volatile float * __restrict velxd, 
+//                         volatile float * __restrict velyd) 
+// {
+//   register int i, inc;
 
-  // iterate over all bodies assigned to thread
-  inc = blockDim.x * gridDim.x;
-  for (i = threadIdx.x + blockIdx.x * blockDim.x; i < nbodiesd; i += inc) {
-    posxd[i] += velxd[i] * eta;
-    posyd[i] += velyd[i] * eta;
-   }
-}
+//   // iterate over all bodies assigned to thread
+//   inc = blockDim.x * gridDim.x;
+//   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < nbodiesd; i += inc) {
+//     posxd[i] += velxd[i] * eta;
+//     posyd[i] += velyd[i] * eta;
+//    }
+// }
 
 
 /******************************************************************************/
@@ -766,7 +767,7 @@ void computeAttrForce(int N,
                             thrust::raw_pointer_cast(ones.data()),
                             N, &beta, thrust::raw_pointer_cast(forces.data()),
                             N));
-    thrust::transform(forces.begin(), forces.end(), pts.begin(), forces.begin(), thrust::multiply<float>());
+    thrust::transform(forces.begin(), forces.end(), pts.begin(), forces.begin(), thrust::multiplies<float>());
 
     // compute forces_i = forces_i - sum_j pij*qij*normalization*yj
     alpha = -1.0f;
@@ -785,17 +786,17 @@ void computeAttrForce(int N,
 
 /******************************************************************************/
 
-static void CudaTest(const char *msg)
-{
-  cudaError_t e;
+// static void CudaTest(const char *msg)
+// {
+//   cudaError_t e;
 
-  cudaThreadSynchronize();
-  if (cudaSuccess != (e = cudaGetLastError())) {
-    fprintf(stderr, "%s: %d\n", msg, e);
-    fprintf(stderr, "%s\n", cudaGetErrorString(e));
-    exit(-1);
-  }
-}
+//   cudaThreadSynchronize();
+//   if (cudaSuccess != (e = cudaGetLastError())) {
+//     fprintf(stderr, "%s: %d\n", msg, e);
+//     fprintf(stderr, "%s\n", cudaGetErrorString(e));
+//     exit(-1);
+//   }
+// }
 
 
 /******************************************************************************/
@@ -807,327 +808,327 @@ static void CudaTest(const char *msg)
 #define MASK 0x7FFFFFFF
 #define TWOTO31 2147483648.0
 
-static int A = 1;
-static int B = 0;
-static int randx = 1;
-static int lastrand;
+// static int A = 1;
+// static int B = 0;
+// static int randx = 1;
+// static int lastrand;
 
 
-static void drndset(int seed)
-{
-   A = 1;
-   B = 0;
-   randx = (A * seed + B) & MASK;
-   A = (MULT * A) & MASK;
-   B = (MULT * B + ADD) & MASK;
-}
+// static void drndset(int seed)
+// {
+//    A = 1;
+//    B = 0;
+//    randx = (A * seed + B) & MASK;
+//    A = (MULT * A) & MASK;
+//    B = (MULT * B + ADD) & MASK;
+// }
 
 
-static double drnd()
-{
-   lastrand = randx;
-   randx = (A * randx + B) & MASK;
-   return (double)lastrand / TWOTO31;
-}
+// static double drnd()
+// {
+//    lastrand = randx;
+//    randx = (A * randx + B) & MASK;
+//    return (double)lastrand / TWOTO31;
+// }
 
 
 /******************************************************************************/
 
-int main(int argc, char *argv[])
-{
-  register int i, run, blocks;
-  int nnodes, nbodies, step, timesteps;
-  register double runtime;
-  int error;
-  register float dtime, dthf, epssq, itolsq;
-  float time, timing[7];
-  cudaEvent_t start, stop;
-  float *mass, *posx, *posy, *velx, *vely;
+// int main(int argc, char *argv[])
+// {
+//   register int i, run, blocks;
+//   int nnodes, nbodies, step, timesteps;
+//   register double runtime;
+//   int error;
+//   register float dtime, dthf, epssq, itolsq;
+//   float time, timing[7];
+//   cudaEvent_t start, stop;
+//   float *mass, *posx, *posy, *velx, *vely;
 
-  int *errl, *sortl, *childl, *countl, *startl;
-  float *massl;
-  float *posxl, *posyl;
-  float *velxl, *velyl;
-  float *maxxl, *maxyl;
-  float *minxl, *minyl;
-  float *norml;
-  register double rsc, vsc, r, v, x, y, sq, scale;
+//   int *errl, *sortl, *childl, *countl, *startl;
+//   float *massl;
+//   float *posxl, *posyl;
+//   float *velxl, *velyl;
+//   float *maxxl, *maxyl;
+//   float *minxl, *minyl;
+//   float *norml;
+//   register double rsc, vsc, r, v, x, y, sq, scale;
 
-  // perform some checks
+//   // perform some checks
 
-  printf("CUDA BarnesHut v3.1 ");
-#ifdef __KEPLER__
-  printf("[Kepler]\n");
-#else
-  printf("[Fermi]\n");
-#endif
-  printf("Copyright (c) 2013, Texas State University-San Marcos. All rights reserved.\n");
-  fflush(stdout);
-  if (argc != 4) {
-    fprintf(stderr, "\n");
-    fprintf(stderr, "arguments: number_of_bodies number_of_timesteps device\n");
-    exit(-1);
-  }
+//   printf("CUDA BarnesHut v3.1 ");
+// #ifdef __KEPLER__
+//   printf("[Kepler]\n");
+// #else
+//   printf("[Fermi]\n");
+// #endif
+//   printf("Copyright (c) 2013, Texas State University-San Marcos. All rights reserved.\n");
+//   fflush(stdout);
+//   if (argc != 4) {
+//     fprintf(stderr, "\n");
+//     fprintf(stderr, "arguments: number_of_bodies number_of_timesteps device\n");
+//     exit(-1);
+//   }
 
-  int deviceCount;
-  cudaGetDeviceCount(&deviceCount);
-  if (deviceCount == 0) {
-    fprintf(stderr, "There is no device supporting CUDA\n");
-    exit(-1);
-  }
+//   int deviceCount;
+//   cudaGetDeviceCount(&deviceCount);
+//   if (deviceCount == 0) {
+//     fprintf(stderr, "There is no device supporting CUDA\n");
+//     exit(-1);
+//   }
 
-  const int dev = atoi(argv[3]);
-  if ((dev < 0) || (deviceCount <= dev)) {
-    fprintf(stderr, "There is no device %d\n", dev);
-    exit(-1);
-  }
-  cudaSetDevice(dev);
+//   const int dev = atoi(argv[3]);
+//   if ((dev < 0) || (deviceCount <= dev)) {
+//     fprintf(stderr, "There is no device %d\n", dev);
+//     exit(-1);
+//   }
+//   cudaSetDevice(dev);
 
-  cudaDeviceProp deviceProp;
-  cudaGetDeviceProperties(&deviceProp, dev);
-  if ((deviceProp.major == 9999) && (deviceProp.minor == 9999)) {
-    fprintf(stderr, "There is no CUDA capable device\n");
-    exit(-1);
-  }
-  if (deviceProp.major < 2) {
-    fprintf(stderr, "Need at least compute capability 2.0\n");
-    exit(-1);
-  }
-  if (deviceProp.warpSize != WARPSIZE) {
-    fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
-    exit(-1);
-  }
+//   cudaDeviceProp deviceProp;
+//   cudaGetDeviceProperties(&deviceProp, dev);
+//   if ((deviceProp.major == 9999) && (deviceProp.minor == 9999)) {
+//     fprintf(stderr, "There is no CUDA capable device\n");
+//     exit(-1);
+//   }
+//   if (deviceProp.major < 2) {
+//     fprintf(stderr, "Need at least compute capability 2.0\n");
+//     exit(-1);
+//   }
+//   if (deviceProp.warpSize != WARPSIZE) {
+//     fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
+//     exit(-1);
+//   }
 
-  blocks = deviceProp.multiProcessorCount;
-//  fprintf(stderr, "blocks = %d\n", blocks);
+//   blocks = deviceProp.multiProcessorCount;
+// //  fprintf(stderr, "blocks = %d\n", blocks);
 
-  if ((WARPSIZE <= 0) || (WARPSIZE & (WARPSIZE-1) != 0)) {
-    fprintf(stderr, "Warp size must be greater than zero and a power of two\n");
-    exit(-1);
-  }
-  if (MAXDEPTH > WARPSIZE) {
-    fprintf(stderr, "MAXDEPTH must be less than or equal to WARPSIZE\n");
-    exit(-1);
-  }
-  if ((THREADS1 <= 0) || (THREADS1 & (THREADS1-1) != 0)) {
-    fprintf(stderr, "THREADS1 must be greater than zero and a power of two\n");
-    exit(-1);
-  }
+//   if ((WARPSIZE <= 0) || (WARPSIZE & (WARPSIZE-1) != 0)) {
+//     fprintf(stderr, "Warp size must be greater than zero and a power of two\n");
+//     exit(-1);
+//   }
+//   if (MAXDEPTH > WARPSIZE) {
+//     fprintf(stderr, "MAXDEPTH must be less than or equal to WARPSIZE\n");
+//     exit(-1);
+//   }
+//   if ((THREADS1 <= 0) || (THREADS1 & (THREADS1-1) != 0)) {
+//     fprintf(stderr, "THREADS1 must be greater than zero and a power of two\n");
+//     exit(-1);
+//   }
 
-  // set L1/shared memory configuration
-  cudaFuncSetCacheConfig(BoundingBoxKernel, cudaFuncCachePreferShared);
-  cudaFuncSetCacheConfig(TreeBuildingKernel, cudaFuncCachePreferL1);
-  cudaFuncSetCacheConfig(ClearKernel1, cudaFuncCachePreferL1);
-  cudaFuncSetCacheConfig(ClearKernel2, cudaFuncCachePreferL1);
-  cudaFuncSetCacheConfig(SummarizationKernel, cudaFuncCachePreferShared);
-  cudaFuncSetCacheConfig(SortKernel, cudaFuncCachePreferL1);
-#ifdef __KEPLER__
-  cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferEqual);
-#else
-  cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
-#endif
-  cudaFuncSetCacheConfig(IntegrationKernel, cudaFuncCachePreferL1);
+//   // set L1/shared memory configuration
+//   cudaFuncSetCacheConfig(BoundingBoxKernel, cudaFuncCachePreferShared);
+//   cudaFuncSetCacheConfig(TreeBuildingKernel, cudaFuncCachePreferL1);
+//   cudaFuncSetCacheConfig(ClearKernel1, cudaFuncCachePreferL1);
+//   cudaFuncSetCacheConfig(ClearKernel2, cudaFuncCachePreferL1);
+//   cudaFuncSetCacheConfig(SummarizationKernel, cudaFuncCachePreferShared);
+//   cudaFuncSetCacheConfig(SortKernel, cudaFuncCachePreferL1);
+// #ifdef __KEPLER__
+//   cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferEqual);
+// #else
+//   cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
+// #endif
+//   cudaFuncSetCacheConfig(IntegrationKernel, cudaFuncCachePreferL1);
 
-  cudaGetLastError();  // reset error value
-  for (run = 0; run < 3; run++) {
-    for (i = 0; i < 7; i++) timing[i] = 0.0f;
+//   cudaGetLastError();  // reset error value
+//   for (run = 0; run < 3; run++) {
+//     for (i = 0; i < 7; i++) timing[i] = 0.0f;
 
-    nbodies = atoi(argv[1]);
-    if (nbodies < 1) {
-      fprintf(stderr, "nbodies is too small: %d\n", nbodies);
-      exit(-1);
-    }
-    if (nbodies > (1 << 30)) {
-      fprintf(stderr, "nbodies is too large: %d\n", nbodies);
-      exit(-1);
-    }
-    nnodes = nbodies * 2;
-    if (nnodes < 1024*blocks) nnodes = 1024*blocks;
-    while ((nnodes & (WARPSIZE-1)) != 0) nnodes++;
-    nnodes--;
+//     nbodies = atoi(argv[1]);
+//     if (nbodies < 1) {
+//       fprintf(stderr, "nbodies is too small: %d\n", nbodies);
+//       exit(-1);
+//     }
+//     if (nbodies > (1 << 30)) {
+//       fprintf(stderr, "nbodies is too large: %d\n", nbodies);
+//       exit(-1);
+//     }
+//     nnodes = nbodies * 2;
+//     if (nnodes < 1024*blocks) nnodes = 1024*blocks;
+//     while ((nnodes & (WARPSIZE-1)) != 0) nnodes++;
+//     nnodes--;
 
-    timesteps = atoi(argv[2]);
-    dtime = 0.025;  dthf = dtime * 0.5f;
-    epssq = 0.05 * 0.05;
-    itolsq = 1.0f / (0.5 * 0.5);
+//     timesteps = atoi(argv[2]);
+//     dtime = 0.025;  dthf = dtime * 0.5f;
+//     epssq = 0.05 * 0.05;
+//     itolsq = 1.0f / (0.5 * 0.5);
 
-    // allocate memory
+//     // allocate memory
 
-    if (run == 0) {
-      printf("configuration: %d bodies, %d time steps\n", nbodies, timesteps);
+//     if (run == 0) {
+//       printf("configuration: %d bodies, %d time steps\n", nbodies, timesteps);
 
-      mass = (float *)malloc(sizeof(float) * nbodies);
-      if (mass == NULL) {fprintf(stderr, "cannot allocate mass\n");  exit(-1);}
-      posx = (float *)malloc(sizeof(float) * nbodies);
-      if (posx == NULL) {fprintf(stderr, "cannot allocate posx\n");  exit(-1);}
-      posy = (float *)malloc(sizeof(float) * nbodies);
-      if (posy == NULL) {fprintf(stderr, "cannot allocate posy\n");  exit(-1);}
-      velx = (float *)malloc(sizeof(float) * nbodies);
-      if (velx == NULL) {fprintf(stderr, "cannot allocate velx\n");  exit(-1);}
-      vely = (float *)malloc(sizeof(float) * nbodies);
-      if (vely == NULL) {fprintf(stderr, "cannot allocate vely\n");  exit(-1);}
+//       mass = (float *)malloc(sizeof(float) * nbodies);
+//       if (mass == NULL) {fprintf(stderr, "cannot allocate mass\n");  exit(-1);}
+//       posx = (float *)malloc(sizeof(float) * nbodies);
+//       if (posx == NULL) {fprintf(stderr, "cannot allocate posx\n");  exit(-1);}
+//       posy = (float *)malloc(sizeof(float) * nbodies);
+//       if (posy == NULL) {fprintf(stderr, "cannot allocate posy\n");  exit(-1);}
+//       velx = (float *)malloc(sizeof(float) * nbodies);
+//       if (velx == NULL) {fprintf(stderr, "cannot allocate velx\n");  exit(-1);}
+//       vely = (float *)malloc(sizeof(float) * nbodies);
+//       if (vely == NULL) {fprintf(stderr, "cannot allocate vely\n");  exit(-1);}
 
-      if (cudaSuccess != cudaMalloc((void **)&errl, sizeof(int))) fprintf(stderr, "could not allocate errd\n");  CudaTest("couldn't allocate errd");
-      if (cudaSuccess != cudaMalloc((void **)&childl, sizeof(int) * (nnodes+1) * 4)) fprintf(stderr, "could not allocate childd\n");  CudaTest("couldn't allocate childd");
-      if (cudaSuccess != cudaMalloc((void **)&massl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate massd\n");  CudaTest("couldn't allocate massd");
-      if (cudaSuccess != cudaMalloc((void **)&posxl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate posxd\n");  CudaTest("couldn't allocate posxd");
-      if (cudaSuccess != cudaMalloc((void **)&posyl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate posyd\n");  CudaTest("couldn't allocate posyd");
-      if (cudaSuccess != cudaMalloc((void **)&velxl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate velxd\n");  CudaTest("couldn't allocate velxd");
-      if (cudaSuccess != cudaMalloc((void **)&velyl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate velyd\n");  CudaTest("couldn't allocate velyd");
-      if (cudaSuccess != cudaMalloc((void **)&countl, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate countd\n");  CudaTest("couldn't allocate countd");
-      if (cudaSuccess != cudaMalloc((void **)&startl, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate startd\n");  CudaTest("couldn't allocate startd");
-      if (cudaSuccess != cudaMalloc((void **)&sortl, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate sortd\n");  CudaTest("couldn't allocate sortd");
-      if (cudaSuccess != cudaMalloc((void **)&norml, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate normd\n");  CudaTest("couldn't allocate normd");
+//       if (cudaSuccess != cudaMalloc((void **)&errl, sizeof(int))) fprintf(stderr, "could not allocate errd\n");  CudaTest("couldn't allocate errd");
+//       if (cudaSuccess != cudaMalloc((void **)&childl, sizeof(int) * (nnodes+1) * 4)) fprintf(stderr, "could not allocate childd\n");  CudaTest("couldn't allocate childd");
+//       if (cudaSuccess != cudaMalloc((void **)&massl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate massd\n");  CudaTest("couldn't allocate massd");
+//       if (cudaSuccess != cudaMalloc((void **)&posxl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate posxd\n");  CudaTest("couldn't allocate posxd");
+//       if (cudaSuccess != cudaMalloc((void **)&posyl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate posyd\n");  CudaTest("couldn't allocate posyd");
+//       if (cudaSuccess != cudaMalloc((void **)&velxl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate velxd\n");  CudaTest("couldn't allocate velxd");
+//       if (cudaSuccess != cudaMalloc((void **)&velyl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate velyd\n");  CudaTest("couldn't allocate velyd");
+//       if (cudaSuccess != cudaMalloc((void **)&countl, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate countd\n");  CudaTest("couldn't allocate countd");
+//       if (cudaSuccess != cudaMalloc((void **)&startl, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate startd\n");  CudaTest("couldn't allocate startd");
+//       if (cudaSuccess != cudaMalloc((void **)&sortl, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate sortd\n");  CudaTest("couldn't allocate sortd");
+//       if (cudaSuccess != cudaMalloc((void **)&norml, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate normd\n");  CudaTest("couldn't allocate normd");
 
-      if (cudaSuccess != cudaMalloc((void **)&maxxl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate maxxd\n");  CudaTest("couldn't allocate maxxd");
-      if (cudaSuccess != cudaMalloc((void **)&maxyl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate maxyd\n");  CudaTest("couldn't allocate maxyd");
-      if (cudaSuccess != cudaMalloc((void **)&minxl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate minxd\n");  CudaTest("couldn't allocate minxd");
-      if (cudaSuccess != cudaMalloc((void **)&minyl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate minyd\n");  CudaTest("couldn't allocate minyd");
-    }
+//       if (cudaSuccess != cudaMalloc((void **)&maxxl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate maxxd\n");  CudaTest("couldn't allocate maxxd");
+//       if (cudaSuccess != cudaMalloc((void **)&maxyl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate maxyd\n");  CudaTest("couldn't allocate maxyd");
+//       if (cudaSuccess != cudaMalloc((void **)&minxl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate minxd\n");  CudaTest("couldn't allocate minxd");
+//       if (cudaSuccess != cudaMalloc((void **)&minyl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate minyd\n");  CudaTest("couldn't allocate minyd");
+//     }
 
-    // generate input
+//     // generate input
 
-    drndset(7);
-    rsc = (3 * 3.1415926535897932384626433832795) / 16;
-    vsc = sqrt(1.0 / rsc);
-    for (i = 0; i < nbodies; i++) {
-      mass[i] = 1.0 / nbodies;
-      r = 1.0 / sqrt(pow(drnd()*0.999, -2.0/3.0) - 1);
-      do {
-        x = drnd()*2.0 - 1.0;
-        y = drnd()*2.0 - 1.0;
-        sq = x*x + y*y;
-      } while (sq > 1.0);
-      scale = rsc * r / sqrt(sq);
-      posx[i] = x * scale;
-      posy[i] = y * scale;
+//     drndset(7);
+//     rsc = (3 * 3.1415926535897932384626433832795) / 16;
+//     vsc = sqrt(1.0 / rsc);
+//     for (i = 0; i < nbodies; i++) {
+//       mass[i] = 1.0 / nbodies;
+//       r = 1.0 / sqrt(pow(drnd()*0.999, -2.0/3.0) - 1);
+//       do {
+//         x = drnd()*2.0 - 1.0;
+//         y = drnd()*2.0 - 1.0;
+//         sq = x*x + y*y;
+//       } while (sq > 1.0);
+//       scale = rsc * r / sqrt(sq);
+//       posx[i] = x * scale;
+//       posy[i] = y * scale;
 
-      do {
-        x = drnd();
-        y = drnd() * 0.1;
-      } while (y > x*x * pow(1 - x*x, 3.5));
-      v = x * sqrt(2.0 / sqrt(1 + r*r));
-      do {
-        x = drnd()*2.0 - 1.0;
-        y = drnd()*2.0 - 1.0;
-        sq = x*x + y*y;
-      } while (sq > 1.0);
-      scale = vsc * v / sqrt(sq);
-      velx[i] = x * scale;
-      vely[i] = y * scale;
-    }
+//       do {
+//         x = drnd();
+//         y = drnd() * 0.1;
+//       } while (y > x*x * pow(1 - x*x, 3.5));
+//       v = x * sqrt(2.0 / sqrt(1 + r*r));
+//       do {
+//         x = drnd()*2.0 - 1.0;
+//         y = drnd()*2.0 - 1.0;
+//         sq = x*x + y*y;
+//       } while (sq > 1.0);
+//       scale = vsc * v / sqrt(sq);
+//       velx[i] = x * scale;
+//       vely[i] = y * scale;
+//     }
 
-    if (cudaSuccess != cudaMemcpy(massl, mass, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of mass to device failed\n");  CudaTest("mass copy to device failed");
-    if (cudaSuccess != cudaMemcpy(posxl, posx, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of posx to device failed\n");  CudaTest("posx copy to device failed");
-    if (cudaSuccess != cudaMemcpy(posyl, posy, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of posy to device failed\n");  CudaTest("posy copy to device failed");
-    if (cudaSuccess != cudaMemcpy(velxl, velx, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of velx to device failed\n");  CudaTest("velx copy to device failed");
-    if (cudaSuccess != cudaMemcpy(velyl, vely, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of vely to device failed\n");  CudaTest("vely copy to device failed");
+//     if (cudaSuccess != cudaMemcpy(massl, mass, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of mass to device failed\n");  CudaTest("mass copy to device failed");
+//     if (cudaSuccess != cudaMemcpy(posxl, posx, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of posx to device failed\n");  CudaTest("posx copy to device failed");
+//     if (cudaSuccess != cudaMemcpy(posyl, posy, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of posy to device failed\n");  CudaTest("posy copy to device failed");
+//     if (cudaSuccess != cudaMemcpy(velxl, velx, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of velx to device failed\n");  CudaTest("velx copy to device failed");
+//     if (cudaSuccess != cudaMemcpy(velyl, vely, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of vely to device failed\n");  CudaTest("vely copy to device failed");
 
-    // run timesteps (launch GPU kernels)
+//     // run timesteps (launch GPU kernels)
 
-    cudaEventCreate(&start);  cudaEventCreate(&stop);  
-    struct timeval starttime, endtime;
-    gettimeofday(&starttime, NULL);
+//     cudaEventCreate(&start);  cudaEventCreate(&stop);  
+//     struct timeval starttime, endtime;
+//     gettimeofday(&starttime, NULL);
 
-    cudaEventRecord(start, 0);
-    InitializationKernel<<<1, 1>>>(errl);
-    cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-    timing[0] += time;
-    CudaTest("kernel 0 launch failed");
+//     cudaEventRecord(start, 0);
+//     InitializationKernel<<<1, 1>>>(errl);
+//     cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
+//     timing[0] += time;
+//     CudaTest("kernel 0 launch failed");
 
-    for (step = 0; step < timesteps; step++) {
-      cudaEventRecord(start, 0);
-      BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, nbodies, startl, childl, massl, posxl, posyl, maxxl, maxyl, minxl, minyl);
-      cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-      timing[1] += time;
-      CudaTest("kernel 1 launch failed");
+//     for (step = 0; step < timesteps; step++) {
+//       cudaEventRecord(start, 0);
+//       BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, nbodies, startl, childl, massl, posxl, posyl, maxxl, maxyl, minxl, minyl);
+//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
+//       timing[1] += time;
+//       CudaTest("kernel 1 launch failed");
 
-      cudaEventRecord(start, 0);
-      ClearKernel1<<<blocks * 1, 1024>>>(nnodes, nbodies, childl);
-      TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, nbodies, errl, childl, posxl, posyl);
-      ClearKernel2<<<blocks * 1, 1024>>>(nnodes, startl, massl);
-      cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-      timing[2] += time;
-      CudaTest("kernel 2 launch failed");
+//       cudaEventRecord(start, 0);
+//       ClearKernel1<<<blocks * 1, 1024>>>(nnodes, nbodies, childl);
+//       TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, nbodies, errl, childl, posxl, posyl);
+//       ClearKernel2<<<blocks * 1, 1024>>>(nnodes, startl, massl);
+//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
+//       timing[2] += time;
+//       CudaTest("kernel 2 launch failed");
 
-      cudaEventRecord(start, 0);
-      SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, nbodies, countl, childl, massl, posxl, posyl);
-      cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-      timing[3] += time;
-      CudaTest("kernel 3 launch failed");
+//       cudaEventRecord(start, 0);
+//       SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, nbodies, countl, childl, massl, posxl, posyl);
+//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
+//       timing[3] += time;
+//       CudaTest("kernel 3 launch failed");
 
-      cudaEventRecord(start, 0);
-      SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, nbodies, sortl, countl, startl, childl);
-      cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-      timing[4] += time;
-      CudaTest("kernel 4 launch failed");
+//       cudaEventRecord(start, 0);
+//       SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, nbodies, sortl, countl, startl, childl);
+//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
+//       timing[4] += time;
+//       CudaTest("kernel 4 launch failed");
 
-      cudaEventRecord(start, 0);
-      ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, nbodies, errl, itolsq, epssq, sortl, childl, massl, posxl, posyl, velxl, velyl, norml);
-      cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-      timing[5] += time;
-      CudaTest("kernel 5 launch failed");
+//       cudaEventRecord(start, 0);
+//       ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, nbodies, errl, itolsq, epssq, sortl, childl, massl, posxl, posyl, velxl, velyl, norml);
+//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
+//       timing[5] += time;
+//       CudaTest("kernel 5 launch failed");
 
-      cudaEventRecord(start, 0);
-      IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(nbodies, dtime, posxl, posyl, velxl, velyl);
-      cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-      timing[6] += time;
-      CudaTest("kernel 6 launch failed");
-    }
-    CudaTest("kernel launch failed");
-    cudaEventDestroy(start);  cudaEventDestroy(stop);
+//       cudaEventRecord(start, 0);
+//       IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(nbodies, dtime, posxl, posyl, velxl, velyl);
+//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
+//       timing[6] += time;
+//       CudaTest("kernel 6 launch failed");
+//     }
+//     CudaTest("kernel launch failed");
+//     cudaEventDestroy(start);  cudaEventDestroy(stop);
 
-    // transfer result back to CPU
-    if (cudaSuccess != cudaMemcpy(&error, errl, sizeof(int), cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of err from device failed\n");  CudaTest("err copy from device failed");
-    if (cudaSuccess != cudaMemcpy(posx, posxl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of posx from device failed\n");  CudaTest("posx copy from device failed");
-    if (cudaSuccess != cudaMemcpy(posy, posyl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of posy from device failed\n");  CudaTest("posy copy from device failed");
-    if (cudaSuccess != cudaMemcpy(velx, velxl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of velx from device failed\n");  CudaTest("velx copy from device failed");
-    if (cudaSuccess != cudaMemcpy(vely, velyl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of vely from device failed\n");  CudaTest("vely copy from device failed");
+//     // transfer result back to CPU
+//     if (cudaSuccess != cudaMemcpy(&error, errl, sizeof(int), cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of err from device failed\n");  CudaTest("err copy from device failed");
+//     if (cudaSuccess != cudaMemcpy(posx, posxl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of posx from device failed\n");  CudaTest("posx copy from device failed");
+//     if (cudaSuccess != cudaMemcpy(posy, posyl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of posy from device failed\n");  CudaTest("posy copy from device failed");
+//     if (cudaSuccess != cudaMemcpy(velx, velxl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of velx from device failed\n");  CudaTest("velx copy from device failed");
+//     if (cudaSuccess != cudaMemcpy(vely, velyl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of vely from device failed\n");  CudaTest("vely copy from device failed");
 
-    gettimeofday(&endtime, NULL);
-    runtime = endtime.tv_sec + endtime.tv_usec/1000000.0 - starttime.tv_sec - starttime.tv_usec/1000000.0;
+//     gettimeofday(&endtime, NULL);
+//     runtime = endtime.tv_sec + endtime.tv_usec/1000000.0 - starttime.tv_sec - starttime.tv_usec/1000000.0;
 
-    printf("runtime: %.4lf s  (", runtime);
-    time = 0;
-    for (i = 1; i < 7; i++) {
-      printf(" %.1f ", timing[i]);
-      time += timing[i];
-    }
-    if (error == 0) {
-      printf(") = %.1f ms\n", time);
-    } else {
-      printf(") = %.1f ms FAILED %d\n", time, error);
-    }
-  }
+//     printf("runtime: %.4lf s  (", runtime);
+//     time = 0;
+//     for (i = 1; i < 7; i++) {
+//       printf(" %.1f ", timing[i]);
+//       time += timing[i];
+//     }
+//     if (error == 0) {
+//       printf(") = %.1f ms\n", time);
+//     } else {
+//       printf(") = %.1f ms FAILED %d\n", time, error);
+//     }
+//   }
 
-  // print output
-  i = 0;
-//  for (i = 0; i < nbodies; i++) {
-    printf("%.2e %.2e\n", posx[i], posy[i]);
-//  }
+//   // print output
+//   i = 0;
+// //  for (i = 0; i < nbodies; i++) {
+//     printf("%.2e %.2e\n", posx[i], posy[i]);
+// //  }
 
-  free(mass);
-  free(posx);
-  free(posy);
-  free(velx);
-  free(vely);
+//   free(mass);
+//   free(posx);
+//   free(posy);
+//   free(velx);
+//   free(vely);
 
-  cudaFree(errl);
-  cudaFree(childl);
-  cudaFree(massl);
-  cudaFree(posxl);
-  cudaFree(posyl);
-  cudaFree(countl);
-  cudaFree(startl);
-  cudaFree(norml);
+//   cudaFree(errl);
+//   cudaFree(childl);
+//   cudaFree(massl);
+//   cudaFree(posxl);
+//   cudaFree(posyl);
+//   cudaFree(countl);
+//   cudaFree(startl);
+//   cudaFree(norml);
 
-  cudaFree(maxxl);
-  cudaFree(maxyl);
-  cudaFree(minxl);
-  cudaFree(minyl);
+//   cudaFree(maxxl);
+//   cudaFree(maxyl);
+//   cudaFree(minxl);
+//   cudaFree(minyl);
 
-  return 0;
-}
+//   return 0;
+// }
 
 void compute_pij(cublasHandle_t &handle, 
                     thrust::device_vector<float> &pij,  
@@ -1156,6 +1157,8 @@ void compute_pij(cublasHandle_t &handle,
     Broadcast::broadcast_matrix_vector(pij, sums, K, N, thrust::divides<float>(), 1, 1.0f);
 }
 
+
+
 struct saxpy_functor : public thrust::binary_function<float,float,float>
 {
     const float a;
@@ -1181,10 +1184,22 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                             float min_g_norm)
 {
 
+    cudaFuncSetCacheConfig(BoundingBoxKernel, cudaFuncCachePreferShared);
+    cudaFuncSetCacheConfig(TreeBuildingKernel, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(ClearKernel1, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(ClearKernel2, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(SummarizationKernel, cudaFuncCachePreferShared);
+    cudaFuncSetCacheConfig(SortKernel, cudaFuncCachePreferL1);
+    #ifdef __KEPLER__
+    cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferEqual);
+    #else
+    cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
+    #endif
+
     const unsigned int K = 1023;
     float *knn_distances = new float[N_POINTS*K];
     long *knn_indices = new long[N_POINTS*K];
-    Distance::knn(points, knn_indices, knn_distances, N_DIMS, N_POINTS, K);
+    // Distance::knn(points, knn_indices, knn_distances, N_DIMS, N_POINTS, K);
 
     thrust::device_vector<float> d_knn_distances(N_POINTS*K);
     thrust::copy(knn_distances, knn_distances + N_POINTS*K, d_knn_distances.begin());
@@ -1194,34 +1209,33 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
     cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ZERO);
 
-
     // Normalize the knn distances - this may not be necessary
     Math::max_norm(d_knn_distances);
 
     // Compute the perplexity/pij of the KNN distribution
     thrust::device_vector<float> sigmas(N_POINTS, 1.0);
     thrust::device_vector<float> d_pij(N_POINTS*K);
-    compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N, K, N_DIMS);
+    compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
 
     // TODO: symmetrize pij so that it is stored in sparse csr format
     thrust::device_vector<float> sparsePij; // Device
     thrust::device_vector<int> pijRowPtr; // Device
     thrust::device_vector<int> pijColInd; // Device
+    int sym_nnz;
+    Sparse::sym_mat_gpu(knn_distances, knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K);
 
-    Sparse::sym_mat_gpu(knn_distances, knn_indices, sparsePij, pijColInd, pijRowPtr, N_POINTS, K);
     thrust::device_vector<float> forceProd(sparsePij.size());
-
-    thrust::device_vector<float> pts(N * 2); // TODO: Initialize with random points
-    thrust::device_vector<float> forces(N * 2);
+    thrust::device_vector<float> pts = Random::random_vector(N_POINTS * 2); //TODO: Rename this function
+    thrust::device_vector<float> forces(N_POINTS * 2);
 
     cudaDeviceProp deviceProp;
-    cudaGetDeviceProperties(&deviceProp, dev);
+    cudaGetDeviceProperties(&deviceProp, 0);
     if (deviceProp.warpSize != WARPSIZE) {
       fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
       exit(-1);
     }
 
-    blocks = deviceProp.multiProcessorCount;
+    int blocks = deviceProp.multiProcessorCount;
 
     int nnodes = N_POINTS * 2;
     if (nnodes < 1024*blocks) nnodes = 1024*blocks;
@@ -1233,9 +1247,16 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<int> childl((nnodes + 1) * 4);
     thrust::device_vector<float> massl(nnodes + 1, 1); // TODO: probably don't need massl
     thrust::device_vector<int> countl(nnodes + 1);
-    thrust::device_vector<int> startl(nnodes + 1);
     thrust::device_vector<int> sortl(nnodes + 1);
     thrust::device_vector<float> norml(nnodes + 1);
+
+    thrust::device_vector<float> maxxl(blocks * FACTOR1);
+    thrust::device_vector<float> maxyl(blocks * FACTOR1);
+    thrust::device_vector<float> minxl(blocks * FACTOR1);
+    thrust::device_vector<float> minyl(blocks * FACTOR1);
+    
+
+
     float eta = 10.0f;
     float norm;
     // These variables currently govern the tolerance (whether it recurses on a cell)
@@ -1247,7 +1268,6 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         // TODO: add device synchronization in computeAttrForce
         computeAttrForce(N_POINTS, sparsePij.size(), sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, forces);
         // compute repulsive forces and normalization
-        // TODO: allocate all these things
         BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
                                                           N_POINTS, 
                                                           thrust::raw_pointer_cast(startl.data()), 
@@ -1291,7 +1311,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         thrust::transform(forces.begin(), forces.end(), pts.begin(), pts.begin(), saxpy_functor(eta * 4.0f / norm));
 
         // Done (check progress, etc.)
-
-
     }
+    std::cout << "Fin." << std::endl;
+
+    return pts;
 }

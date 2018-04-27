@@ -18,10 +18,6 @@ struct func_kl {
     }
 };
 
-struct func_exp {
-    __host__ __device__ float operator()(const float &x) const { return exp(x); }
-};
-
 struct func_entropy_kernel {
     __host__ __device__ float operator()(const float &x) const { float val = x*log2(x); return (val != val) ? 0 : val; }
 };

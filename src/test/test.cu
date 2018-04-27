@@ -12,6 +12,7 @@
 #include "util/distance_utils.h"
 #include "naive_tsne.h"
 #include "naive_tsne_cpu.h"
+#include "bh_tsne.h"
 #include <time.h>
 
 // G-Test include
@@ -21,6 +22,8 @@
 #include "test/test_distance.h"
 #include "test/test_reduce.h"
 #include "test/test_tsne.h"
+#include "test/test_math.h"
+
 
 namespace {
 
@@ -53,7 +56,10 @@ namespace {
     TEST(NaiveTSNE, 1024x50) {test_tsne(1024, 50);}
 
     // Test Symmetrization
-    TEST(MatrixSymmetry, 70000x784) {test_sym_mat(70000,784);}
+    // TEST(MatrixSymmetry, 70000x784) {test_sym_mat(70000,784);}
+
+    // Test the BHTSNE
+    TEST(BhTSNE, friendship) {test_bhtsne(5000, 200);}
 
     
 }

@@ -87,6 +87,10 @@ struct minmax_binary_op : public thrust::binary_function< pair_t<T>, pair_t<T>, 
 
 void zero_diagonal(thrust::device_vector<float> &vec, const unsigned int N);
 
+struct func_exp {
+    __host__ __device__ float operator()(const float &x) const { return exp(x); }
+};
+
 
 
 #endif
