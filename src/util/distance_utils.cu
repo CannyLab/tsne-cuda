@@ -74,7 +74,7 @@ void Distance::knn(float* points, long* I, float* D, const unsigned int N_DIM, c
     if (K < 1024) {
         // Construct the GPU resources necessary
         faiss::gpu::StandardGpuResources res;
-        res.noTempMemory();
+        // res.noTempMemory();
 
         // Construct the GPU configuration object
         faiss::gpu::GpuIndexIVFFlatConfig config;
