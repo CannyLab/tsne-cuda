@@ -36,7 +36,7 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -Xcompiler '-msse4'
                     -Xcompiler '-m64'
                     -Xcompiler '-mpopcnt'
-                    -rdc=true
+                    
                     )
 #-------------------------------------------------------------------------------
 
@@ -135,6 +135,8 @@ ADD_DEPENDENCIES(pyctsne copy_pyctsne)
 
 #-------------------------------------------------------------------------------
 
+get_filename_component(CUDA_LIB_PATH ${CUDA_CUDART_LIBRARY} DIRECTORY)
+find_library(CUDA_cudadevrt_LIBRARY cudadevrt PATHS ${CUDA_LIB_PATH})
 
 # Test Target
 #-------------------------------------------------------------------------------
@@ -151,6 +153,7 @@ target_link_libraries(tsne_test
     ${OpenMP_CXX_FLAGS}
     ${CUDA_CUBLAS_LIBRARIES}
     ${CUDA_cusparse_LIBRARY}
+    ${CUDA_cudadevrt_LIBRARY}
     libfaiss.a
     libgpufaiss.a
     pthread

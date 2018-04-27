@@ -63,7 +63,7 @@ void Math::max_norm(thrust::device_vector<float> &vec) {
     thrust::transform(vec.begin(), vec.end(), div_iter, vec.begin(), thrust::divides<float>());
 }
 
-void Sparse::sym_mat_gpu(float* values, long* indices, thrust::device_vector<float> &sym_values,  
+void Sparse::sym_mat_gpu(float* values, int* indices, thrust::device_vector<float> &sym_values,  
                                 thrust::device_vector<int> &sym_colind, thrust::device_vector<int> &sym_rowptr, int* sym_nnz, 
                                 unsigned int N_POINTS, unsigned int K) {
     // Allocate memory
@@ -74,13 +74,9 @@ void Sparse::sym_mat_gpu(float* values, long* indices, thrust::device_vector<flo
     cudaMalloc((void**)& csrColPtrA, (N_POINTS*K)*sizeof(int));
     float* csrValA = nullptr;
     cudaMalloc((void**)& csrValA, (N_POINTS*K)*sizeof(float));
-    float* csrColPtrA_long = nullptr;
-    cudaMalloc((void**)& csrColPtrA_long, (N_POINTS*K)*sizeof(long));
 
     // Copy the data
-    cudaMemcpy(csrColPtrA_long, indices, N_POINTS*K*sizeof(long), cudaMemcpyHostToDevice);
-    thrust::transform(csrColPtrA_long, csrColPtrA_long + N_POINTS*K, csrColPtrA, func_cast_to_int());
-    cudaFree(csrColPtrA_long);
+    cudaMemcpy(csrColPtrA, indices, N_POINTS*K*sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(csrValA, values, N_POINTS*K*sizeof(float), cudaMemcpyHostToDevice);
 
 

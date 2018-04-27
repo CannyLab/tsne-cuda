@@ -1196,10 +1196,18 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
     #endif
 
+    std::cout << 1 << std::endl;
+
     const unsigned int K = 1023;
     float *knn_distances = new float[N_POINTS*K];
     long *knn_indices = new long[N_POINTS*K];
+    int *knn_indices_int = new int[N_POINTS*K];
+
+    for (int i = 0; i < N_POINTS*K; i++) knn_indices_int[i] = (int) knn_indices[i];
+    delete[] knn_indices;
+
     // Distance::knn(points, knn_indices, knn_distances, N_DIMS, N_POINTS, K);
+    std::cout << 2 << std::endl;
 
     thrust::device_vector<float> d_knn_distances(N_POINTS*K);
     thrust::copy(knn_distances, knn_distances + N_POINTS*K, d_knn_distances.begin());
@@ -1211,18 +1219,24 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
 
     // Normalize the knn distances - this may not be necessary
     Math::max_norm(d_knn_distances);
+    std::cout << 3 << std::endl;
 
     // Compute the perplexity/pij of the KNN distribution
     thrust::device_vector<float> sigmas(N_POINTS, 1.0);
     thrust::device_vector<float> d_pij(N_POINTS*K);
     compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
 
+    std::cout << 4 << std::endl;
+
     // TODO: symmetrize pij so that it is stored in sparse csr format
     thrust::device_vector<float> sparsePij; // Device
     thrust::device_vector<int> pijRowPtr; // Device
     thrust::device_vector<int> pijColInd; // Device
     int sym_nnz;
-    Sparse::sym_mat_gpu(knn_distances, knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K);
+    Sparse::sym_mat_gpu(knn_distances, knn_indices_int, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K);
+    delete[] knn_distances;
+
+    std::cout << 5 << std::endl;
 
     thrust::device_vector<float> forceProd(sparsePij.size());
     thrust::device_vector<float> pts = Random::random_vector(N_POINTS * 2); //TODO: Rename this function
@@ -1234,6 +1248,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
       fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
       exit(-1);
     }
+
+    std::cout << 6 << std::endl;
 
     int blocks = deviceProp.multiProcessorCount;
 
@@ -1254,8 +1270,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> maxyl(blocks * FACTOR1);
     thrust::device_vector<float> minxl(blocks * FACTOR1);
     thrust::device_vector<float> minyl(blocks * FACTOR1);
-    
 
+    std::cout << 7 << std::endl;
 
     float eta = 10.0f;
     float norm;
@@ -1264,9 +1280,11 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     float itolsq = 1.0f / (0.5 * 0.5);
 
     for (int step = 0; step < n_iter; step++) {
+        std::cout << "Step: " << step << std::endl;
         // compute attractive forces
         // TODO: add device synchronization in computeAttrForce
         computeAttrForce(N_POINTS, sparsePij.size(), sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, forces);
+
         // compute repulsive forces and normalization
         BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
                                                           N_POINTS, 
@@ -1306,6 +1324,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                                                     thrust::raw_pointer_cast(norml.data()));
         // non-normalized xrep stored in velxl, yrep stored in velyl, norm_i stored in norml
         norm = thrust::reduce(norml.begin(), norml.end(), 0.0f, thrust::plus<float>());
+
+        //TODO: Add forces non-destructively
          
         // Add resulting force vector to positions w/ normalization, mul by 4 and learning rate
         thrust::transform(forces.begin(), forces.end(), pts.begin(), pts.begin(), saxpy_functor(eta * 4.0f / norm));
