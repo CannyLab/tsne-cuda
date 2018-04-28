@@ -274,3 +274,34 @@ void test_bhtsne(int N, int NDIMS) {
     printf("Elapsed time: %f (ms)\n", milliseconds);
     EXPECT_EQ(0, 0);
 }
+
+void test_bhtsne_ref(int N, int NDIMS) {
+    std::default_random_engine;
+    std::normal_distribution<double> distribution1(0.0, 20.0);
+    std::normal_distribution<double> distribution2(0.0, 20.0);
+
+    std::vector<float> h_X(NDIMS * N);
+    for (int i = 0; i < N * NDIMS; i ++) {
+        if (i < (N * NDIMS / 2)) {
+            h_X[i] = distribution1(generator);
+        } else {
+            h_X[i] = distribution2(generator);
+        }
+    }
+    float * fYs = (float *) calloc(N * 2, sizeof(float));
+
+    for (int i = 0; i < N * 2; i++) {
+        fYs[i] = (float) distribution1(generator);
+    }
+
+    int K = N - 1;
+
+    double * forces = BHTSNERef::computeEdgeForces(h_X.data(), fYs, NDIMS, 2, N, K, 1.0f);
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < NDIMS; j++)
+            std::cout << forces[i * NDIMS + j] << " ";
+        printf("\n");
+    }
+
+
+}

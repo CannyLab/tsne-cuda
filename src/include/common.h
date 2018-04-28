@@ -56,6 +56,7 @@
 #include <algorithm>
 #include <random>
 #include <iomanip>
+#include <cmath>
 
 // Additional Macros
 #include "macros.h"
