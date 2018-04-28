@@ -5,7 +5,7 @@ std::vector<float> squared_pairwise_dist(std::vector<float> &points, const unsig
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
 			for(int k = 0; k < NDIMS; k++) {
-				squared_pairwise_dist[i * N + j] += (points[i + k * N] - points[j + k * N]) * (points[i + k * N] - points[j + k * N]); 
+				squared_pairwise_dist[i * N + j] += (points[i * NDIMS + k] - points[j * NDIMS + k]) * (points[i * NDIMS + k] - points[j * NDIMS + k]); 
 			}
 		}
     }

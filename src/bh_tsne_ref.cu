@@ -5,24 +5,35 @@ double * BHTSNERef::computeEdgeForces(float * Xs, float * Ys, float NDIMS, float
 	double * dXs = (double *) malloc(N * NDIMS * sizeof(double));
 	double * dYs = (double *) malloc(N * PROJDIMS * sizeof(double));
 	double * edgeForces = (double *) calloc(N * NDIMS, sizeof(double));
-	for (int i = 0; i < N * NDIMS) {
+	for (int i = 0; i < N * NDIMS; i++) {
 		dXs[i] = (double) Xs[i];
 		dYs[i] = (double) Ys[i];
 	}
-	unsigned int * row_P, col_P;
+	unsigned int * row_P;
+    unsigned int * col_P;
 	double * val_P;
-	computeGaussianPerplexity(Xs, N, NDIMS, &row_P, &col_P, &val_P, (double) sigma, K)
+	computeGaussianPerplexity(dXs, N, NDIMS, &row_P, &col_P, &val_P, (double) sigma, K);
 
 	symmetrizeMatrix(&row_P, &col_P, &val_P, N);
-    double sum_P = .0;
-    
-    for(int i = 0; i < row_P[N]; i++) sum_P += val_P[i];
-	for(int i = 0; i < row_P[N]; i++) val_P[i] /= sum_P;
+  //  for(int i = 0; i < row_P[N]; i++) val_P[i] *= 12.0;
 
-	SPTree * tree = new SPTree(PROJDIMS, dYs, N);
+	BHTSNERef::SPTree * tree = new BHTSNERef::SPTree(PROJDIMS, dYs, N);
 	tree->computeEdgeForces(row_P, col_P, val_P, N, edgeForces);
 	return edgeForces;
 }
+
+double BHTSNERef::euclidean_distance(const BHTSNERef::DataPoint &t1, const BHTSNERef::DataPoint &t2){
+        double dd = .0;
+        double* x1 = t1._x;
+        double* x2 = t2._x;
+        double diff;
+        for(int d = 0; d < t1._D; d++) {
+            diff = (x1[d] - x2[d]);
+            dd += diff * diff;
+        }
+        return sqrt(dd);
+    };
+
 
 void BHTSNERef::symmetrizeMatrix(unsigned int** _row_P, unsigned int** _col_P, double** _val_P, int N) {
 
@@ -101,6 +112,10 @@ void BHTSNERef::symmetrizeMatrix(unsigned int** _row_P, unsigned int** _col_P, d
     // Divide the result by two
     for(int i = 0; i < no_elem; i++) sym_val_P[i] /= 2.0;
 
+    double sum_P = .0;
+    for(int i = 0; i < row_P[N]; i++) sum_P += sym_val_P[i];
+    for(int i = 0; i < row_P[N]; i++) sym_val_P[i] /= sum_P;
+
     // Return symmetrized matrices
     free(*_row_P); *_row_P = sym_row_P;
     free(*_col_P); *_col_P = sym_col_P;
@@ -114,11 +129,9 @@ void BHTSNERef::symmetrizeMatrix(unsigned int** _row_P, unsigned int** _col_P, d
 
 void BHTSNERef::computeGaussianPerplexity(double* X, int N, int D, unsigned int** _row_P, unsigned int** _col_P, double** _val_P, double sigma, int K) {
 
-    if(perplexity > K) printf("Perplexity should be lower than K!\n");
-
     // Allocate the memory we need
-    *_row_P = (unsigned int*)    malloc((N + 1) * sizeof(unsigned int));
-    *_col_P = (unsigned int*)    calloc(N * K, sizeof(unsigned int));
+    *_col_P = (unsigned int*) calloc(N * K, sizeof(unsigned int));
+    *_row_P = (unsigned int*) calloc((N + 1), sizeof(unsigned int));
     *_val_P = (double*) calloc(N * K, sizeof(double));
     if(*_row_P == NULL || *_col_P == NULL || *_val_P == NULL) { printf("Memory allocation failed!\n"); exit(1); }
     unsigned int* row_P = *_row_P;
@@ -130,15 +143,15 @@ void BHTSNERef::computeGaussianPerplexity(double* X, int N, int D, unsigned int*
     for(int n = 0; n < N; n++) row_P[n + 1] = row_P[n] + (unsigned int) K;
 
     // Build ball tree on data set
-    VpTree<DataPoint, euclidean_distance>* tree = new VpTree<DataPoint, euclidean_distance>();
-    vector<DataPoint> obj_X(N, DataPoint(D, -1, X));
-    for(int n = 0; n < N; n++) obj_X[n] = DataPoint(D, n, X + n * D);
+    BHTSNERef::VpTree<BHTSNERef::DataPoint, BHTSNERef::euclidean_distance>* tree = new BHTSNERef::VpTree<BHTSNERef::DataPoint, BHTSNERef::euclidean_distance>();
+    std::vector<BHTSNERef::DataPoint> obj_X(N, BHTSNERef::DataPoint(D, -1, X));
+    for(int n = 0; n < N; n++) obj_X[n] = BHTSNERef::DataPoint(D, n, X + n * D);
     tree->create(obj_X);
 
     // Loop over all points to find nearest neighbors
     printf("Building tree...\n");
-    vector<DataPoint> indices;
-    vector<double> distances;
+    std::vector<BHTSNERef::DataPoint> indices;
+    std::vector<double> distances;
     for(int n = 0; n < N; n++) {
 
         if(n % 10000 == 0) printf(" - point %d of %d\n", n, N);
@@ -148,12 +161,10 @@ void BHTSNERef::computeGaussianPerplexity(double* X, int N, int D, unsigned int*
         distances.clear();
         tree->search(obj_X[n], K + 1, &indices, &distances);
 
-        // Initialize some variables for binary search
-        bool found = false;
         double beta = 1.0f / 2.0f * sigma * sigma;
 
         // Iterate until we found a good perplexity
-        int iter = 0; double sum_P;
+        double sum_P;
        
         // Compute Gaussian kernel row
         for(int m = 0; m < K; m++) cur_P[m] = exp(-beta * distances[m + 1] * distances[m + 1]);
@@ -335,7 +346,7 @@ void BHTSNERef::SPTree::setData(double* inp_data)
 
 
 // Get the parent of the current tree
-SPTree* BHTSNERef::SPTree::getParent()
+BHTSNERef::SPTree* BHTSNERef::SPTree::getParent()
 {
     return parent;
 }
@@ -471,7 +482,7 @@ unsigned int BHTSNERef::SPTree::getAllIndices(unsigned int* indices, unsigned in
 unsigned int BHTSNERef::SPTree::getDepth() {
     if(is_leaf) return 1;
     int depth = 0;
-    for(unsigned int i = 0; i < no_children; i++) depth = fmax(depth, children[i]->getDepth());
+    for(unsigned int i = 0; i < no_children; i++) depth = max(depth, children[i]->getDepth());
     return 1 + depth;
 }
 

@@ -108,6 +108,7 @@ set(SOURCES
     src/ext/pymodule_ext.cu
     src/bh.cu
     src/bh_tsne.cu
+    src/bh_tsne_ref.cu
 )
 #-------------------------------------------------------------------------------
 
@@ -138,6 +139,14 @@ ADD_DEPENDENCIES(pyctsne copy_pyctsne)
 get_filename_component(CUDA_LIB_PATH ${CUDA_CUDART_LIBRARY} DIRECTORY)
 find_library(CUDA_cudadevrt_LIBRARY cudadevrt PATHS ${CUDA_LIB_PATH})
 
+link_directories(
+    ${CUDA_LIB_PATH}
+)
+
+#message("${CUDA_vudaevrt_LIBRARY}")
+#message("${CUDA_LIB_PATH}")
+#message("${CUDA_CUDART_LIBRARY}")
+
 # Test Target
 #-------------------------------------------------------------------------------
 cuda_add_executable(tsne_test
@@ -153,6 +162,7 @@ target_link_libraries(tsne_test
     ${OpenMP_CXX_FLAGS}
     ${CUDA_CUBLAS_LIBRARIES}
     ${CUDA_cusparse_LIBRARY}
+    #/usr/local/cuda-8.0/lib64/libcudaevrt.a
     ${CUDA_cudadevrt_LIBRARY}
     libfaiss.a
     libgpufaiss.a
