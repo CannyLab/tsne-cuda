@@ -791,6 +791,7 @@ void computeAttrForce(int N,
 
 }
 
+//TODO: Remove NDIMS argument
 void compute_pij(cublasHandle_t &handle, 
                     thrust::device_vector<float> &pij,  
                     const thrust::device_vector<float> &knn_distances, 
@@ -850,6 +851,118 @@ struct saxpy_functor : public thrust::binary_function<float,float,float>
         }
 };
 
+struct func_kl {
+  __host__ __device__ float operator()(const float &x, const float &y) const { 
+      return x == 0.0f ? 0.0f : x * (log(x) - log(y));
+  }
+};
+
+struct func_entropy_kernel {
+  __host__ __device__ float operator()(const float &x) const { float val = x*log2(x); return (val != val || isinf(val)) ? 0 : val; }
+};
+
+struct func_pow2 {
+  __host__ __device__ float operator()(const float &x) const { return pow(2,x); }
+};
+
+__global__ void upper_lower_assign_bh(float * __restrict__ sigmas,
+                                      float * __restrict__ lower_bound,
+                                      float * __restrict__ upper_bound,
+                                      const float * __restrict__ perplexity,
+                                      const float target_perplexity,
+                                      const unsigned int N)
+{
+  int TID = threadIdx.x + blockIdx.x * blockDim.x;
+  if (TID > N) return;
+
+  if (perplexity[TID] > target_perplexity)
+    upper_bound[TID] = sigmas[TID];
+  else
+    lower_bound[TID] = sigmas[TID];
+  sigmas[TID] = (upper_bound[TID] + lower_bound[TID])/2.0f;
+}
+
+void thrust_search_perplexity(cublasHandle_t &handle,
+                                thrust::device_vector<float> &sigmas,
+                                thrust::device_vector<float> &lower_bound,
+                                thrust::device_vector<float> &upper_bound,
+                                thrust::device_vector<float> &perplexity,
+                                const thrust::device_vector<float> &pij,
+                                const float target_perplexity,
+                                const unsigned int N,
+                                const unsigned int K)
+{
+//   std::cout << "pij:" << std::endl;
+//   printarray(pij, N, K);
+//   std::cout << std::endl;
+  thrust::device_vector<float> entropy_(pij.size());
+  thrust::transform(pij.begin(), pij.end(), entropy_.begin(), func_entropy_kernel());
+
+//   std::cout << "entropy:" << std::endl;
+//   printarray(entropy_, N, K);
+//   std::cout << std::endl;
+
+  auto neg_entropy = Reduce::reduce_alpha(handle, entropy_, K, N, -1.0f, 0);
+
+//   std::cout << "neg_entropy:" << std::endl;
+//   printarray(neg_entropy, 1, N);
+//   std::cout << std::endl;
+  
+  thrust::transform(neg_entropy.begin(), neg_entropy.end(), perplexity.begin(), func_pow2());
+ 
+//   std::cout << "perplexity:" << std::endl;
+//   printarray(perplexity, 1, N);
+//   std::cout << std::endl;
+
+  const unsigned int BLOCKSIZE = 128;
+  const unsigned int NBLOCKS = iDivUp(N, BLOCKSIZE);
+  upper_lower_assign_bh<<<NBLOCKS,BLOCKSIZE>>>(thrust::raw_pointer_cast(sigmas.data()),
+                thrust::raw_pointer_cast(lower_bound.data()),
+                thrust::raw_pointer_cast(upper_bound.data()),
+                thrust::raw_pointer_cast(perplexity.data()),
+                target_perplexity,
+                N);
+//   std::cout << "sigmas" << std::endl;
+//   printarray(sigmas, 1, N);
+//   std::cout << std::endl;
+
+}
+
+thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
+                                                  thrust::device_vector<float> &knn_distances,
+                                                  const float perplexity_target,
+                                                  const float eps,
+                                                  const unsigned int N,
+                                                  const unsigned int K) 
+{
+    thrust::device_vector<float> sigmas(N, 500.0f);
+    thrust::device_vector<float> best_sigmas(N);
+    thrust::device_vector<float> perplexity(N);
+    thrust::device_vector<float> lbs(N, 0.0f);
+    thrust::device_vector<float> ubs(N, 1000.0f);
+    thrust::device_vector<float> pij(N*K);
+
+    compute_pij(handle, pij, knn_distances, sigmas, N, K, 0);
+    normalize_pij(handle, pij, N, K);
+    float best_perplexity = 1000.0f;
+    float perplexity_diff = 50.0f;
+    int iters = 0;
+    while (perplexity_diff > eps) {
+        thrust_search_perplexity(handle, sigmas, lbs, ubs, perplexity, pij, perplexity_target, N, K);
+        perplexity_diff = abs(thrust::reduce(perplexity.begin(), perplexity.end())/((float) N) - perplexity_target);
+        if (perplexity_diff < best_perplexity){
+            best_perplexity = perplexity_diff;
+            printf("!! Best perplexity found in %d iterations: %0.5f\n", iters, perplexity_diff);
+            thrust::copy(sigmas.begin(), sigmas.end(), best_sigmas.begin());
+        }
+        compute_pij(handle, pij, knn_distances, sigmas, N, K, 0);
+        normalize_pij(handle, pij, N, K);
+        iters++;
+    } // Close perplexity search
+
+    return pij;
+}
+
 
 thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle, 
                                           cusparseHandle_t &sparse_handle,
@@ -877,6 +990,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
     #endif
 
+    //TODO: Make this an argument
     const unsigned int K = 1023 < N_POINTS ? 1023 : N_POINTS - 1; 
     float *knn_distances = new float[N_POINTS*K];
     memset(knn_distances, 0, N_POINTS * K * sizeof(float));
@@ -900,9 +1014,13 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     // printarray<float>(d_knn_distances, N_POINTS, K);
     
     // Compute the pij of the KNN distribution
-    thrust::device_vector<float> sigmas(N_POINTS, 0.3);
-    thrust::device_vector<float> d_pij(N_POINTS*K);
-    compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
+
+    //TODO: Make these arguments
+    thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances,  35, 1e-4, N_POINTS, K);
+
+    // thrust::device_vector<float> sigmas(N_POINTS, 0.3);
+    // thrust::device_vector<float> d_pij(N_POINTS*K);
+    // compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
 
     // std::cout << std::endl;
     // printarray<float>(d_pij, N_POINTS, K);
@@ -995,7 +1113,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> minxl(blocks * FACTOR1);
     thrust::device_vector<float> minyl(blocks * FACTOR1);
 
-    float eta = 50.0f;
+    float eta = 5000.0f;
     float norm;
     // These variables currently govern the tolerance (whether it recurses on a cell)
     float epssq = 0.05 * 0.05;

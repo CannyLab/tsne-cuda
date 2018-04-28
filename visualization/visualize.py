@@ -39,5 +39,5 @@ mat, = ax.plot(particles[0,:,0], particles[0,:,1], 'o', ms=0.6)
 
 ax = plt.axis([min_particle, max_particle, min_particle, max_particle])
 ani = animation.FuncAnimation(fig, animate, interval=1)
-ani.save('animation.gif', writer='imagemagick', fps=50)
+# ani.save('animation.gif', writer='imagemagick', fps=50)
 plt.show()
