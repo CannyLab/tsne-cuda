@@ -71,9 +71,6 @@ ExternalProject_Add(gtest
   BUILD_COMMAND make gtest && make gtest_main
   INSTALL_COMMAND ""
 )
-ExternalProject_Get_Property(gtest source_dir binary_dir)
-message(${source_dir})
-message(${binary_dir})
 #-------------------------------------------------------------------------------
 
 # FAISS Configuration
