@@ -28,38 +28,38 @@
 namespace {
 
     // Pairwise Distance Tests
-    TEST(PairwiseDist, 4x2) {test_pairwise_distance(4,2);}
-    TEST(PairwiseDist, 64x2) {test_pairwise_distance(64,2);}
-    TEST(PairwiseDist, 64x64) {test_pairwise_distance(64,64);}
-    TEST(PairwiseDist, 64x128) {test_pairwise_distance(64,128);}
-    TEST(PairwiseDist, 20000x128) {test_pairwise_distance_speed(20000,128);}
+    // TEST(PairwiseDist, 4x2) {test_pairwise_distance(4,2);}
+    // TEST(PairwiseDist, 64x2) {test_pairwise_distance(64,2);}
+    // TEST(PairwiseDist, 64x64) {test_pairwise_distance(64,64);}
+    // TEST(PairwiseDist, 64x128) {test_pairwise_distance(64,128);}
+    // TEST(PairwiseDist, 20000x128) {test_pairwise_distance_speed(20000,128);}
 
     // Reduction Tests
-    TEST(Reductions, ReduceSum_Col_512x512){test_reduce_sum_col(512,512);}
-    TEST(Reductions, ReduceSum_Row_512x512){test_reduce_sum_row(512,512);}
-    TEST(Reductions, ReduceMean_Col_512x512){test_reduce_mean_col(512,512);}
-    TEST(Reductions, ReduceMean_Row_512x512){test_reduce_mean_row(512,512);}
-    TEST(Reductions, ReduceAlpha_Col_512x512_pos){test_reduce_alpha_col(512,512,0.1);}
-    TEST(Reductions, ReduceAlpha_Row_512x512_pos){test_reduce_alpha_row(512,512,0.1);}
-    TEST(Reductions, ReduceAlpha_Col_512x512_neg){test_reduce_alpha_col(512,512,-0.1);}
-    TEST(Reductions, ReduceAlpha_Row_512x512_neg){test_reduce_alpha_row(512,512, -0.1);}
+    // TEST(Reductions, ReduceSum_Col_512x512){test_reduce_sum_col(512,512);}
+    // TEST(Reductions, ReduceSum_Row_512x512){test_reduce_sum_row(512,512);}
+    // TEST(Reductions, ReduceMean_Col_512x512){test_reduce_mean_col(512,512);}
+    // TEST(Reductions, ReduceMean_Row_512x512){test_reduce_mean_row(512,512);}
+    // TEST(Reductions, ReduceAlpha_Col_512x512_pos){test_reduce_alpha_col(512,512,0.1);}
+    // TEST(Reductions, ReduceAlpha_Row_512x512_pos){test_reduce_alpha_row(512,512,0.1);}
+    // TEST(Reductions, ReduceAlpha_Col_512x512_neg){test_reduce_alpha_col(512,512,-0.1);}
+    // TEST(Reductions, ReduceAlpha_Row_512x512_neg){test_reduce_alpha_row(512,512, -0.1);}
 
     // TEST(ComputePIJ, CPU_256x50) {test_cpu_compute_pij(256, 50);}
-    TEST(ComputePIJ, GPUisCPU) {test_cpu_is_gpu_pij(16,16);}
-    TEST(ComputePerplexity, GPUisCPU) {test_cpu_is_gpu_perplexity(16,16);}
-    TEST(ComputeSigma, GPUisCPU) {test_cpu_sigmas_search(16,16);}
-    TEST(ComputePerplexity, 16x16) {test_sigmas_search(16, 16);}
+    // TEST(ComputePIJ, GPUisCPU) {test_cpu_is_gpu_pij(16,16);}
+    // TEST(ComputePerplexity, GPUisCPU) {test_cpu_is_gpu_perplexity(16,16);}
+    // TEST(ComputeSigma, GPUisCPU) {test_cpu_sigmas_search(16,16);}
+    // TEST(ComputePerplexity, 16x16) {test_sigmas_search(16, 16);}
 
     // T-SNE tests
-    TEST(NaiveTSNE, 256x50) {test_tsne(256, 50);}
-    TEST(NaiveTSNE, 512x50) {test_tsne(512, 50);}
-    TEST(NaiveTSNE, 1024x50) {test_tsne(1024, 50);}
+    // TEST(NaiveTSNE, 256x50) {test_tsne(256, 50);}
+    // TEST(NaiveTSNE, 512x50) {test_tsne(512, 50);}
+    // TEST(NaiveTSNE, 1024x50) {test_tsne(1024, 50);}
 
     // Test Symmetrization
     // TEST(MatrixSymmetry, 70000x784) {test_sym_mat(70000,784);}
 
     // Test the BHTSNE
-    TEST(BhTSNE, friendship) {test_bhtsne(5000, 200);}
+    TEST(BhTSNE, friendship) {test_bhtsne(128, 50);}
 
     
 }
