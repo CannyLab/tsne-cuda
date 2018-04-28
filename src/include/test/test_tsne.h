@@ -276,7 +276,7 @@ void test_bhtsne(int N, int NDIMS) {
 }
 
 void test_bhtsne_ref(int N, int NDIMS) {
-    std::default_random_engine;
+    std::default_random_engine generator;
     std::normal_distribution<double> distribution1(0.0, 20.0);
     std::normal_distribution<double> distribution2(0.0, 20.0);
 
