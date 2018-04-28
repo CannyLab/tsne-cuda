@@ -13,23 +13,52 @@ Todo :)
 ## Python
 ### Install
 
-Make sure `cmake` is installed on your system, and you will also need a C++ compiler, such as `gcc` or `llvm-clang`. On macOS, you can get both via [homebrew](https://brew.sh/). In addition, you will need NVCC and a suitable GPU. 
+#### Requirements
+
+- CUDA: You will need a working version of the CUDA toolkit which can be obtained from [here](https://developer.nvidia.com/cuda-toolkit).
+- CMAKE: Version >= 3.5.1 which can be obtained by running `sudo apt install cmake` on ubuntu/debian systems.
+- MKL/OpenBLAS: If you're using MKL, install it using the intel provided installation scripts. If you're using OpenBLAS install it using `sudo apt install libopenblas-dev` on ubuntu/debian systems. 
+- GCC/llvm-clang: This is likely already installed on your system. If not, on ubuntu you can run `sudo apt install build-essential` to get a version.
+- OpenMP: On ubuntu this is likely already installed with your version of GCC. For other distributions, be sure your compiler has OpenMP support.
+- Python (for Python bindings): Python is not required, however to build the python bindings you must install Python. This library was tested with Python 3, however it is possible that Python 2 will work as well (though it is untested). 
+- Doxygen: To build the documentation, a working version of doxygen is required (which can be obtained using `sudo apt install doxygen` on debian/ubuntu systems).
+
+This package contains no distribution specific code - thus it should compile and run on other Linux distros (and possibly even OSX) however do so at your own peril, as it has not been tested.
+
+#### Building
 
 To build the C++ portion of the library:
 ```
 git clone https://github.com/rmrao/tsne-cuda.git
 cd tsne-cuda/build/
 cmake ..
-make -j6
+make
 ```
 
-Please for the love of god, use parallel compilation. Otherwise between our library and FAISS it will take you hours to build.
+If you are using OpenBLAS instead of MKL, you need to run the following instead (otherwise it will complain that MKL is missing):
+```
+git clone https://github.com/rmrao/tsne-cuda.git
+cd tsne-cuda/build/
+cmake .. -DWITH_MKL=OFF
+make
+```
+
+For faster builds, you can utilize parallel versions of make by running `make -j<num cores>`, so to build with 5 cores, you would run `make -j5`. This can significantly speed up the build, however sometimes the build will fail because of parallel dependencies. To fix a failed build, just run `make` again, and it should work.
+
 
 To install the python package, do the above steps, then run:
 ```
 cd python/
 python setup.py install
 ```
+
+To build the documentation, run from the root directory:
+```
+cd tsne-cuda/build/
+cmake .. -DBUILD_DOC=ON
+make doc_doxygen
+```
+This command will put the documentation in the `tsne-cuda/build/doc_doxygen/html` folder. 
 
 #### Known good build configurations
 
