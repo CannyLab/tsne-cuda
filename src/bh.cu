@@ -900,7 +900,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     // printarray<float>(d_knn_distances, N_POINTS, K);
     
     // Compute the pij of the KNN distribution
-    thrust::device_vector<float> sigmas(N_POINTS, 1.0);
+    thrust::device_vector<float> sigmas(N_POINTS, 0.3);
     thrust::device_vector<float> d_pij(N_POINTS*K);
     compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
 
@@ -995,7 +995,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> minxl(blocks * FACTOR1);
     thrust::device_vector<float> minyl(blocks * FACTOR1);
 
-    float eta = 1000.0f;
+    float eta = 50.0f;
     float norm;
     // These variables currently govern the tolerance (whether it recurses on a cell)
     float epssq = 0.05 * 0.05;
@@ -1073,6 +1073,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         // for (int i = 0; i < N_POINTS; i++) {
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
         // }
+        // std::cout << std::endl;
         // std::cout << "REP FORCES:" << std::endl;
         // for (int i = 0; i < N_POINTS; i++) {
             // std::cout << rep_forces[i] / norm << ", " << rep_forces[i + nnodes + 1] / norm << std::endl;
@@ -1080,8 +1081,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         // Add resulting force vector to positions w/ normalization, mul by 4 and learning rate
         thrust::transform(rep_forces.begin(), rep_forces.begin() + N_POINTS, attr_forces.begin(), attr_forces.begin(), saxpy_functor(1 / norm));
         thrust::transform(rep_forces.begin() + nnodes + 1, rep_forces.begin() + nnodes + 1 + N_POINTS, attr_forces.begin() + N_POINTS, attr_forces.begin() + N_POINTS, saxpy_functor(1 / norm));
-        thrust::transform(attr_forces.begin(), attr_forces.begin() + N_POINTS, pts.begin(), pts.begin(), saxpy_functor(eta * 4.0f));
-        thrust::transform(attr_forces.begin() + N_POINTS, attr_forces.end(), pts.begin() + nnodes + 1, pts.begin() + nnodes + 1, saxpy_functor(eta * 4.0f));
+        thrust::transform(attr_forces.begin(), attr_forces.begin() + N_POINTS, pts.begin(), pts.begin(), saxpy_functor(-eta * 4.0f));
+        thrust::transform(attr_forces.begin() + N_POINTS, attr_forces.end(), pts.begin() + nnodes + 1, pts.begin() + nnodes + 1, saxpy_functor(-eta * 4.0f));
         // for (int i = 0; i < N_POINTS; i++) {
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
         // }
@@ -1092,6 +1093,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         }
         // exit(1);
         // Done (check progress, etc.)
+        // if (step >= 20)
+            // exit(1);
     }
     dump_file.close();
     std::cout << "Fin." << std::endl;
