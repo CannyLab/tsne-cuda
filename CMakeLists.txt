@@ -125,6 +125,8 @@ set(PYTHON_SOURCES
 cuda_add_library(pyctsne
                  SHARED
                  ${SOURCES})
+add_dependencies(pyctsne gtest)
+add_dependencies(pyctsne faiss)
 target_link_libraries(pyctsne ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
 set_target_properties(pyctsne PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -136,6 +138,8 @@ add_custom_command(TARGET pyctsne POST_BUILD
 
 ADD_CUSTOM_TARGET(copy_pyctsne DEPENDS ${PYTHON_SOURCES})
 ADD_DEPENDENCIES(pyctsne copy_pyctsne)
+add_dependencies(copy_pyctsne gtest)
+add_dependencies(copy_pyctsne faiss)
 
 #-------------------------------------------------------------------------------
 
