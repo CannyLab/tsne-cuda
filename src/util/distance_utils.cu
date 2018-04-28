@@ -68,8 +68,8 @@ void Distance::pairwise_dist(cublasHandle_t &handle,
 }
 
 void Distance::knn(float* points, long* I, float* D, const unsigned int N_DIM, const unsigned int N_POINTS, const unsigned int K) {
-    const int nlist = (int) std::sqrt((float)N_POINTS);
-    const int nprobe = nlist;
+    const int nlist = 400;//(int) std::sqrt((float)N_POINTS);
+    const int nprobe = 20;
     
     if (K < 1024) {
         // Construct the GPU resources necessary
@@ -80,16 +80,25 @@ void Distance::knn(float* points, long* I, float* D, const unsigned int N_DIM, c
         faiss::gpu::GpuIndexIVFFlatConfig config;
         config.device = 0;
         config.indicesOptions = faiss::gpu::INDICES_32_BIT;
-        config.flatConfig.useFloat16 = true;
-        config.useFloat16IVFStorage = true;
+        config.flatConfig.useFloat16 = false;
+        config.useFloat16IVFStorage = false;
 
         faiss::gpu::GpuIndexIVFFlat index(&res, N_DIM, nlist, faiss::METRIC_L2, config);
         index.setNumProbes(nprobe);
+        std::cout << "Training model..." << std::endl;
         index.train(N_POINTS, points);
+        std::cout << "Adding points..." << std::endl;
         index.add(N_POINTS, points);
 
         // Perform the KNN query
+        std::cout << "Searching..." << std::endl;
         index.search(N_POINTS, points, K, D, I);
+        // for (int i = 0; i < N_POINTS; i += 1024) {
+        //     // Do searches in chunks of 1024
+        //     int chunksize = std::min<int>(N_POINTS-i, 1024);
+        //     index.search(chunksize, points + N_DIM*i, K, D + K*i, I + K*i);
+        // }
+        
     } else {
         // Construct the index table on the CPU (since the GPU can only handle 1023 neighbors)
         faiss::IndexFlatL2 quantizer(N_DIM);
