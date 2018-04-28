@@ -38,6 +38,8 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -Xcompiler '-mpopcnt'
                     
                     )
+get_filename_component(CUDA_LIB_PATH ${CUDA_CUDART_LIBRARY} DIRECTORY)
+find_library(CUDA_cudadevrt_LIBRARY cudadevrt PATHS ${CUDA_LIB_PATH})
 #-------------------------------------------------------------------------------
 
 # OpenMP configuration
@@ -66,9 +68,12 @@ ExternalProject_Add(gtest
   GIT_REPOSITORY https://github.com/google/googletest.git
   GIT_TAG  release-1.8.0
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest
+  BUILD_COMMAND make gtest && make gtest_main
   INSTALL_COMMAND ""
 )
 ExternalProject_Get_Property(gtest source_dir binary_dir)
+message(${source_dir})
+message(${binary_dir})
 #-------------------------------------------------------------------------------
 
 # FAISS Configuration
@@ -77,6 +82,7 @@ ExternalProject_Add(faiss
   GIT_REPOSITORY https://github.com/facebookresearch/faiss.git
   GIT_TAG  v1.2.1
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third_party/faiss
+  CMAKE_ARGS -DCMAKE_PREFIX_PATH=${source_dir};${binary_dir} -DWITH_MKL=${WITH_MKL} -DMKL_LIBRARIES=${DMKL_LIBRARIES} -DMKL_INCLUDE_DIRS=${MKL_INCLUDE_DIRS} -DOpenBLAS_LIB=${OpenBLAS_LIB} -DOpenBLAS_INCLUDE_DIR=${OpenBLAS_INCLUDE_DIR} -DBUILD_TEST=NO
   BUILD_COMMAND make faiss -j${NTHREADS} && make gpufaiss -j${NTHREADS}
   INSTALL_COMMAND ""
 )
@@ -93,6 +99,7 @@ include_directories(
 
 link_directories(
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/faiss/src/faiss-build/lib/
+    ${CUDA_LIB_PATH}
 )
 
 set(SOURCES
@@ -135,9 +142,6 @@ ADD_DEPENDENCIES(pyctsne copy_pyctsne)
 
 #-------------------------------------------------------------------------------
 
-get_filename_component(CUDA_LIB_PATH ${CUDA_CUDART_LIBRARY} DIRECTORY)
-find_library(CUDA_cudadevrt_LIBRARY cudadevrt PATHS ${CUDA_LIB_PATH})
-
 # Test Target
 #-------------------------------------------------------------------------------
 cuda_add_executable(tsne_test
@@ -160,47 +164,6 @@ target_link_libraries(tsne_test
     ${BLAS_LIB}
 )
 #-------------------------------------------------------------------------------
-
-# Barnes Hut Testing Targets (For Roshan)
-#-------------------------------------------------------------------------------
-
-# cuda_add_executable(bh_test
-#    ${SOURCES}
-#    src/bh.cu
-#)
-#add_dependencies(bh_test faiss)
-#target_link_libraries(bh_test
-#    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
-#    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-#    ${CUDA_LIBRARIES}
-#    ${OpenMP_CXX_FLAGS}
-#    ${CUDA_CUBLAS_LIBRARIES}
-#    libfaiss.a
-#    libgpufaiss.a
-#    pthread
-#    ${BLAS_LIB}
-#)
-#
-#
-#
-#cuda_add_executable(bh_tsne
-#    ${SOURCES}
-#    src/bh_tsne.cu
-#)
-#add_dependencies(bh_tsne faiss)
-#target_link_libraries(bh_tsne
-#    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
-#    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-#    ${CUDA_LIBRARIES}
-#    ${OpenMP_CXX_FLAGS}
-#    ${CUDA_CUBLAS_LIBRARIES}
-#    libfaiss.a
-#    libgpufaiss.a
-#    pthread
-#    ${BLAS_LIB}
-#)
-#-------------------------------------------------------------------------------
-
 
 # Testing
 #-------------------------------------------------------------------------------

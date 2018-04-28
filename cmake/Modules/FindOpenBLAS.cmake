@@ -1,4 +1,4 @@
-
+# From https://raw.githubusercontent.com/caffe2/caffe2/master/cmake/Modules/FindOpenBLAS.cmake
 
 SET(Open_BLAS_INCLUDE_SEARCH_PATHS
   /usr/include
@@ -7,8 +7,8 @@ SET(Open_BLAS_INCLUDE_SEARCH_PATHS
   /usr/local/include
   /usr/local/include/openblas
   /usr/local/include/openblas-base
+  /usr/local/opt/openblas/include
   /opt/OpenBLAS/include
-  /opt/local/include
   $ENV{OpenBLAS_HOME}
   $ENV{OpenBLAS_HOME}/include
 )
@@ -22,15 +22,15 @@ SET(Open_BLAS_LIB_SEARCH_PATHS
         /usr/lib64
         /usr/local/lib
         /usr/local/lib64
+        /usr/local/opt/openblas/lib
         /opt/OpenBLAS/lib
-        /opt/local/lib
         $ENV{OpenBLAS}cd
         $ENV{OpenBLAS}/lib
         $ENV{OpenBLAS_HOME}
         $ENV{OpenBLAS_HOME}/lib
  )
 
-FIND_PATH(OpenBLAS_INCLUDE_DIR NAMES openblas_config.h PATHS ${Open_BLAS_INCLUDE_SEARCH_PATHS})
+FIND_PATH(OpenBLAS_INCLUDE_DIR NAMES cblas.h PATHS ${Open_BLAS_INCLUDE_SEARCH_PATHS})
 FIND_LIBRARY(OpenBLAS_LIB NAMES openblas PATHS ${Open_BLAS_LIB_SEARCH_PATHS})
 
 SET(OpenBLAS_FOUND ON)
@@ -63,4 +63,3 @@ MARK_AS_ADVANCED(
     OpenBLAS_LIB
     OpenBLAS
 )
-
