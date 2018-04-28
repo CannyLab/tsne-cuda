@@ -7,9 +7,11 @@ double * BHTSNERef::computeEdgeForces(float * Xs, float * Ys, float NDIMS, float
 	double * edgeForces = (double *) calloc(N * NDIMS, sizeof(double));
 	for (int i = 0; i < N * NDIMS; i++) {
 		dXs[i] = (double) Xs[i];
-		dYs[i] = (double) Ys[i];
 	}
-	unsigned int * row_P;
+    for (int i = 0; i < N * PROJDIMS; i++) {
+        dYs[i] = (double) Ys[i];
+    }
+    unsigned int * row_P;
     unsigned int * col_P;
 	double * val_P;
 	computeGaussianPerplexity(dXs, N, NDIMS, &row_P, &col_P, &val_P, (double) sigma, K);
@@ -19,6 +21,9 @@ double * BHTSNERef::computeEdgeForces(float * Xs, float * Ys, float NDIMS, float
 
 	BHTSNERef::SPTree * tree = new BHTSNERef::SPTree(PROJDIMS, dYs, N);
 	tree->computeEdgeForces(row_P, col_P, val_P, N, edgeForces);
+    free(row_P);
+    free(col_P);
+    free(val_P);
 	return edgeForces;
 }
 
