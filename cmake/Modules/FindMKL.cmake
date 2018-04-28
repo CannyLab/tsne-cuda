@@ -8,6 +8,8 @@
 #unset(MKL_COMPILER_REDIST_PATH CACHE)
 
 SET(MKL_INCLUDE_SEARCH_PATHS
+  /home/forrest_huang/intel/mkl
+  /home/forrest_huang/intel/mkl/include
   /usr/include
   /usr/include/mkl
   /usr/include/intel/mkl
