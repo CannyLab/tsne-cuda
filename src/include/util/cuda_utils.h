@@ -184,6 +184,8 @@ struct SharedMemory <double>
 	}
 };
 
-void printarray(thrust::device_vector<float> vec, const unsigned int N, const unsigned int M);
+template <typename T>
+void printarray(thrust::device_vector<T> vec, const unsigned int N, const unsigned int M);
+
 
 #endif

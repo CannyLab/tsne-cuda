@@ -833,8 +833,7 @@ __global__ void postprocess_matrix(float* matrix,
     if (TID >= N_POINTS*K) return;
 
     // Set pij to 0 for each of the broken values
-    // if (indices[TID] == (TID / K)) 
-    //     matrix[TID] = 0;
+    if (matrix[TID] == 1.0f) matrix[TID] = 0.0f;
     indices[TID] = (int) long_indices[TID];
     return;
 }
@@ -877,7 +876,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
     #endif
 
-    const unsigned int K = 1023;
+    const unsigned int K = 5;
     float *knn_distances = new float[N_POINTS*K]; // Allocate memory for the distances on the CPU
     memset(knn_distances, 0, N_POINTS * K * sizeof(float));
     long *knn_indices = new long[N_POINTS*K]; // Allocate memory for the indices on the CPU
@@ -889,16 +888,23 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> d_knn_distances(N_POINTS*K);
     thrust::copy(knn_distances, knn_distances + N_POINTS*K, d_knn_distances.begin());
 
+    // printarray<float>(d_knn_distances, N_POINTS, K);
+
     // Normalize the knn distances - this may not be necessary
     // TODO: Need to filter out zeros from distances
     // TODO: Some point is fucked up
     // TODO: nprobe / nlist issue? Check if there are -1s floating around...
     Math::max_norm(d_knn_distances); // Here, the extra 0s floating around won't matter
+
+    // printarray<float>(d_knn_distances, N_POINTS, K);
     
     // Compute the pij of the KNN distribution
     thrust::device_vector<float> sigmas(N_POINTS, 1.0);
     thrust::device_vector<float> d_pij(N_POINTS*K);
     compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
+
+    // std::cout << std::endl;
+    // printarray<float>(d_pij, N_POINTS, K);
 
     // Clean up the d_knn_distances matrix
     d_knn_distances.clear();
@@ -909,12 +915,20 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<int> d_knn_indices(N_POINTS*K);
     thrust::copy(knn_indices, knn_indices + N_POINTS*K, d_knn_indices_long.begin());
 
+    // std::cout << std::endl;
+    // printarray<long>(d_knn_indices_long, N_POINTS, K);
+
     // Post-process the pij matrix-indives to remove zero elements/check for -1 elements
     const int NBLOCKS_PP = iDivUp(N_POINTS*K, 128);
     postprocess_matrix<<< NBLOCKS_PP, 128 >>>(thrust::raw_pointer_cast(d_pij.data()), 
                                               thrust::raw_pointer_cast(d_knn_indices_long.data()), 
                                               thrust::raw_pointer_cast(d_knn_indices.data()),  N_POINTS, K);
     cudaDeviceSynchronize();
+
+    // std::cout << std::endl;
+    // printarray<float>(d_pij, N_POINTS, K);
+    // std::cout << std::endl;
+    // printarray<int>(d_knn_indices, N_POINTS, K);
 
     // Clean up extra memory
     d_knn_indices_long.clear();
@@ -925,6 +939,9 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     // Normalize the pij matrix, we do this after post-processing to avoid issues
     // in the distribution caused by exponentiation.
     normalize_pij(dense_handle, d_pij, N_POINTS, K);
+
+    // std::cout << std::endl;
+    // printarray<float>(d_pij, N_POINTS, K);
 
     // Construct some additional descriptors for sparse matrix multiplication (for the symmetrization)
     cusparseMatDescr_t descr;
@@ -944,6 +961,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     d_knn_indices.shrink_to_fit();
     d_pij.clear();
     d_pij.shrink_to_fit();
+
+    exit(1);
     
 
     cudaDeviceProp deviceProp;
@@ -980,8 +999,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     float eta = 1000.0f;
     float norm;
     // These variables currently govern the tolerance (whether it recurses on a cell)
-    float epssq = 0.05 * 0.05;
-    float itolsq = 1.0f / (0.5 * 0.5);
+    // float epssq = 0.05 * 0.05;
+    // float itolsq = 1.0f / (0.5 * 0.5);
     InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
     gpuErrchk(cudaDeviceSynchronize());
     std::ofstream dump_file;

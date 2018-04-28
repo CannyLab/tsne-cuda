@@ -503,7 +503,8 @@ void cudaMemoryUsage() {
 
 }
 
-void printarray(thrust::device_vector<float> vec, const unsigned int N, const unsigned int M) {
+template <typename T>
+void printarray(thrust::device_vector<T> vec, const unsigned int N, const unsigned int M) {
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
         	std::cout << vec[i + j * N] << " ";
@@ -512,6 +513,10 @@ void printarray(thrust::device_vector<float> vec, const unsigned int N, const un
         std::cout << std::endl;
     }
 }
+
+template void printarray<float>(thrust::device_vector<float> vec, const unsigned int N, const unsigned int M); 
+template void printarray<long>(thrust::device_vector<long> vec, const unsigned int N, const unsigned int M); 
+template void printarray<int>(thrust::device_vector<int> vec, const unsigned int N, const unsigned int M); 
 
 // convert a linear index to a linear index in the transpose 
 struct transpose_index : public thrust::unary_function<size_t,size_t>
