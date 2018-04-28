@@ -69,7 +69,7 @@ void Distance::pairwise_dist(cublasHandle_t &handle,
 
 void Distance::knn(float* points, long* I, float* D, const unsigned int N_DIM, const unsigned int N_POINTS, const unsigned int K) {
     const int nlist = (int) std::sqrt((float)N_POINTS);
-    const int nprobe = 5;
+    const int nprobe = nlist;
     
     if (K < 1024) {
         // Construct the GPU resources necessary

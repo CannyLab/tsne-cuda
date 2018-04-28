@@ -489,7 +489,8 @@ void SummarizationKernel(const int nnodesd,
         flag = 1;
       }
     }
-    __syncthreads();  // __threadfence();
+    __syncthreads();  
+    __threadfence();
     if (flag != 0) {
       massd[k] = cm;
       k += inc;
@@ -657,10 +658,10 @@ void ForceCalculationKernel(int nnodesd,
         depth--;  // done with this level
       } while (depth >= j);
 
-      if (stepd > 0) {
+      if (stepd >= 0) {
         // update velocity
         // TODO: This is probably wrongish and depends on what I do in the attractive force calculation
-        velxd[i] += vx; // don't assign if velxd already contains attractive forces
+        velxd[i] += vx;
         velyd[i] += vy;
         normd[i] = normsum;
       }
@@ -699,6 +700,7 @@ void ForceCalculationKernel(int nnodesd,
 __global__
 void computePijxQij(int N, 
                     int nnz, 
+                    int nnodes,
                     volatile float * __restrict pij,
                     volatile int   * __restrict pijRowPtr,
                     volatile int   * __restrict pijColInd,
@@ -722,8 +724,8 @@ void computePijxQij(int N,
     
     j = pijColInd[TID - i];
     
-    ix = pts[i]; iy = pts[N + i];
-    jx = pts[j]; jy = pts[N + j];
+    ix = pts[i]; iy = pts[nnodes + 1 + i];
+    jx = pts[j]; jy = pts[nnodes + 1 + j];
     dx = ix - jx;
     dy = iy - jy;
     tmp = 1 / (1 + dx*dx + dy*dy);
@@ -733,14 +735,15 @@ void computePijxQij(int N,
 // computes unnormalized attractive forces
 void computeAttrForce(int N,
                         int nnz,
+                        int nnodes,
                         cusparseHandle_t &handle,
                         cusparseMatDescr_t &descr,
                         thrust::device_vector<float> &sparsePij,
                         thrust::device_vector<int>   &pijRowPtr, // (N + 1)-D vector, should be constant L
                         thrust::device_vector<int>   &pijColInd, // NxL matrix (same shape as sparsePij)
                         thrust::device_vector<float> &forceProd, // NxL matrix
-                        thrust::device_vector<float> &pts,
-                        thrust::device_vector<float> &forces)
+                        thrust::device_vector<float> &pts,       // (nnodes + 1) x 2 matrix
+                        thrust::device_vector<float> &forces)    // (nnodes + 1) x 2 matrix
 {
     assert(nnz == sparsePij.size());
     assert(pijRowPtr.size() == N + 1);
@@ -749,25 +752,17 @@ void computeAttrForce(int N,
 
     const int BLOCKSIZE = 128;
     const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
-    computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, nnz,
+    computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
                                             thrust::raw_pointer_cast(sparsePij.data()),
                                             thrust::raw_pointer_cast(pijRowPtr.data()),
                                             thrust::raw_pointer_cast(pijColInd.data()),
                                             thrust::raw_pointer_cast(forceProd.data()),
                                             thrust::raw_pointer_cast(pts.data()));
-
+    gpuErrchk(cudaDeviceSynchronize());
     // compute forces_i = sum_j pij*qij*normalization*yi
     float alpha = 1.0f;
     float beta = 0.0f;
     thrust::device_vector<float> ones(N*2, 1);
-    std::cout << "points" << std::endl;
-    for (int i = 0; i < 10; i++) {
-        std::cout << pts[i] << ", " << pts[i + N] << std::endl;
-    }
-    std::cout << "pij" << std::endl;
-    for (int i = 0; i < 10; i++) {
-        std::cout << sparsePij[i] << std::endl;
-    }
     cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                             N, 2, N, nnz, &alpha, descr,
                             thrust::raw_pointer_cast(forceProd.data()),
@@ -775,15 +770,10 @@ void computeAttrForce(int N,
                             thrust::raw_pointer_cast(pijColInd.data()),
                             thrust::raw_pointer_cast(ones.data()),
                             N, &beta, thrust::raw_pointer_cast(forces.data()),
-                            N));
-    
-    for (int i = 0; i < 10; i++) {
-        std::cout << forces[i] << ", " << forces[i + N] << std::endl;
-    }
+                            nnodes + 1));
+    gpuErrchk(cudaDeviceSynchronize());
+    // TODO: we're doing a lot of extra work here...
     thrust::transform(forces.begin(), forces.end(), pts.begin(), forces.begin(), thrust::multiplies<float>());
-    for (int i = 0; i < 10; i++) {
-        std::cout << forces[i] << ", " << forces[i + N] << std::endl;
-    }
     // compute forces_i = forces_i - sum_j pij*qij*normalization*yj
     alpha = -1.0f;
     beta = 1.0f;
@@ -793,11 +783,9 @@ void computeAttrForce(int N,
                             thrust::raw_pointer_cast(pijRowPtr.data()),
                             thrust::raw_pointer_cast(pijColInd.data()),
                             thrust::raw_pointer_cast(pts.data()),
-                            N, &beta, thrust::raw_pointer_cast(forces.data()),
-                            N));
-    for (int i = 0; i < 10; i++) {
-        std::cout << forces[i] << ", " << forces[i + N] << std::endl;
-    }
+                            nnodes + 1, &beta, thrust::raw_pointer_cast(forces.data()),
+                            nnodes + 1));
+    gpuErrchk(cudaDeviceSynchronize());
     
 
 }
@@ -820,15 +808,7 @@ void compute_pij(cublasHandle_t &handle,
 
     // PIJ is KxN. :)
     Broadcast::broadcast_matrix_vector(pij, sigma_squared, K, N, thrust::divides<float>(), 1, -2.0f); // Divide by -2sigma
-    std::cout << "div_pij" << std::endl;
-    for (int i = 0; i < 10; i++) {
-        std::cout << pij[i] << std::endl;
-    }
     thrust::transform(pij.begin(), pij.end(), pij.begin(), func_exp()); //Exponentiate
-    std::cout << "exp_pij" << std::endl;    
-    for (int i = 0; i < 10; i++) {
-        std::cout << pij[i] << std::endl;
-    }
     // Reduce::reduce_sum over cols
     auto sums = Reduce::reduce_sum(handle, pij, K, N, 0);
 
@@ -875,21 +855,17 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
     #endif
 
-    std::cout << 1 << std::endl;
-
     const unsigned int K = 1023;
     float *knn_distances = new float[N_POINTS*K];
+    memset(knn_distances, 0, N_POINTS * K * sizeof(float));
     long *knn_indices = new long[N_POINTS*K];
     int *knn_indices_int = new int[N_POINTS*K];
 
     Distance::knn(points, knn_indices, knn_distances, N_DIMS, N_POINTS, K);
 
     for (int i = 0; i < N_POINTS*K; i++) knn_indices_int[i] = (int) knn_indices[i];
-    delete[] knn_indices;
-
+    // delete[] knn_indices;
     
-    std::cout << 2 << std::endl;
-
     thrust::device_vector<float> d_knn_distances(knn_distances, knn_distances + N_POINTS*K);
 
     cusparseMatDescr_t descr;
@@ -900,25 +876,13 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     // Normalize the knn distances - this may not be necessary
     // TODO: Need to filter out zeros from distances
     // TODO: Some point is fucked up
-    std::cout << "distances" << std::endl;
-    for (int i = 0; i < 10; i++) {
-        std::cout << d_knn_distances[i] << std::endl;
-    }
-    std::cout << thrust::reduce(d_knn_distances.begin(), d_knn_distances.end(), 0.0f, thrust::maximum<float>()) << std::endl;
-
+    // TODO: nprobe / nlist issue? Check if there are -1s floating around...
     Math::max_norm(d_knn_distances);
-    std::cout << "distances" << std::endl;
-    for (int i = 0; i < 10; i++) {
-        std::cout << d_knn_distances[i] << std::endl;
-    }
-    std::cout << 3 << std::endl;
 
     // Compute the perplexity/pij of the KNN distribution
     thrust::device_vector<float> sigmas(N_POINTS, 1.0);
     thrust::device_vector<float> d_pij(N_POINTS*K);
     compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
-
-    std::cout << 4 << std::endl;
 
     // TODO: symmetrize pij so that it is stored in sparse csr format
     thrust::device_vector<float> sparsePij; // Device
@@ -928,20 +892,12 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     Sparse::sym_mat_gpu(knn_distances, knn_indices_int, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K);
     delete[] knn_distances;
 
-    std::cout << 5 << std::endl;
-
-    thrust::device_vector<float> forceProd(sparsePij.size());
-    thrust::device_vector<float> pts = Random::random_vector(N_POINTS * 2); //TODO: Rename this function
-    thrust::device_vector<float> forces(N_POINTS * 2);
-
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
     if (deviceProp.warpSize != WARPSIZE) {
       fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
       exit(-1);
     }
-
-    std::cout << 6 << std::endl;
 
     int blocks = deviceProp.multiProcessorCount;
 
@@ -950,10 +906,14 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     while ((nnodes & (WARPSIZE-1)) != 0) nnodes++;
     nnodes--;
 
+    thrust::device_vector<float> forceProd(sparsePij.size());
+    thrust::device_vector<float> pts = Random::random_vector((nnodes + 1) * 2); //TODO: Rename this function
+    thrust::device_vector<float> forces((nnodes + 1) * 2, 0);
+
     thrust::device_vector<int> errl(1);
     thrust::device_vector<int> startl(nnodes + 1);
     thrust::device_vector<int> childl((nnodes + 1) * 4);
-    thrust::device_vector<float> massl(nnodes + 1, 1); // TODO: probably don't need massl
+    thrust::device_vector<float> massl(nnodes + 1, 1.0); // TODO: probably don't need massl
     thrust::device_vector<int> countl(nnodes + 1);
     thrust::device_vector<int> sortl(nnodes + 1);
     thrust::device_vector<float> norml(nnodes + 1);
@@ -963,91 +923,91 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> minxl(blocks * FACTOR1);
     thrust::device_vector<float> minyl(blocks * FACTOR1);
 
-    std::cout << 7 << std::endl;
-
-    float eta = 10.0f;
+    float eta = 1000.0f;
     float norm;
     // These variables currently govern the tolerance (whether it recurses on a cell)
     float epssq = 0.05 * 0.05;
     float itolsq = 1.0f / (0.5 * 0.5);
     InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
     gpuErrchk(cudaDeviceSynchronize());
+    std::ofstream dump_file;
+    dump_file.open("dump_ys.txt");
+    float host_ys[(nnodes + 1) * 2];
+    dump_file << N_POINTS << " " << 2 << std::endl;
     for (int step = 0; step < n_iter; step++) {
-        std::cout << "Step: " << step << std::endl;
+        thrust::fill(forces.begin(), forces.end(), 0);
         // compute attractive forces
         // TODO: add device synchronization in computeAttrForce
-        computeAttrForce(N_POINTS, sparsePij.size(), sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, forces);
+        computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, forces);
         gpuErrchk(cudaDeviceSynchronize());
-        for (int i = 0; i < 10; i++) {
-            std::cout << forces[i] << ", " << forces[i + N_POINTS] << std::endl;
-        }
-        // compute repulsive forces and normalization
-        printf("\tBB\n");
+        
+        // Repulsive force with Barnes Hut
         BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
                                                           N_POINTS, 
                                                           thrust::raw_pointer_cast(startl.data()), 
                                                           thrust::raw_pointer_cast(childl.data()), 
                                                           thrust::raw_pointer_cast(massl.data()), 
                                                           thrust::raw_pointer_cast(pts.data()), 
-                                                          thrust::raw_pointer_cast(pts.data() + N_POINTS), 
+                                                          thrust::raw_pointer_cast(pts.data() + nnodes + 1), 
                                                           thrust::raw_pointer_cast(maxxl.data()), 
                                                           thrust::raw_pointer_cast(maxyl.data()), 
                                                           thrust::raw_pointer_cast(minxl.data()), 
                                                           thrust::raw_pointer_cast(minyl.data()));
 
         gpuErrchk(cudaDeviceSynchronize());
-        printf("\tTree Builder\n");
+
         ClearKernel1<<<blocks * 1, 1024>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(childl.data()));
         TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
                                                                              thrust::raw_pointer_cast(childl.data()), 
                                                                              thrust::raw_pointer_cast(pts.data()), 
-                                                                             thrust::raw_pointer_cast(pts.data() + N_POINTS));
+                                                                             thrust::raw_pointer_cast(pts.data() + nnodes + 1));
         ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
-        
         gpuErrchk(cudaDeviceSynchronize());
-        printf("\tSummarize\n");
+        
         SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(countl.data()), 
                                                                                       thrust::raw_pointer_cast(childl.data()), 
                                                                                       thrust::raw_pointer_cast(massl.data()),
                                                                                       thrust::raw_pointer_cast(pts.data()),
-                                                                                      thrust::raw_pointer_cast(pts.data() + N_POINTS));
-        
+                                                                                      thrust::raw_pointer_cast(pts.data() + nnodes + 1));
         gpuErrchk(cudaDeviceSynchronize());
-        printf("\tSort\n");
+        
         SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(sortl.data()), 
                                                                      thrust::raw_pointer_cast(countl.data()), 
                                                                      thrust::raw_pointer_cast(startl.data()), 
                                                                      thrust::raw_pointer_cast(childl.data()));
         gpuErrchk(cudaDeviceSynchronize());
-        printf("\tForce Calc\n");
-        ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
-                                                                    itolsq, epssq, // Should these by changed? 
-                                                                    thrust::raw_pointer_cast(sortl.data()), 
-                                                                    thrust::raw_pointer_cast(childl.data()), 
-                                                                    thrust::raw_pointer_cast(massl.data()), 
-                                                                    thrust::raw_pointer_cast(pts.data()),
-                                                                    thrust::raw_pointer_cast(pts.data() + N_POINTS),
-                                                                    thrust::raw_pointer_cast(forces.data()),
-                                                                    thrust::raw_pointer_cast(forces.data() + N_POINTS),
-                                                                    thrust::raw_pointer_cast(norml.data()));
-        gpuErrchk(cudaDeviceSynchronize());
-        printf("\tDone\n");
+        
+        // ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
+        //                                                             itolsq, epssq, // Should these by changed? 
+        //                                                             thrust::raw_pointer_cast(sortl.data()), 
+        //                                                             thrust::raw_pointer_cast(childl.data()), 
+        //                                                             thrust::raw_pointer_cast(massl.data()), 
+        //                                                             thrust::raw_pointer_cast(pts.data()),
+        //                                                             thrust::raw_pointer_cast(pts.data() + nnodes + 1),
+        //                                                             thrust::raw_pointer_cast(forces.data()),
+        //                                                             thrust::raw_pointer_cast(forces.data() + nnodes + 1),
+        //                                                             thrust::raw_pointer_cast(norml.data()));
+        // gpuErrchk(cudaDeviceSynchronize());
+        
         // non-normalized xrep stored in velxl, yrep stored in velyl, norm_i stored in norml
-        norm = thrust::reduce(norml.begin(), norml.end(), 0.0f, thrust::plus<float>());
-
+        norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
+        if (step > 100)
+            exit(1);
         //TODO: Add forces non-destructively
-        for (int i = 0; i < 10; i++) {
-            std::cout << forces[i] << ", " << forces[i + N_POINTS] << std::endl;
-        }
-        std::cout << norm << std::endl;
+        if (step % 10 == 0)
+            std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
         // Add resulting force vector to positions w/ normalization, mul by 4 and learning rate
-        thrust::transform(forces.begin(), forces.end(), pts.begin(), pts.begin(), saxpy_functor(eta * 4.0f / norm));
-        for (int i = 0; i < 10; i++) {
-            std::cout << pts[i] << ", " << pts[i + N_POINTS] << std::endl;
+        thrust::transform(forces.begin(), forces.begin() + N_POINTS, pts.begin(), pts.begin(), saxpy_functor(eta * 4.0f / norm));
+        thrust::transform(forces.begin() + nnodes + 1, forces.begin() + nnodes + 1 + N_POINTS, pts.begin() + nnodes + 1, pts.begin() + nnodes + 1, saxpy_functor(eta * 4.0f / norm));
+        
+        thrust::copy(pts.begin(), pts.end(), host_ys);
+        for (int i = 0; i < N_POINTS; i++) {
+            dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
         }
-        exit(1);
+        // exit(1);
         // Done (check progress, etc.)
     }
+    dump_file.close();
     std::cout << "Fin." << std::endl;
 
     return pts;
