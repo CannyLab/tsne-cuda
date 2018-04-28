@@ -61,7 +61,7 @@ find_path(MKL_ROOT_DIR
     "Program Files (x86)/Intel/ComposerXE-2011/mkl"
 )
 
-MESSAGE("-- MKL_ROOT_DIR : ${MKL_ROOT_DIR}") # for debug
+#MESSAGE("-- MKL_ROOT_DIR : ${MKL_ROOT_DIR}") # for debug
 
 find_path(MKL_INCLUDE_DIR
   mkl_cblas.h
@@ -189,7 +189,7 @@ foreach (MODEVAR ${MKL_MODE_VARIANTS})
             set(MKL_${MODEVAR}_${THREADVAR}_LIBRARIES
                 ${MKL_${MODEVAR}_LIBRARY} ${MKL_${THREADVAR}_LIBRARY} ${MKL_CORE_LIBRARY}
                 ${MKL_LAPACK_LIBRARY} ${MKL_IOMP5_LIBRARY})
-            message("${MODEVAR} ${THREADVAR} ${MKL_${MODEVAR}_${THREADVAR}_LIBRARIES}") # for debug
+            #message("${MODEVAR} ${THREADVAR} ${MKL_${MODEVAR}_${THREADVAR}_LIBRARIES}") # for debug
         endif()
     endforeach()
 endforeach()
