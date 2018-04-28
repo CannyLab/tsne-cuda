@@ -809,14 +809,35 @@ void compute_pij(cublasHandle_t &handle,
     // PIJ is KxN. :)
     Broadcast::broadcast_matrix_vector(pij, sigma_squared, K, N, thrust::divides<float>(), 1, -2.0f); // Divide by -2sigma
     thrust::transform(pij.begin(), pij.end(), pij.begin(), func_exp()); //Exponentiate
+}
+
+void normalize_pij(cublasHandle_t &handle, 
+                    thrust::device_vector<float> &pij,
+                    const unsigned int N,
+                    const unsigned int K) 
+{
     // Reduce::reduce_sum over cols
     auto sums = Reduce::reduce_sum(handle, pij, K, N, 0);
-
     // divide column by resulting vector
     Broadcast::broadcast_matrix_vector(pij, sums, K, N, thrust::divides<float>(), 1, 1.0f);
 }
 
+// TODO: Add -1 notification here...
+__global__ void postprocess_matrix(float* matrix, 
+                                    long* long_indices,
+                                    int* indices,
+                                    unsigned int N_POINTS,
+                                    unsigned int K) 
+{
+    register int TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID >= N_POINTS*K) return;
 
+    // Set pij to 0 for each of the broken values
+    // if (indices[TID] == (TID / K)) 
+    //     matrix[TID] = 0;
+    indices[TID] = (int) long_indices[TID];
+    return;
+}
 
 struct saxpy_functor : public thrust::binary_function<float,float,float>
 {
@@ -828,6 +849,7 @@ struct saxpy_functor : public thrust::binary_function<float,float,float>
             return a * x + y;
         }
 };
+
 
 thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle, 
                                           cusparseHandle_t &sparse_handle,
@@ -856,41 +878,73 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     #endif
 
     const unsigned int K = 1023;
-    float *knn_distances = new float[N_POINTS*K];
+    float *knn_distances = new float[N_POINTS*K]; // Allocate memory for the distances on the CPU
     memset(knn_distances, 0, N_POINTS * K * sizeof(float));
-    long *knn_indices = new long[N_POINTS*K];
-    int *knn_indices_int = new int[N_POINTS*K];
+    long *knn_indices = new long[N_POINTS*K]; // Allocate memory for the indices on the CPU
 
+    // Compute the KNNs and distances
     Distance::knn(points, knn_indices, knn_distances, N_DIMS, N_POINTS, K);
 
-    for (int i = 0; i < N_POINTS*K; i++) knn_indices_int[i] = (int) knn_indices[i];
-    // delete[] knn_indices;
-    
-    thrust::device_vector<float> d_knn_distances(knn_distances, knn_distances + N_POINTS*K);
-
-    cusparseMatDescr_t descr;
-    cusparseCreateMatDescr(&descr);
-    cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ZERO);
+    // Copy the distances to the GPU
+    thrust::device_vector<float> d_knn_distances(N_POINTS*K);
+    thrust::copy(knn_distances, knn_distances + N_POINTS*K, d_knn_distances.begin());
 
     // Normalize the knn distances - this may not be necessary
     // TODO: Need to filter out zeros from distances
     // TODO: Some point is fucked up
     // TODO: nprobe / nlist issue? Check if there are -1s floating around...
-    Math::max_norm(d_knn_distances);
-
-    // Compute the perplexity/pij of the KNN distribution
+    Math::max_norm(d_knn_distances); // Here, the extra 0s floating around won't matter
+    
+    // Compute the pij of the KNN distribution
     thrust::device_vector<float> sigmas(N_POINTS, 1.0);
     thrust::device_vector<float> d_pij(N_POINTS*K);
     compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
 
-    // TODO: symmetrize pij so that it is stored in sparse csr format
+    // Clean up the d_knn_distances matrix
+    d_knn_distances.clear();
+    d_knn_distances.shrink_to_fit();
+    
+    // Allocate memory for the indices
+    thrust::device_vector<long> d_knn_indices_long(N_POINTS*K);
+    thrust::device_vector<int> d_knn_indices(N_POINTS*K);
+    thrust::copy(knn_indices, knn_indices + N_POINTS*K, d_knn_indices_long.begin());
+
+    // Post-process the pij matrix-indives to remove zero elements/check for -1 elements
+    const int NBLOCKS_PP = iDivUp(N_POINTS*K, 128);
+    postprocess_matrix<<< NBLOCKS_PP, 128 >>>(thrust::raw_pointer_cast(d_pij.data()), 
+                                              thrust::raw_pointer_cast(d_knn_indices_long.data()), 
+                                              thrust::raw_pointer_cast(d_knn_indices.data()),  N_POINTS, K);
+    cudaDeviceSynchronize();
+
+    // Clean up extra memory
+    d_knn_indices_long.clear();
+    d_knn_indices_long.shrink_to_fit();
+    delete[] knn_distances;
+    delete[] knn_indices;
+
+    // Normalize the pij matrix, we do this after post-processing to avoid issues
+    // in the distribution caused by exponentiation.
+    normalize_pij(dense_handle, d_pij, N_POINTS, K);
+
+    // Construct some additional descriptors for sparse matrix multiplication (for the symmetrization)
+    cusparseMatDescr_t descr;
+    cusparseCreateMatDescr(&descr);
+    cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ZERO);
+
+    // Symmetrize d_pij
     thrust::device_vector<float> sparsePij; // Device
     thrust::device_vector<int> pijRowPtr; // Device
     thrust::device_vector<int> pijColInd; // Device
     int sym_nnz;
-    Sparse::sym_mat_gpu(knn_distances, knn_indices_int, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K);
-    delete[] knn_distances;
+    Sparse::sym_mat_gpu(d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K);
+
+    // Clear some old memory
+    d_knn_indices.clear();
+    d_knn_indices.shrink_to_fit();
+    d_pij.clear();
+    d_pij.shrink_to_fit();
+    
 
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
