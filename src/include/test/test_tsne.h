@@ -248,7 +248,7 @@ void test_bhtsne(int N, int NDIMS) {
 
     thrust::host_vector<float> h_X(NDIMS * N);
     for (int i = 0; i < NDIMS * N; i ++) {
-        if (i % N < (N / 2)) {
+        if (i < ((N / 2) * NDIMS)) {
             h_X[i] = distribution1(generator);
         } else {
             h_X[i] = distribution2(generator);
