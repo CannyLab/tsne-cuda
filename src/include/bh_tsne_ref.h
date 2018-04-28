@@ -6,13 +6,21 @@
  * @date 2018-04-28
  */
 
+
+
 #ifndef BH_TSNE_REF_H
 #define BH_TSNE_REF_H
 
 
-namespace BHTSNERef {
-	double * computeEdgeForces(float * Xs, float * Ys, float PROJDIMS, int N);
+#include <common.h>
+#include <queue>
+#include <limits>
 
+namespace BHTSNERef {
+
+	double * computeEdgeForces(float * Xs, float * Ys, float NDIMS, float PROJDIMS, int N, int K, float sigma);
+	void symmetrizeMatrix(unsigned int** _row_P, unsigned int** _col_P, double** _val_P, int N);
+	void computeGaussianPerplexity(double* X, int N, int D, unsigned int** _row_P, unsigned int** _col_P, double** _val_P, double sigma, int K);
 	double * computeNonEdgeForces();
 	class Cell {
 
@@ -141,7 +149,7 @@ namespace BHTSNERef {
 	        dd += diff * diff;
 	    }
 	    return sqrt(dd);
-	}
+	};
 
 
 	template<typename T, double (*distance)( const T&, const T& )>
@@ -314,3 +322,5 @@ namespace BHTSNERef {
 	};
 
 }
+
+#endif
