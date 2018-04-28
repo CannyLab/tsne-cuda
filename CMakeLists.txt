@@ -112,6 +112,7 @@ set(SOURCES
     src/ext/pymodule_ext.cu
     src/bh.cu
     src/bh_tsne.cu
+    src/bh_tsne_ref.cu
 )
 #-------------------------------------------------------------------------------
 
@@ -158,6 +159,7 @@ target_link_libraries(tsne_test
     ${OpenMP_CXX_FLAGS}
     ${CUDA_CUBLAS_LIBRARIES}
     ${CUDA_cusparse_LIBRARY}
+    #/usr/local/cuda-8.0/lib64/libcudaevrt.a
     ${CUDA_cudadevrt_LIBRARY}
     libfaiss.a
     libgpufaiss.a
