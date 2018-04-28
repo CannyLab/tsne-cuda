@@ -72,8 +72,8 @@
          * sym_* values should be declared but not allocated with the exception of sym_nnz which shhould be the
          * address of an integer to return into (probably allocated on the stack). 
          * 
-         * @param values The values of the FAISS-constructed pij matrix to symmetrize (HOST FLOAT MATRIX)
-         * @param indices The indices of the FAISS matrix to symmetrize (HOST INDICES MATRIX)
+         * @param values The values of the FAISS-constructed pij matrix to symmetrize (DEVICE FLOAT MATRIX)
+         * @param indices The indices of the FAISS matrix to symmetrize (DEVICE INDICES MATRIX)
          * @param sym_values DO NOT ALLOCATE (the function does this for you) The returned sparse matrix values (CSR format, DEVICE)
          * @param sym_colind DO NOT ALLOCATE (the function does this for you) The returned sparse matrix column indices (CSR format, DEVICE)
          * @param sym_rowptr DO NOT ALLOCATE (the function does this for you) The returned sparse matrix row pointers (CSR format, DEVICE)
@@ -81,7 +81,7 @@
          * @param N_POINTS The number of points
          * @param K The number of nearest neighbors
          */
-        void sym_mat_gpu(float* values, int* indices, thrust::device_vector<float> &sym_values,  
+        void sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_vector<int> &indices, thrust::device_vector<float> &sym_values,  
                                 thrust::device_vector<int> &sym_colind, thrust::device_vector<int> &sym_rowptr, int* sym_nnz, 
                                 unsigned int N_POINTS, unsigned int K);
 

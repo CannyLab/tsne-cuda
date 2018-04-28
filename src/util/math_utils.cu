@@ -63,22 +63,21 @@ void Math::max_norm(thrust::device_vector<float> &vec) {
     thrust::transform(vec.begin(), vec.end(), div_iter, vec.begin(), thrust::divides<float>());
 }
 
-void Sparse::sym_mat_gpu(float* values, int* indices, thrust::device_vector<float> &sym_values,  
+void Sparse::sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_vector<int> &indices, thrust::device_vector<float> &sym_values,  
                                 thrust::device_vector<int> &sym_colind, thrust::device_vector<int> &sym_rowptr, int* sym_nnz, 
                                 unsigned int N_POINTS, unsigned int K) {
     // Allocate memory
     // std::cout << "Allocating initial memory on GPU..." << std::endl;
     int* csrRowPtrA = nullptr;
     cudaMalloc((void**)& csrRowPtrA, (N_POINTS+1)*sizeof(int));
-    int* csrColPtrA = nullptr;
-    cudaMalloc((void**)& csrColPtrA, (N_POINTS*K)*sizeof(int));
-    float* csrValA = nullptr;
-    cudaMalloc((void**)& csrValA, (N_POINTS*K)*sizeof(float));
+    int* csrColPtrA = thrust::raw_pointer_cast(indices.data());
+    // cudaMalloc((void**)& csrColPtrA, (N_POINTS*K)*sizeof(int));
+    float* csrValA = thrust::raw_pointer_cast(values.data());
+    // cudaMalloc((void**)& csrValA, (N_POINTS*K)*sizeof(float));
 
     // Copy the data
-    cudaMemcpy(csrColPtrA, indices, N_POINTS*K*sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(csrValA, values, N_POINTS*K*sizeof(float), cudaMemcpyHostToDevice);
-
+    // cudaMemcpy(csrColPtrA, indices, N_POINTS*K*sizeof(int), cudaMemcpyHostToDevice);
+    // cudaMemcpy(csrValA, values, N_POINTS*K*sizeof(float), cudaMemcpyHostToDevice);
 
     thrust::device_vector<int> vx(csrRowPtrA, csrRowPtrA+N_POINTS+1);
     thrust::sequence(vx.begin(), vx.end(), 0,(int) K);
@@ -124,7 +123,7 @@ void Sparse::sym_mat_gpu(float* values, int* indices, thrust::device_vector<floa
     // Free some memory
     cudaFree(pBuffer);
     cudaFree(P);
-    cudaFree(csrValA);
+    // cudaFree(csrValA);
     csrValA = csrValA_sorted;
 
     // We need A^T, so we do a csr2csc() call
@@ -184,7 +183,7 @@ void Sparse::sym_mat_gpu(float* values, int* indices, thrust::device_vector<floa
     cudaFree(cscValAT);
     cudaFree(csrRowPtrA);
     cudaFree(cscColPtrAT);
-    cudaFree(csrColPtrA);
+    // cudaFree(csrColPtrA);
     cudaFree(cscRowIndAT);
 }
 
