@@ -961,10 +961,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     d_knn_indices.clear();
     d_knn_indices.shrink_to_fit();
     d_pij.clear();
-    d_pij.shrink_to_fit();
-
-    exit(1);
-    
+    d_pij.shrink_to_fit();  
 
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
@@ -1001,8 +998,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     float eta = 1000.0f;
     float norm;
     // These variables currently govern the tolerance (whether it recurses on a cell)
-    // float epssq = 0.05 * 0.05;
-    // float itolsq = 1.0f / (0.5 * 0.5);
+    float epssq = 0.05 * 0.05;
+    float itolsq = 1.0f / (0.5 * 0.5);
     InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
     gpuErrchk(cudaDeviceSynchronize());
     std::ofstream dump_file;
@@ -1089,10 +1086,10 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
         // }
         
-        // thrust::copy(pts.begin(), pts.end(), host_ys);
-        // for (int i = 0; i < N_POINTS; i++) {
-            // dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
-        // }
+        thrust::copy(pts.begin(), pts.end(), host_ys);
+        for (int i = 0; i < N_POINTS; i++) {
+            dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
+        }
         // exit(1);
         // Done (check progress, etc.)
     }
