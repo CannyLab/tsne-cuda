@@ -15,7 +15,7 @@ double * BHTSNERef::computeEdgeForces(float * Xs, float * Ys, float NDIMS, float
 	computeGaussianPerplexity(dXs, N, NDIMS, &row_P, &col_P, &val_P, (double) sigma, K);
 
 	symmetrizeMatrix(&row_P, &col_P, &val_P, N);
-  //  for(int i = 0; i < row_P[N]; i++) val_P[i] *= 12.0;
+    for(int i = 0; i < row_P[N]; i++) val_P[i] *= 12.0;
 
 	BHTSNERef::SPTree * tree = new BHTSNERef::SPTree(PROJDIMS, dYs, N);
 	tree->computeEdgeForces(row_P, col_P, val_P, N, edgeForces);
