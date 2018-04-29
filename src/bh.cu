@@ -555,6 +555,7 @@ void ForceCalculationKernel(int nnodesd,
                             int nbodiesd, 
                             volatile int * __restrict errd, 
                             float theta, 
+                            float epssqd, // correction for zero distance
                             volatile int * __restrict sortd, 
                             volatile int * __restrict childd, 
                             volatile float * __restrict massd, 
@@ -572,12 +573,14 @@ void ForceCalculationKernel(int nnodesd,
   if (0 == threadIdx.x) {
     // tmp = radiusd * 2;
     // precompute values that depend only on tree level
-    dq[0] = radiusd * theta; //tmp * tmp * itolsqd;
+    dq[0] = radiusd * theta; 
+    // dq[0] = tmp * tmp * itolsqd;
     for (i = 1; i < maxdepthd; i++) {
-      dq[i] = dq[i - 1] * 0.5f; // radius is halved with every level of the tree
-      // dq[i - 1] += epssqd;
+      // dq[i] = dq[i - 1] * 0.5f; // radius is halved with every level of the tree
+        dq[i] = dq[i -1] * 0.5f;
+        dq[i - 1] += epssqd;
     }
-    // dq[i - 1] += epssqd;
+    dq[i - 1] += epssqd;
 
     if (maxdepthd > MAXDEPTH) {
       *errd = maxdepthd;
@@ -629,9 +632,12 @@ void ForceCalculationKernel(int nnodesd,
           if (n >= 0) {
             dx = posxd[n] - px;
             dy = posyd[n] - py;
-            tmp = dx*dx + dy*dy; // distance squared
-            // tmp = dx*dx + (dy*dy + epssqd) (why softening?)
-            if ((n < nbodiesd) || __all(tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+            // tmp = dx*dx + dy*dy; // distance squared
+            tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
+            if ((n < nbodiesd) || __all(tmp < dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+                // if (depth == 0) {
+                    // printf("(%0.2f, %0.2f), (%0.2f, %0.2f), radius: %0.2f, tmp: %0.2f, dq: %0.2f\n", px, py, posxd[n], posyd[n], radiusd, tmp, dq[depth]);
+                // }
             //   tmp = rsqrtf(tmp);  // compute distance
               // from sptree.cpp
               tmp = 1 / (1 + tmp);
@@ -1131,6 +1137,9 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     
     // These variables currently govern the tolerance (whether it recurses on a cell)
     float theta = 0.5f;
+    float epssq = 0.05 * 0.05;
+    // float itolsq = 1.0f / (0.5 * 0.5);
+
     InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
     gpuErrchk(cudaDeviceSynchronize());
     
@@ -1179,7 +1188,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         gpuErrchk(cudaDeviceSynchronize());
         
         ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
-                                                                    theta,
+                                                                    theta, epssq,
                                                                     thrust::raw_pointer_cast(sortl.data()), 
                                                                     thrust::raw_pointer_cast(childl.data()), 
                                                                     thrust::raw_pointer_cast(massl.data()), 
