@@ -102,6 +102,7 @@ link_directories(
 set(SOURCES
     src/naive_tsne.cu
     src/naive_tsne_cpu.cu
+    src/util/data_utils.cu
     src/util/cuda_utils.cu
     src/util/thrust_utils.cu
     src/util/distance_utils.cu
