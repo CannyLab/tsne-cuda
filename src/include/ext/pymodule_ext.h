@@ -6,6 +6,7 @@
     #include "common.h"
     #include "util/distance_utils.h"
     #include "naive_tsne.h"
+    #include "bh_tsne.h"
 
     extern "C" {
         /**
@@ -45,6 +46,12 @@
                                     int proj_dim, float perplexity, float early_ex, 
                                     float learning_rate, int n_iter,  int n_iter_np, 
                                     float min_g_norm);
+
+
+        void pymodule_bh_tsne(float *points, float *result, ssize_t *dimsm, 
+                                int proj_dim, float perplexity, float early_ex, 
+                                float learning_rate, int n_iter, int n_iter_np,
+                                float min_g_norm);
     }
 
 #endif

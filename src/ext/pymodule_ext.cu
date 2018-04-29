@@ -81,3 +81,38 @@ void pymodule_compute_pij(float *points, float* sigmas, float *result, ssize_t *
      thrust::copy(pij.begin(), pij.end(), result);
 
 }
+
+thrust::device_vector<float> tsne(cublasHandle_t &dense_handle, 
+    cusparseHandle_t &sparse_handle,
+      float* points, 
+      unsigned int N_POINTS, 
+      unsigned int N_DIMS, 
+      unsigned int PROJDIM, 
+      float perplexity, 
+      float early_ex, 
+      float learning_rate, 
+      unsigned int n_iter, 
+      unsigned int n_iter_np, 
+      float min_g_norm);
+
+void pymodule_bh_tsne(float *points, float *result, ssize_t *dims, int proj_dim, float perplexity, float early_ex, 
+    float learning_rate, int n_iter,  int n_iter_np, float min_g_norm) {
+
+    // Extract the dimensions of the points array
+    ssize_t N_POINTS = dims[0];
+    ssize_t N_DIMS = dims[1];
+
+    // Create the CUBLAS handles
+    cublasHandle_t dense_handle;
+    cublasSafeCall(cublasCreate(&dense_handle));
+    cusparseHandle_t sparse_handle;
+    cusparseSafeCall(cusparseCreate(&sparse_handle));
+
+    // Do the t-SNE
+    thrust::device_vector<float> tsne_results = BHTSNE::tsne(dense_handle, sparse_handle, points, 
+                                                              N_POINTS, N_DIMS, 2, perplexity, early_ex, learning_rate, 
+                                                              n_iter, n_iter_np, min_g_norm);
+
+    // Copy the data back from the GPU
+    thrust::copy(tsne_results.begin(), tsne_results.end(), result);
+}
