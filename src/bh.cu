@@ -573,11 +573,11 @@ void ForceCalculationKernel(int nnodesd,
   if (0 == threadIdx.x) {
     // tmp = radiusd * 2;
     // precompute values that depend only on tree level
-    dq[0] = radiusd * theta; 
+    dq[0] = radiusd * radiusd * theta; 
     // dq[0] = tmp * tmp * itolsqd;
     for (i = 1; i < maxdepthd; i++) {
       // dq[i] = dq[i - 1] * 0.5f; // radius is halved with every level of the tree
-        dq[i] = dq[i -1] * 0.5f;
+        dq[i] = dq[i - 1] * 0.5f;
         dq[i - 1] += epssqd;
     }
     dq[i - 1] += epssqd;
@@ -634,15 +634,16 @@ void ForceCalculationKernel(int nnodesd,
             dy = py - posyd[n];
             // tmp = dx*dx + dy*dy; // distance squared
             tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
-            if ((n < nbodiesd) || __all(tmp < dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
-                // if (depth == 0) {
-                    // printf("(%0.2f, %0.2f), (%0.2f, %0.2f), radius: %0.2f, tmp: %0.2f, dq: %0.2f\n", px, py, posxd[n], posyd[n], radiusd, tmp, dq[depth]);
+              // if ((n >= nbodiesd) && (tmp < dq[depth])) {
+                    // printf("(%0.2f, %0.2f), (%0.2f, %0.2f), radius: %0.2f, tmp: %0.2f, dq: %0.2f\n, allzero: %d\n, mass: %0.2f\n", px, py, posxd[n], posyd[n], radiusd, tmp, dq[depth], __all(tmp < dq[depth]), massd[n]);
                 // }
+            if ((n < nbodiesd) || __all(tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
             //   tmp = rsqrtf(tmp);  // compute distance
               // from sptree.cpp
               tmp = 1 / (1 + tmp);
               mult = massd[n] * tmp;
-              // printf("%0.2f\n", massd[n]);
+              // if (n >= nbodiesd)
+                // printf("%0.2f\n", massd[n]);
               normsum += mult;
               mult *= tmp;
               vx += dx * mult;
@@ -1137,7 +1138,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     float norm;
     
     // These variables currently govern the tolerance (whether it recurses on a cell)
-    float theta = 0.0f;
+    float theta = 0.5f;
     float epssq = 0.05 * 0.05;
     // float itolsq = 1.0f / (0.5 * 0.5);
 
@@ -1201,7 +1202,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         gpuErrchk(cudaDeviceSynchronize());
 
         // compute attractive forces
-        // computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones);
+        computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones);
         gpuErrchk(cudaDeviceSynchronize());
         
         norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
