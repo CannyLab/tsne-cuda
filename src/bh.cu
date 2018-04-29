@@ -554,8 +554,7 @@ __launch_bounds__(THREADS5, FACTOR5)
 void ForceCalculationKernel(int nnodesd, 
                             int nbodiesd, 
                             volatile int * __restrict errd, 
-                            float itolsqd, 
-                            float epssqd, 
+                            float theta, 
                             volatile int * __restrict sortd, 
                             volatile int * __restrict childd, 
                             volatile float * __restrict massd, 
@@ -571,14 +570,14 @@ void ForceCalculationKernel(int nnodesd,
   __shared__ float dq[MAXDEPTH * THREADS5/WARPSIZE];
 
   if (0 == threadIdx.x) {
-    tmp = radiusd * 2;
+    // tmp = radiusd * 2;
     // precompute values that depend only on tree level
-    dq[0] = tmp * tmp * itolsqd;
+    dq[0] = radiusd * theta; //tmp * tmp * itolsqd;
     for (i = 1; i < maxdepthd; i++) {
-      dq[i] = dq[i - 1] * 0.25f;
-      dq[i - 1] += epssqd;
+      dq[i] = dq[i - 1] * 0.5f; // radius is halved with every level of the tree
+      // dq[i - 1] += epssqd;
     }
-    dq[i - 1] += epssqd;
+    // dq[i - 1] += epssqd;
 
     if (maxdepthd > MAXDEPTH) {
       *errd = maxdepthd;
@@ -630,7 +629,7 @@ void ForceCalculationKernel(int nnodesd,
           if (n >= 0) {
             dx = posxd[n] - px;
             dy = posyd[n] - py;
-            tmp = dx*dx + (dy*dy + epssqd); // distance squared + softening (how does the softening actually interact with things?
+            tmp = dx*dx + dy*dy; // distance squared
             // tmp = dx*dx + (dy*dy + epssqd) (why softening?)
             if ((n < nbodiesd) || __all(tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
             //   tmp = rsqrtf(tmp);  // compute distance
@@ -1124,8 +1123,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     float norm;
     
     // These variables currently govern the tolerance (whether it recurses on a cell)
-    float epssq = 0.05 * 0.05;
-    float itolsq = 1.0f / (0.5 * 0.5);
+    float theta = 0.5f;
     InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
     gpuErrchk(cudaDeviceSynchronize());
     
@@ -1174,7 +1172,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         gpuErrchk(cudaDeviceSynchronize());
         
         ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
-                                                                    itolsq, epssq, // Should these by changed? 
+                                                                    theta,
                                                                     thrust::raw_pointer_cast(sortl.data()), 
                                                                     thrust::raw_pointer_cast(childl.data()), 
                                                                     thrust::raw_pointer_cast(massl.data()), 
