@@ -60,7 +60,7 @@ namespace {
     // TEST(MatrixSymmetry, 70000x784) {test_sym_mat(70000,784);}
 
     // Test the BHTSNE
-    TEST(BhTSNE, friendship) {test_bhtsne(128, 50);}
+    TEST(BhTSNE, friendship) {test_bhtsne(5000, 50);}
     // Test the BHTSNE_Ref
     // TEST(BhTSNERef, friendship) {test_bhtsne_ref(32, 50);}
     

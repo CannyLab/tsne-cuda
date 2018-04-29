@@ -713,14 +713,18 @@ void computePijxQij(int N,
     if (TID >= nnz) return;
     start = 0; end = N + 1;
     i = (N + 1) >> 1;
-    while (!(pijRowPtr[i] <= TID && pijRowPtr[i+1] > TID)) {
-      if (pijRowPtr[i] > TID) {
-        end = i;
-      } else {
-        start = i;
-      }
+    while (end - start > 1) {
+      j = pijRowPtr[i];
+      end = (j <= TID) ? end : i;
+      start = (j > TID) ? start : i;
+      // if (j > TID)
+          // end = i;
+      // else
+          // start = i;
       i = (start + end) >> 1;
     }
+    // if (!(pijRowPtr[i] <= TID && pijRowPtr[i + 1] > TID))
+        // printf("something's wrong!\n");
     
     j = pijColInd[TID - i];
     
@@ -729,7 +733,7 @@ void computePijxQij(int N,
     dx = ix - jx;
     dy = iy - jy;
     tmp = (1 + dx*dx + dy*dy);
-    forceProd[TID] = (i == j) ? 0 : pij[TID] / tmp; // deal with symmetry
+    forceProd[TID] = pij[TID] / tmp;
 }
 
 // computes unnormalized attractive forces
@@ -743,13 +747,9 @@ void computeAttrForce(int N,
                         thrust::device_vector<int>   &pijColInd, // NxL matrix (same shape as sparsePij)
                         thrust::device_vector<float> &forceProd, // NxL matrix
                         thrust::device_vector<float> &pts,       // (nnodes + 1) x 2 matrix
-                        thrust::device_vector<float> &forces)    // N x 2 matrix
+                        thrust::device_vector<float> &forces,    // N x 2 matrix
+                        thrust::device_vector<float> &ones)      // N x 2 matrix of ones
 {
-    assert(nnz == sparsePij.size());
-    assert(pijRowPtr.size() == N + 1);
-    assert(pijColInd.size() == sparsePij.size());
-    assert(forceProd.size() == sparsePij.size());
-
     const int BLOCKSIZE = 128;
     const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
     computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
@@ -762,7 +762,6 @@ void computeAttrForce(int N,
     // compute forces_i = sum_j pij*qij*normalization*yi
     float alpha = 1.0f;
     float beta = 0.0f;
-    thrust::device_vector<float> ones(N*2, 1);
     cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                             N, 2, N, nnz, &alpha, descr,
                             thrust::raw_pointer_cast(forceProd.data()),
@@ -900,7 +899,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     // printarray<float>(d_knn_distances, N_POINTS, K);
     
     // Compute the pij of the KNN distribution
-    thrust::device_vector<float> sigmas(N_POINTS, 0.3);
+    thrust::device_vector<float> sigmas(N_POINTS, 0.1);
     thrust::device_vector<float> d_pij(N_POINTS*K);
     compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
 
@@ -926,11 +925,6 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                               thrust::raw_pointer_cast(d_knn_indices.data()),  N_POINTS, K);
     cudaDeviceSynchronize();
 
-    // std::cout << std::endl;
-    // printarray<float>(d_pij, N_POINTS, K);
-    // std::cout << std::endl;
-    // printarray<int>(d_knn_indices, N_POINTS, K);
-
     // Clean up extra memory
     d_knn_indices_long.clear();
     d_knn_indices_long.shrink_to_fit();
@@ -940,9 +934,6 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     // Normalize the pij matrix, we do this after post-processing to avoid issues
     // in the distribution caused by exponentiation.
     normalize_pij(dense_handle, d_pij, N_POINTS, K);
-
-    // std::cout << std::endl;
-    // printarray<float>(d_pij, N_POINTS, K);
 
     // Construct some additional descriptors for sparse matrix multiplication (for the symmetrization)
     cusparseMatDescr_t descr;
@@ -994,6 +985,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> maxyl(blocks * FACTOR1);
     thrust::device_vector<float> minxl(blocks * FACTOR1);
     thrust::device_vector<float> minyl(blocks * FACTOR1);
+    
+    thrust::device_vector<float> ones(N_POINTS * 2, 1); // This is for reduce summing, etc.
 
     float eta = 50.0f;
     float norm;
@@ -1006,6 +999,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     dump_file.open("dump_ys.txt");
     float host_ys[(nnodes + 1) * 2];
     dump_file << N_POINTS << " " << 2 << std::endl;
+    
     for (int step = 0; step < n_iter; step++) {
         thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
         
@@ -1058,22 +1052,17 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         gpuErrchk(cudaDeviceSynchronize());
 
         // compute attractive forces
-        computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces);
+        computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones);
         gpuErrchk(cudaDeviceSynchronize());
         
         norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
-        // DEBUG:
-        // norm = 1000;
-        // if (step > 100)
-            // exit(1);
-        //TODO: Add forces non-destructively
         if (step % 10 == 0)
             std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
-        // std::cout << "ATTR FORCES:" << std::endl;
-        // for (int i = 0; i < N_POINTS; i++) {
-            // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
-        // }
-        // std::cout << std::endl;
+        std::cout << "ATTR FORCES:" << std::endl;
+        for (int i = 0; i < 128; i++) {
+            std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
+        }
+        std::cout << std::endl;
         // std::cout << "REP FORCES:" << std::endl;
         // for (int i = 0; i < N_POINTS; i++) {
             // std::cout << rep_forces[i] / norm << ", " << rep_forces[i + nnodes + 1] / norm << std::endl;
