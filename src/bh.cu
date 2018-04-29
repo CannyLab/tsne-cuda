@@ -673,25 +673,36 @@ void ForceCalculationKernel(int nnodesd,
 /******************************************************************************/
 /*** advance bodies ***********************************************************/
 /******************************************************************************/
-// Probably should just do this with thrust
-// __global__
-// __launch_bounds__(THREADS6, FACTOR6)
-// void IntegrationKernel(int nbodiesd,
-//                         float eta,
-//                         volatile float * __restrict posxd, 
-//                         volatile float * __restrict posyd, 
-//                         volatile float * __restrict velxd, 
-//                         volatile float * __restrict velyd) 
-// {
-//   register int i, inc;
+// Edited to add momentum, repulsive, attr forces, etc.
+__global__
+__launch_bounds__(THREADS6, FACTOR6)
+void IntegrationKernel(int N,
+                        int nnodes,
+                        float eta,
+                        float norm,
+                        float momentum,
+                        volatile float * __restrict pts, // (nnodes + 1) x 2
+                        volatile float * __restrict attr_forces, // (N x 2)
+                        volatile float * __restrict rep_forces, // (nnodes + 1) x 2
+                        volatile float * __restrict old_forces) // (N x 2)
+{
+  register int i, inc;
+  register float tmpx, tmpy;
 
-//   // iterate over all bodies assigned to thread
-//   inc = blockDim.x * gridDim.x;
-//   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < nbodiesd; i += inc) {
-//     posxd[i] += velxd[i] * eta;
-//     posyd[i] += velyd[i] * eta;
-//    }
-// }
+  // iterate over all bodies assigned to thread
+  // TODO: fix momentum at step 0
+  inc = blockDim.x * gridDim.x;
+  for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
+      tmpx = 4.0f * (attr_forces[i] + (rep_forces[i] / norm));
+      tmpy = 4.0f * (attr_forces[i + N] + (rep_forces[nnodes + 1 + i] / norm));
+      tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
+      tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
+      pts[i] -= eta * tmpx;
+      pts[i + nnodes + 1] -= eta * tmpy;
+      old_forces[i] = tmpx;
+      old_forces[i + N] = tmpy;
+   }
+}
 
 
 /******************************************************************************/
@@ -988,6 +999,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     #else
     cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
     #endif
+    cudaFuncSetCacheConfig(IntegrationKernel, cudaFuncCachePreferL1);
 
     //TODO: Make this an argument
     const unsigned int K = 1023 < N_POINTS ? 1023 : N_POINTS - 1; 
@@ -1090,6 +1102,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> pts = Random::random_vector((nnodes + 1) * 2); //TODO: Rename this function
     thrust::device_vector<float> rep_forces((nnodes + 1) * 2, 0);
     thrust::device_vector<float> attr_forces(N_POINTS * 2, 0);
+    thrust::device_vector<float> old_forces(N_POINTS * 2, 0); // for momentum
 
     thrust::device_vector<int> errl(1);
     thrust::device_vector<int> startl(nnodes + 1);
@@ -1107,6 +1120,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> ones(N_POINTS * 2, 1); // This is for reduce summing, etc.
 
     float eta = 5000.0f;
+    float momentum = 0.8f;
     float norm;
     // These variables currently govern the tolerance (whether it recurses on a cell)
     float epssq = 0.05 * 0.05;
@@ -1176,6 +1190,12 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
         if (step % 10 == 0)
             std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
+      
+        IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(N_POINTS, nnodes, eta, norm, momentum, 
+                                                                    thrust::raw_pointer_cast(pts.data()),
+                                                                    thrust::raw_pointer_cast(attr_forces.data()),
+                                                                    thrust::raw_pointer_cast(rep_forces.data()),
+                                                                    thrust::raw_pointer_cast(old_forces.data()));
         // std::cout << "ATTR FORCES:" << std::endl;
         // for (int i = 0; i < 128; i++) {
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
@@ -1186,10 +1206,11 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             // std::cout << rep_forces[i] / norm << ", " << rep_forces[i + nnodes + 1] / norm << std::endl;
         // }
         // Add resulting force vector to positions w/ normalization, mul by 4 and learning rate
-        thrust::transform(rep_forces.begin(), rep_forces.begin() + N_POINTS, attr_forces.begin(), attr_forces.begin(), saxpy_functor(1 / norm));
-        thrust::transform(rep_forces.begin() + nnodes + 1, rep_forces.begin() + nnodes + 1 + N_POINTS, attr_forces.begin() + N_POINTS, attr_forces.begin() + N_POINTS, saxpy_functor(1 / norm));
-        thrust::transform(attr_forces.begin(), attr_forces.begin() + N_POINTS, pts.begin(), pts.begin(), saxpy_functor(-eta * 4.0f));
-        thrust::transform(attr_forces.begin() + N_POINTS, attr_forces.end(), pts.begin() + nnodes + 1, pts.begin() + nnodes + 1, saxpy_functor(-eta * 4.0f));
+        // thrust::transform(rep_forces.begin(), rep_forces.begin() + N_POINTS, attr_forces.begin(), attr_forces.begin(), saxpy_functor(1 / norm));
+        // thrust::transform(rep_forces.begin() + nnodes + 1, rep_forces.begin() + nnodes + 1 + N_POINTS, attr_forces.begin() + N_POINTS, attr_forces.begin() + N_POINTS, saxpy_functor(1 / norm));
+
+        // thrust::transform(attr_forces.begin(), attr_forces.begin() + N_POINTS, pts.begin(), pts.begin(), saxpy_functor(-eta * 4.0f));
+        // thrust::transform(attr_forces.begin() + N_POINTS, attr_forces.end(), pts.begin() + nnodes + 1, pts.begin() + nnodes + 1, saxpy_functor(-eta * 4.0f));
         // for (int i = 0; i < N_POINTS; i++) {
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
         // }

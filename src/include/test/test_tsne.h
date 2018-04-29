@@ -278,37 +278,37 @@ void test_bhtsne(int N, int NDIMS) {
 }
 
 
-// void test_bhtsne_mnist(std::string fname) {
-    // srand (time(NULL));
-// 
-    // std::default_random_engine generator;
-    // std::normal_distribution<double> distribution1(-10.0, 1.0);
-    // std::normal_distribution<double> distribution2(10.0, 1.0);
-    // int N = 2500;
-    // int NDIMS = 768;
-    // thrust::host_vector<float> h_X = Data::load_file(fname);
+void test_bhtsne_mnist(std::string fname) {
+    srand (time(NULL));
+
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution1(-10.0, 1.0);
+    std::normal_distribution<double> distribution2(10.0, 1.0);
+    int N = 2500;
+    int NDIMS = 768;
+    thrust::host_vector<float> h_X = Data::load_file(fname);
 
     // --- Matrices allocation and initialization
-    // cublasHandle_t dense_handle;
-    // cublasSafeCall(cublasCreate(&dense_handle));
-    // cusparseHandle_t sparse_handle;
-    // cusparseSafeCall(cusparseCreate(&sparse_handle));
+    cublasHandle_t dense_handle;
+    cublasSafeCall(cublasCreate(&dense_handle));
+    cusparseHandle_t sparse_handle;
+    cusparseSafeCall(cusparseCreate(&sparse_handle));
 
-    // cudaEvent_t start, stop;
-    // cudaEventCreate(&start);
-    // cudaEventCreate(&stop);
-    // printf("Starting TSNE calculation with %u points.\n", N);
-    // cudaEventRecord(start);
-    // BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()), N, NDIMS, 2, 2, 1.0, 0.0, 1000, 1000, 0.0);
-    // cudaEventRecord(stop);
-    // cudaEventSynchronize(stop);
-    // float milliseconds = 0;
-    // cudaEventElapsedTime(&milliseconds, start, stop);
-    // printf("Elapsed time: %f (ms)\n", milliseconds);
-    // EXPECT_EQ(0, 0);
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    printf("Starting TSNE calculation with %u points.\n", N);
+    cudaEventRecord(start);
+    BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()), N, NDIMS, 2, 2, 1.0, 0.0, 1000, 1000, 0.0);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Elapsed time: %f (ms)\n", milliseconds);
+    EXPECT_EQ(0, 0);
 
 
-// }
+}
 
 void test_bhtsne_ref(int N, int NDIMS) {
     std::default_random_engine generator;
