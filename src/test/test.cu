@@ -67,6 +67,10 @@ namespace {
     //Test the BHTSNE on MNIST
     // TEST(BhTSNEMnist, friendship) {test_bhtsne_mnist("../mnist2500x768.txt");}
     TEST(BhTSNEMnist, test_set) {test_bhtsne_full_mnist("../train-images.idx3-ubyte");}
+
+    // Test the BHTSNE on CIFAR
+   // TEST(BhTSNECifar, train_set_cifar10) {test_bhtsne_full_cifar10("../cifar-10/bin_data");}
+    //TEST(BhTSNECifar, train_set_cifar100) {test_bhtsne_full_cifar100("../cifar-100/train.bin");}
     // Test the BHTSNE_Ref
     //TEST(BhTSNERef, friendship) {test_bhtsne_ref(300, 50);}
     
