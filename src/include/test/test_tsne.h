@@ -303,7 +303,7 @@ void test_bhtsne_ref(int N, int NDIMS) {
 
     int K = N - 1;
 
-    double * forces = BHTSNERef::computeEdgeForces(h_X.data(), fYs, NDIMS, 2, N, K, 1.0f);
+    double * forces = BHTSNERef::computeEdgeForces(h_X.data(), fYs, NDIMS, 2, N, K, 35.0f);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < NDIMS; j++)
             std::cout << forces[i * NDIMS + j] << " ";

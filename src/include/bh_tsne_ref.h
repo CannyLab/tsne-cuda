@@ -18,10 +18,10 @@
 
 namespace BHTSNERef {
 
-	double * computeEdgeForces(float * Xs, float * Ys, float NDIMS, float PROJDIMS, int N, int K, float sigma);
+	double * computeEdgeForces(float * Xs, float * Ys, float NDIMS, float PROJDIMS, int N, int K, float perplexity);
 	void symmetrizeMatrix(unsigned int** _row_P, unsigned int** _col_P, double** _val_P, int N);
-	void computeGaussianPerplexity(double* X, int N, int D, unsigned int** _row_P, unsigned int** _col_P, double** _val_P, double sigma, int K);
-	double * computeNonEdgeForces();
+	void computeGaussianPerplexity(double* X, int N, int D, unsigned int** _row_P, unsigned int** _col_P, double** _val_P, double perplexity, int K);
+	double * computeNonEdgeForces(float * Ys, int N, double theta, float PROJDIMS);
 	class Cell {
 
 	    unsigned int dimension;
