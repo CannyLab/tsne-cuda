@@ -61,11 +61,12 @@ namespace {
     // TEST(MatrixSymmetry, 70000x784) {test_sym_mat(70000,784);}
 
     // Test the BHTSNE
-    TEST(BhTSNE, friendship) {test_bhtsne(70000, 784);}
+    // TEST(BhTSNE, friendship) {test_bhtsne(70000, 784);}
     //TEST(BhTSNE, friendship) {test_bhtsne(5000, 50);}
 
     //Test the BHTSNE on MNIST
     // TEST(BhTSNEMnist, friendship) {test_bhtsne_mnist("../mnist2500x768.txt");}
+    TEST(BhTSNEMnist, test_set) {test_bhtsne_full_mnist("../train-images.idx3-ubyte");}
     // Test the BHTSNE_Ref
     //TEST(BhTSNERef, friendship) {test_bhtsne_ref(300, 50);}
     

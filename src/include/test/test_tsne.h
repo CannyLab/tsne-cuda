@@ -6,6 +6,10 @@
  * @date 2018-04-11
  */
 
+#include <stdint.h>
+#include <fstream>
+
+
 void test_cpu_compute_pij(unsigned int N, unsigned int NDIMS) {
 
     std::default_random_engine generator;
@@ -337,6 +341,90 @@ void test_bhtsne_ref(int N, int NDIMS) {
             std::cout << forces[i * NDIMS + j] << " ";
         printf("\n");
     }
+
+
+}
+
+void test_bhtsne_full_mnist(std::string fname) {
+    srand (time(NULL));
+    // Construct the file stream
+    std::ifstream mnist_data_file(fname, std::ios::in | std::ios::binary);
+    
+    // Read the data header
+    std::cout << "Reading file header..." << std::endl;
+    int magic_number = 0;
+    mnist_data_file.read(reinterpret_cast<char *>(&magic_number), sizeof(int));
+    if (mnist_data_file.gcount() != 4) {std::cout << "File read error (magic number). The number was: " << magic_number << std::endl;ASSERT_EQ(1, 0);}
+    magic_number = ((magic_number>>24)&0xff) | // move byte 3 to byte 0
+                    ((magic_number<<8)&0xff0000) | // move byte 1 to byte 2
+                    ((magic_number>>8)&0xff00) | // move byte 2 to byte 1
+                    ((magic_number<<24)&0xff000000); // byte 0 to byte 3
+    if (magic_number != 2051) {std::cout << "Invalid magic number. The number was: " << magic_number << std::endl;ASSERT_EQ(1, 0);}
+    
+    int num_images = 0;
+    mnist_data_file.read(reinterpret_cast<char *>(&num_images), sizeof(int));
+    if (mnist_data_file.gcount() != 4) {std::cout << "File read error (number of images)." << std::endl;ASSERT_EQ(1, 0);}
+
+    num_images = ((num_images>>24)&0xff) | // move byte 3 to byte 0
+                    ((num_images<<8)&0xff0000) | // move byte 1 to byte 2
+                    ((num_images>>8)&0xff00) | // move byte 2 to byte 1
+                    ((num_images<<24)&0xff000000); // byte 0 to byte 3
+    std::cout << "Num Images: " << num_images << std::endl;
+
+    int num_rows = 0;
+    mnist_data_file.read(reinterpret_cast<char *>(&num_rows), sizeof(int));
+    if (mnist_data_file.gcount() != 4) {std::cout << "File read error (number of rows)." << std::endl;ASSERT_EQ(1, 0);}
+
+    num_rows = ((num_rows>>24)&0xff) | // move byte 3 to byte 0
+                    ((num_rows<<8)&0xff0000) | // move byte 1 to byte 2
+                    ((num_rows>>8)&0xff00) | // move byte 2 to byte 1
+                    ((num_rows<<24)&0xff000000); // byte 0 to byte 3
+    std::cout << "Num Rows: " << num_rows << std::endl;
+
+    int num_columns = 0;
+    mnist_data_file.read(reinterpret_cast<char *>(&num_columns), sizeof(int));
+    if (mnist_data_file.gcount() != 4) {std::cout << "File read error (number of columns)." << std::endl;ASSERT_EQ(1, 0);}
+
+    num_columns = ((num_columns>>24)&0xff) | // move byte 3 to byte 0
+                    ((num_columns<<8)&0xff0000) | // move byte 1 to byte 2
+                    ((num_columns>>8)&0xff00) | // move byte 2 to byte 1
+                    ((num_columns<<24)&0xff000000); // byte 0 to byte 3
+    std::cout << "Num Cols: " << num_columns << std::endl;
+
+    std::cout << "Reading pixels from file..." << std::endl;
+    uint8_t pixel_val = 0;
+    float* data = new float[num_images*num_rows*num_columns];
+    for (int idx = 0; idx < num_images; idx++) {
+        for (int jdx = 0; jdx < num_rows*num_columns; jdx++) {
+            mnist_data_file.read(reinterpret_cast<char *>(&pixel_val), sizeof(uint8_t));
+            if (mnist_data_file.gcount() != 1) {std::cout << "File read error (pixel)." << std::endl;ASSERT_EQ(1, 0);}
+            data[idx*num_rows*num_columns + jdx] = ((float) pixel_val) / 255.0f;
+        }
+    }
+
+    std::cout << "Done reading!" << std::endl;
+    mnist_data_file.close();
+
+    // --- Matrices allocation and initialization
+    cublasHandle_t dense_handle;
+    cublasSafeCall(cublasCreate(&dense_handle));
+    cusparseHandle_t sparse_handle;
+    cusparseSafeCall(cusparseCreate(&sparse_handle));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    printf("Starting TSNE calculation with %u points.\n", num_images);
+    cudaEventRecord(start);
+    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_columns*num_rows, 2, 45.0, 200.0, 12.0, 1000, 1000, 0.0);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Elapsed time: %f (ms)\n", milliseconds);
+    EXPECT_EQ(0, 0);
+
+    delete[] data;
 
 
 }

@@ -981,8 +981,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                             unsigned int N_DIMS, 
                                             unsigned int PROJDIM, 
                                             float perplexity, 
-                                            float early_ex, 
                                             float learning_rate, 
+                                            float early_ex, 
                                             unsigned int n_iter, 
                                             unsigned int n_iter_np, 
                                             float min_g_norm)
@@ -1027,7 +1027,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     // Compute the pij of the KNN distribution
 
     //TODO: Make these arguments
-    thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances,  35, 1e-4, N_POINTS, K);
+    thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, perplexity, 1e-4, N_POINTS, K);
 
     // thrust::device_vector<float> sigmas(N_POINTS, 0.3);
     // thrust::device_vector<float> d_pij(N_POINTS*K);
@@ -1063,7 +1063,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
 
     // Normalize the pij matrix, we do this after post-processing to avoid issues
     // in the distribution caused by exponentiation.
-    normalize_pij(dense_handle, d_pij, N_POINTS, K);
+    // normalize_pij(dense_handle, d_pij, N_POINTS, K);
 
     // Construct some additional descriptors for sparse matrix multiplication (for the symmetrization)
     cusparseMatDescr_t descr;
@@ -1119,18 +1119,20 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     
     thrust::device_vector<float> ones(N_POINTS * 2, 1); // This is for reduce summing, etc.
 
-    float eta = 5000.0f;
+    float eta = learning_rate * early_ex;
     float momentum = 0.8f;
     float norm;
+    
     // These variables currently govern the tolerance (whether it recurses on a cell)
     float epssq = 0.05 * 0.05;
     float itolsq = 1.0f / (0.5 * 0.5);
     InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
     gpuErrchk(cudaDeviceSynchronize());
-    // std::ofstream dump_file;
-    // dump_file.open("dump_ys.txt");
-    // float host_ys[(nnodes + 1) * 2];
-    // dump_file << N_POINTS << " " << 2 << std::endl;
+    
+    std::ofstream dump_file;
+    dump_file.open("dump_ys.txt");
+    float host_ys[(nnodes + 1) * 2];
+    dump_file << N_POINTS << " " << 2 << std::endl;
     
     for (int step = 0; step < n_iter; step++) {
         thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
@@ -1196,6 +1198,9 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                                                     thrust::raw_pointer_cast(attr_forces.data()),
                                                                     thrust::raw_pointer_cast(rep_forces.data()),
                                                                     thrust::raw_pointer_cast(old_forces.data()));
+
+
+        if (step == 250) {eta /= early_ex;}
         // std::cout << "ATTR FORCES:" << std::endl;
         // for (int i = 0; i < 128; i++) {
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
@@ -1215,16 +1220,16 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
         // }
         
-        // thrust::copy(pts.begin(), pts.end(), host_ys);
-        // for (int i = 0; i < N_POINTS; i++) {
-            // dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
-        // }
+        thrust::copy(pts.begin(), pts.end(), host_ys);
+        for (int i = 0; i < N_POINTS; i++) {
+            dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
+        }
         // exit(1);
         // Done (check progress, etc.)
         // if (step >= 20)
             // exit(1);
     }
-    // dump_file.close();
+    dump_file.close();
     std::cout << "Fin." << std::endl;
 
     return pts;
