@@ -62,11 +62,11 @@ namespace {
 
     // Test the BHTSNE
     // TEST(BhTSNE, friendship) {test_bhtsne(70000, 784);}
-    //TEST(BhTSNE, friendship) {test_bhtsne(5000, 50);}
+    TEST(BhTSNE, friendship) {test_bhtsne(5000, 50);}
 
     //Test the BHTSNE on MNIST
     // TEST(BhTSNEMnist, friendship) {test_bhtsne_mnist("../mnist2500x768.txt");}
-    TEST(BhTSNEMnist, test_set) {test_bhtsne_full_mnist("../train-images.idx3-ubyte");}
+    //TEST(BhTSNEMnist, test_set) {test_bhtsne_full_mnist("../train-images.idx3-ubyte");}
 
     // Test the BHTSNE on CIFAR
    // TEST(BhTSNECifar, train_set_cifar10) {test_bhtsne_full_cifar10("../cifar-10/bin_data");}
