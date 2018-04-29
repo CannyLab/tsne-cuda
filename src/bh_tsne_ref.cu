@@ -1,10 +1,25 @@
 #include "bh_tsne_ref.h"
 #include "common.h"
 
-double * BHTSNERef::computeEdgeForces(float * Xs, float * Ys, float NDIMS, float PROJDIMS, int N, int K, float sigma) {
+double * BHTSNERef::computeNonEdgeForces(float * Ys, int N, double theta, float PROJDIMS) {
+    double * dYs = (double *) malloc(N * PROJDIMS * sizeof(double));
+    for (int i = 0; i < N * PROJDIMS; i++) {
+        dYs[i] = (double) Ys[i];
+    }
+    BHTSNERef::SPTree * tree = new BHTSNERef::SPTree(PROJDIMS, dYs, N);
+
+    double* edgeForces = (double*) calloc(N * PROJDIMS, sizeof(double));
+    double sum_Q = .0;
+    for(int n = 0; n < N; n++) {
+        tree->computeNonEdgeForces(n, theta, edgeForces + n * (int) PROJDIMS, &sum_Q);
+    }
+    return edgeForces;
+}
+
+double * BHTSNERef::computeEdgeForces(float * Xs, float * Ys, float NDIMS, float PROJDIMS, int N, int K, float perplexity) {
 	double * dXs = (double *) malloc(N * NDIMS * sizeof(double));
 	double * dYs = (double *) malloc(N * PROJDIMS * sizeof(double));
-	double * edgeForces = (double *) calloc(N * NDIMS, sizeof(double));
+	double * edgeForces = (double *) calloc(N * PROJDIMS, sizeof(double));
 	for (int i = 0; i < N * NDIMS; i++) {
 		dXs[i] = (double) Xs[i];
 	}
@@ -14,7 +29,7 @@ double * BHTSNERef::computeEdgeForces(float * Xs, float * Ys, float NDIMS, float
     unsigned int * row_P;
     unsigned int * col_P;
 	double * val_P;
-	computeGaussianPerplexity(dXs, N, NDIMS, &row_P, &col_P, &val_P, (double) sigma, K);
+	computeGaussianPerplexity(dXs, N, NDIMS, &row_P, &col_P, &val_P, (double) perplexity, K);
 
 	symmetrizeMatrix(&row_P, &col_P, &val_P, N);
     for(int i = 0; i < row_P[N]; i++) val_P[i] *= 12.0;
@@ -132,7 +147,7 @@ void BHTSNERef::symmetrizeMatrix(unsigned int** _row_P, unsigned int** _col_P, d
 }
 
 
-void BHTSNERef::computeGaussianPerplexity(double* X, int N, int D, unsigned int** _row_P, unsigned int** _col_P, double** _val_P, double sigma, int K) {
+void BHTSNERef::computeGaussianPerplexity(double* X, int N, int D, unsigned int** _row_P, unsigned int** _col_P, double** _val_P, double perplexity, int K) {
 
     // Allocate the memory we need
     *_col_P = (unsigned int*) calloc(N * K, sizeof(unsigned int));
@@ -159,31 +174,66 @@ void BHTSNERef::computeGaussianPerplexity(double* X, int N, int D, unsigned int*
     std::vector<double> distances;
     for(int n = 0; n < N; n++) {
 
-        if(n % 10000 == 0) printf(" - point %d of %d\n", n, N);
+            if(n % 10000 == 0) printf(" - point %d of %d\n", n, N);
 
-        // Find nearest neighbors
-        indices.clear();
-        distances.clear();
-        tree->search(obj_X[n], K + 1, &indices, &distances);
+            // Find nearest neighbors
+            indices.clear();
+            distances.clear();
+            tree->search(obj_X[n], K + 1, &indices, &distances);
 
-        double beta = 1.0f / 2.0f * sigma * sigma;
+            // Initialize some variables for binary search
+            bool found = false;
+            double beta = 1.0;
+            double min_beta = -DBL_MAX;
+            double max_beta =  DBL_MAX;
+            double tol = 1e-5;
 
-        // Iterate until we found a good perplexity
-        double sum_P;
-       
-        // Compute Gaussian kernel row
-        for(int m = 0; m < K; m++) cur_P[m] = exp(-beta * distances[m + 1] * distances[m + 1]);
+            // Iterate until we found a good perplexity
+            int iter = 0; double sum_P;
+            while(!found && iter < 200) {
 
-        // Compute entropy of current row
-        sum_P = DBL_MIN;
-        for(int m = 0; m < K; m++) sum_P += cur_P[m];
+                // Compute Gaussian kernel row
+                for(int m = 0; m < K; m++) cur_P[m] = exp(-beta * distances[m + 1] * distances[m + 1]);
 
-        // Row-normalize current row of P and store in matrix
-        for(unsigned int m = 0; m < K; m++) cur_P[m] /= sum_P;
-        for(unsigned int m = 0; m < K; m++) {
-            col_P[row_P[n] + m] = (unsigned int) indices[m + 1].index();
-            val_P[row_P[n] + m] = cur_P[m];
-        }
+                // Compute entropy of current row
+                sum_P = DBL_MIN;
+                for(int m = 0; m < K; m++) sum_P += cur_P[m];
+                double H = .0;
+                for(int m = 0; m < K; m++) H += beta * (distances[m + 1] * distances[m + 1] * cur_P[m]);
+                H = (H / sum_P) + log(sum_P);
+
+                // Evaluate whether the entropy is within the tolerance level
+                double Hdiff = H - log(perplexity);
+                if(Hdiff < tol && -Hdiff < tol) {
+                    found = true;
+                }
+                else {
+                    if(Hdiff > 0) {
+                        min_beta = beta;
+                        if(max_beta == DBL_MAX || max_beta == -DBL_MAX)
+                            beta *= 2.0;
+                        else
+                            beta = (beta + max_beta) / 2.0;
+                    }
+                    else {
+                        max_beta = beta;
+                        if(min_beta == -DBL_MAX || min_beta == DBL_MAX)
+                            beta /= 2.0;
+                        else
+                            beta = (beta + min_beta) / 2.0;
+                    }
+                }
+
+                // Update iteration counter
+                iter++;
+            }
+
+            // Row-normalize current row of P and store in matrix
+            for(unsigned int m = 0; m < K; m++) cur_P[m] /= sum_P;
+            for(unsigned int m = 0; m < K; m++) {
+                col_P[row_P[n] + m] = (unsigned int) indices[m + 1].index();
+                val_P[row_P[n] + m] = cur_P[m];
+            }
     }
 
     // Clean up memory
