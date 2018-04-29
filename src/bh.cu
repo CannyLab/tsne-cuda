@@ -697,6 +697,13 @@ void IntegrationKernel(int N,
       tmpy = 4.0f * (attr_forces[i + N] + (rep_forces[nnodes + 1 + i] / norm));
       tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
       tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
+
+      // If the point is screwed up, just put it in the middle of the screen
+      if (pts[i] != pts[i] || isinf(pts[i])) 
+        pts[i] = 0;
+      if (pts[i + nnodes + 1] != pts[i + nnodes + 1] || isinf(pts[i + nnodes + 1])) 
+        pts[i + nnodes + 1] = 0;
+        
       pts[i] -= eta * tmpx;
       pts[i + nnodes + 1] -= eta * tmpy;
       old_forces[i] = tmpx;
