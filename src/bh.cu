@@ -630,8 +630,8 @@ void ForceCalculationKernel(int nnodesd,
           pd++;
 
           if (n >= 0) {
-            dx = posxd[n] - px;
-            dy = posyd[n] - py;
+            dx = px - posxd[n];
+            dy = py - posyd[n];
             // tmp = dx*dx + dy*dy; // distance squared
             tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
             if ((n < nbodiesd) || __all(tmp < dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
@@ -642,6 +642,7 @@ void ForceCalculationKernel(int nnodesd,
               // from sptree.cpp
               tmp = 1 / (1 + tmp);
               mult = massd[n] * tmp;
+              // printf("%0.2f\n", massd[n]);
               normsum += mult;
               mult *= tmp;
               vx += dx * mult;
@@ -698,8 +699,8 @@ void IntegrationKernel(int N,
   // TODO: fix momentum at step 0
   inc = blockDim.x * gridDim.x;
   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
-      tmpx = 4.0f * (attr_forces[i] + (rep_forces[i] / norm));
-      tmpy = 4.0f * (attr_forces[i + N] + (rep_forces[nnodes + 1 + i] / norm));
+      tmpx = 4.0f * (attr_forces[i] - (rep_forces[i] / norm));
+      tmpy = 4.0f * (attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm));
       tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
       tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
       pts[i] -= eta * tmpx;
@@ -1129,7 +1130,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     float norm;
     
     // These variables currently govern the tolerance (whether it recurses on a cell)
-    float theta = 0.5f;
+    float theta = 0.0f;
     float epssq = 0.05 * 0.05;
     // float itolsq = 1.0f / (0.5 * 0.5);
 
@@ -1193,7 +1194,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         gpuErrchk(cudaDeviceSynchronize());
 
         // compute attractive forces
-        computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones);
+        // computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones);
         gpuErrchk(cudaDeviceSynchronize());
         
         norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
