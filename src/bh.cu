@@ -751,7 +751,7 @@ void computePijxQij(int N,
     // if (!(pijRowPtr[i] <= TID && pijRowPtr[i + 1] > TID))
         // printf("something's wrong!\n");
     
-    j = pijColInd[TID - i];
+    j = pijColInd[TID];
     
     ix = pts[i]; iy = pts[nnodes + 1 + i];
     jx = pts[j]; jy = pts[nnodes + 1 + j];
@@ -1113,7 +1113,17 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     nnodes--;
 
     thrust::device_vector<float> forceProd(sparsePij.size());
-    thrust::device_vector<float> pts = Random::random_vector((nnodes + 1) * 2); //TODO: Rename this function
+    // thrust::device_vector<float> pts = Random::random_vector((nnodes + 1) * 2); //TODO: Rename this function
+
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution1(-10.0, 1.0);
+    thrust::host_vector<float> h_pts((nnodes + 1) * 2);
+    for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = distribution1(generator);
+    thrust::device_vector<float> pts((nnodes + 1) * 2);
+    thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
+    
+
+
     thrust::device_vector<float> rep_forces((nnodes + 1) * 2, 0);
     thrust::device_vector<float> attr_forces(N_POINTS * 2, 0);
     thrust::device_vector<float> old_forces(N_POINTS * 2, 0); // for momentum
@@ -1134,7 +1144,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> ones(N_POINTS * 2, 1); // This is for reduce summing, etc.
 
     float eta = learning_rate * early_ex;
-    float momentum = 0.8f;
+    float momentum = 0.1f;
     float norm;
     
     // These variables currently govern the tolerance (whether it recurses on a cell)
@@ -1216,7 +1226,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                                                     thrust::raw_pointer_cast(old_forces.data()));
 
 
-        if (step == 250) {eta /= early_ex;}
+        if (step == 750) {eta /= early_ex; momentum = 0.8;}
         // std::cout << "ATTR FORCES:" << std::endl;
         // for (int i = 0; i < 128; i++) {
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
