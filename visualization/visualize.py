@@ -4,27 +4,27 @@ import matplotlib.animation as animation
 import numpy as np
 import math
 
-particles = []
+MAX_TIMESTEPS = 1000
+DIMS = 2
+
+particles = None
 n_particles = None
-dims = None
 
 min_particle = -1*float("inf")
 max_particle =float("inf")
-
-
+n_timesteps = 0
 
 with open('../build/dump_ys.txt') as f:
-    line = f.readline().split()
-    n_particles = int(line[0])
-    dims = float(line[1])
-    line = f.readline()
-    while line:
-        particles.append([float(pos) for pos in line.split()])
-        line = f.readline()
+    lines = f.readlines()
+    n_particles = int(lines[0].split()[0])
+    particles = np.array([[float(el) for el in line.split()] for line in lines[1:]])
+    n_timesteps = particles.shape[0] // n_particles
+    particles = particles[:n_particles * n_timesteps]
+    particles = particles.reshape((n_timesteps, n_particles, 2))
 
-particles = np.array(particles)
-particles = particles.reshape((-1, n_particles, 2))
-n_timesteps = particles.shape[0]
+# particles = np.array(particles)
+# particles = particles.reshape((-1, n_particles, 2))
+# n_timesteps = particles.shape[0]
 
 min_particle = np.amin(particles)
 max_particle = np.amax(particles)

@@ -1,4 +1,4 @@
-Metadata-Version: 1.0
+Metadata-Version: 2.1
 Name: MulticoreTSNE
 Version: 0.1
 Summary: Multicore version of t-SNE algorithm.
@@ -8,3 +8,4 @@ Author-email: dmitry.ulyanov.msu@gmail.com
 License: UNKNOWN
 Description: UNKNOWN
 Platform: UNKNOWN
+Provides-Extra: test

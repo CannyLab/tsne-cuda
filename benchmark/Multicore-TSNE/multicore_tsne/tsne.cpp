@@ -272,6 +272,12 @@ double TSNE<treeT, dist_fn>::computeGradient(int* inp_row_P, int* inp_col_P, dou
         dC[i] = pos_f[i] - (neg_f[i] / sum_Q);
     }
 
+    // for (int i = 0; i < 10; i++) {
+        // printf("pos_f: (%0.5f, %0.5f), neg_f: (%0.5f, %0.5f)\n", pos_f[2*i], pos_f[2*i + 1], neg_f[2*i] / sum_Q, neg_f[2*i + 1] / sum_Q);
+    // }
+    // printf("Sum_Q: %0.5f\n", sum_Q);
+    printf("neg_f (%0.5f, %0.5f), sum_q %0.5f\n", neg_f[0], neg_f[1], sum_Q);
+
     delete tree;
     delete[] pos_f;
     delete[] neg_f;
