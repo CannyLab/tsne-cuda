@@ -42,6 +42,10 @@ Author: Martin Burtscher <burtscher@txstate.edu>
 #include <cuda.h>
 #include "bh_tsne.h"
 
+#include <zmq.hpp>
+
+
+
 #ifdef __KEPLER__
 
 // thread count
@@ -700,8 +704,8 @@ void IntegrationKernel(int N,
   // TODO: fix momentum at step 0
   inc = blockDim.x * gridDim.x;
   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
-      tmpx = 4.0f * (attr_forces[i] - (rep_forces[i] / norm));
-      tmpy = 4.0f * (attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm));
+      tmpx = 4.0f * (attr_forces[i] * 1/((float)N) - (rep_forces[i] / norm));
+      tmpy = 4.0f * (attr_forces[i + N] * 1/((float)N) - (rep_forces[nnodes + 1 + i] / norm));
       tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
       tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
 
@@ -1142,13 +1146,15 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     float epssq = 0.05 * 0.05;
     // float itolsq = 1.0f / (0.5 * 0.5);
 
+    std::cout << "Initializing Connection...." << std::endl;
+    zmq::context_t context(1);
+    zmq::socket_t publisher(context, ZMQ_REQ);
+    std::cout << "Waiting for connection to visualization...." << std::endl;
+    publisher.connect("tcp://localhost:5556");
+    std::cout << "Visualization connected!" << std::endl;
+
     InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
     gpuErrchk(cudaDeviceSynchronize());
-    
-    std::ofstream dump_file;
-    dump_file.open("dump_ys.txt");
-    float host_ys[(nnodes + 1) * 2];
-    dump_file << N_POINTS << " " << 2 << std::endl;
     
     for (int step = 0; step < n_iter; step++) {
         thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
@@ -1236,16 +1242,19 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
         // }
         
-        thrust::copy(pts.begin(), pts.end(), host_ys);
-        for (int i = 0; i < N_POINTS; i++) {
-            dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
-        }
+        
+        zmq::message_t message(sizeof(float)*N_POINTS*2);
+        thrust::copy(pts.begin(), pts.begin()+N_POINTS, static_cast<float*>(message.data()));
+        thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+N_POINTS, static_cast<float*>(message.data())+N_POINTS);
+        publisher.send(message);
         // exit(1);
         // Done (check progress, etc.)
         // if (step >= 20)
             // exit(1);
+
+        zmq::message_t request;
+        publisher.recv (&request);
     }
-    dump_file.close();
     std::cout << "Fin." << std::endl;
 
     return pts;
