@@ -272,7 +272,7 @@ void test_bhtsne(int N, int NDIMS) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", N);
     cudaEventRecord(start);
-    BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()), N, NDIMS, 2, 45.0, 100.0, 2.0, 1000, 1000, 0.0);
+    BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()), N, NDIMS, 2, 45.0, 200.0, 12.0, 1000, 1000, 0.0);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;
@@ -329,7 +329,7 @@ void test_bhtsne_full_mnist(std::string fname) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", num_images);
     cudaEventRecord(start);
-    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_columns*num_rows, 2, 45.0, 200.0, 12.0, 1000, 1000, 0.0);
+    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_columns*num_rows, 2, 150.0, 500.0*24, 1.0, 5000, 1000, 0.0);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;
