@@ -40,6 +40,7 @@ Author: Martin Burtscher <burtscher@txstate.edu>
 #include <math.h>
 #include <sys/time.h>
 #include <cuda.h>
+#include <chrono>
 #include "bh_tsne.h"
 
 #ifdef __KEPLER__
@@ -1002,260 +1003,318 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                             float min_g_norm)
 {
 
-    cudaFuncSetCacheConfig(BoundingBoxKernel, cudaFuncCachePreferShared);
-    cudaFuncSetCacheConfig(TreeBuildingKernel, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(ClearKernel1, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(ClearKernel2, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(SummarizationKernel, cudaFuncCachePreferShared);
-    cudaFuncSetCacheConfig(SortKernel, cudaFuncCachePreferL1);
-    #ifdef __KEPLER__
-    cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferEqual);
-    #else
-    cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
-    #endif
-    cudaFuncSetCacheConfig(IntegrationKernel, cudaFuncCachePreferL1);
+    // Setup clock information
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto start_time = std::chrono::high_resolution_clock::now();
+    int times[30]; for (int i = 0; i < 30; i++) times[i] = 0;
 
-    //TODO: Make this an argument
-    const unsigned int K = 1023 < N_POINTS ? 1023 : N_POINTS - 1; 
-    float *knn_distances = new float[N_POINTS*K];
-    memset(knn_distances, 0, N_POINTS * K * sizeof(float));
-    long *knn_indices = new long[N_POINTS*K]; // Allocate memory for the indices on the CPU
+    // Allocate Memory for the KNN problem and do some configuration
+    start_time = std::chrono::high_resolution_clock::now();
+
+        // Setup CUDA configs
+        cudaFuncSetCacheConfig(BoundingBoxKernel, cudaFuncCachePreferShared);
+        cudaFuncSetCacheConfig(TreeBuildingKernel, cudaFuncCachePreferL1);
+        cudaFuncSetCacheConfig(ClearKernel1, cudaFuncCachePreferL1);
+        cudaFuncSetCacheConfig(ClearKernel2, cudaFuncCachePreferL1);
+        cudaFuncSetCacheConfig(SummarizationKernel, cudaFuncCachePreferShared);
+        cudaFuncSetCacheConfig(SortKernel, cudaFuncCachePreferL1);
+        #ifdef __KEPLER__
+        cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferEqual);
+        #else
+        cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
+        #endif
+        cudaFuncSetCacheConfig(IntegrationKernel, cudaFuncCachePreferL1);
+    
+        // Allocate some memory
+        const unsigned int K = 1023 < N_POINTS ? 1023 : N_POINTS - 1; 
+        float *knn_distances = new float[N_POINTS*K];
+        memset(knn_distances, 0, N_POINTS * K * sizeof(float));
+        long *knn_indices = new long[N_POINTS*K]; // Allocate memory for the indices on the CPU
+    
+    end_time = std::chrono::high_resolution_clock::now();
+    times[0] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
 
     // Compute the KNNs and distances
-    Distance::knn(points, knn_indices, knn_distances, N_DIMS, N_POINTS, K);
+    start_time = std::chrono::high_resolution_clock::now();
 
-    // Copy the distances to the GPU
-    thrust::device_vector<float> d_knn_distances(N_POINTS*K);
-    thrust::copy(knn_distances, knn_distances + N_POINTS*K, d_knn_distances.begin());
+        // Do KNN Call
+        Distance::knn(points, knn_indices, knn_distances, N_DIMS, N_POINTS, K);
+        
+    end_time = std::chrono::high_resolution_clock::now();
+    times[1] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
 
-    // printarray<float>(d_knn_distances, N_POINTS, K);
+    // Copy the distances to the GPU and compute Pij
+    start_time = start_time = std::chrono::high_resolution_clock::now();
 
-    // Normalize the knn distances - this may not be necessary
-    // TODO: Need to filter out zeros from distances
-    // TODO: Some point is fucked up
-    // TODO: nprobe / nlist issue? Check if there are -1s floating around...
-    Math::max_norm(d_knn_distances); // Here, the extra 0s floating around won't matter
+        // Allocate device distance memory
+        thrust::device_vector<float> d_knn_distances(N_POINTS*K);
+        thrust::copy(knn_distances, knn_distances + N_POINTS*K, d_knn_distances.begin());
+        Math::max_norm(d_knn_distances); // Here, the extra 0s floating around won't matter
+        thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, perplexity, 1e-4, N_POINTS, K);
 
-    // printarray<float>(d_knn_distances, N_POINTS, K);
-    
-    // Compute the pij of the KNN distribution
+        // Clean up distance memory
+        d_knn_distances.clear();
+        d_knn_distances.shrink_to_fit();
 
-    //TODO: Make these arguments
-    thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, perplexity, 1e-4, N_POINTS, K);
+        // Copy the distances back to the GPU
+        thrust::device_vector<long> d_knn_indices_long(N_POINTS*K);
+        thrust::device_vector<int> d_knn_indices(N_POINTS*K);
+        thrust::copy(knn_indices, knn_indices + N_POINTS*K, d_knn_indices_long.begin());
 
-    // thrust::device_vector<float> sigmas(N_POINTS, 0.3);
-    // thrust::device_vector<float> d_pij(N_POINTS*K);
-    // compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
+        // Post-process the floating point matrix
+        const int NBLOCKS_PP = iDivUp(N_POINTS*K, 128);
+        postprocess_matrix<<< NBLOCKS_PP, 128 >>>(thrust::raw_pointer_cast(d_pij.data()), 
+                                                thrust::raw_pointer_cast(d_knn_indices_long.data()), 
+                                                thrust::raw_pointer_cast(d_knn_indices.data()),  N_POINTS, K);
+        cudaDeviceSynchronize();
 
-    // std::cout << std::endl;
-    // printarray<float>(d_pij, N_POINTS, K);
+        // Clean up extra memory
+        d_knn_indices_long.clear();
+        d_knn_indices_long.shrink_to_fit();
+        delete[] knn_distances;
+        delete[] knn_indices;
 
-    // Clean up the d_knn_distances matrix
-    d_knn_distances.clear();
-    d_knn_distances.shrink_to_fit();
-    
-    // Allocate memory for the indices
-    thrust::device_vector<long> d_knn_indices_long(N_POINTS*K);
-    thrust::device_vector<int> d_knn_indices(N_POINTS*K);
-    thrust::copy(knn_indices, knn_indices + N_POINTS*K, d_knn_indices_long.begin());
+    end_time = std::chrono::high_resolution_clock::now();
+    times[2] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
 
-    // std::cout << std::endl;
-    // printarray<long>(d_knn_indices_long, N_POINTS, K);
+    // Symmetrize the Pij matrix
+    start_time = start_time = std::chrono::high_resolution_clock::now();
 
-    // Post-process the pij matrix-indives to remove zero elements/check for -1 elements
-    const int NBLOCKS_PP = iDivUp(N_POINTS*K, 128);
-    postprocess_matrix<<< NBLOCKS_PP, 128 >>>(thrust::raw_pointer_cast(d_pij.data()), 
-                                              thrust::raw_pointer_cast(d_knn_indices_long.data()), 
-                                              thrust::raw_pointer_cast(d_knn_indices.data()),  N_POINTS, K);
-    cudaDeviceSynchronize();
+        // Construct sparse matrix descriptor
+        cusparseMatDescr_t descr;
+        cusparseCreateMatDescr(&descr);
+        cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
+        cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ZERO);
 
-    // Clean up extra memory
-    d_knn_indices_long.clear();
-    d_knn_indices_long.shrink_to_fit();
-    delete[] knn_distances;
-    delete[] knn_indices;
+        // Compute the symmetrized matrix
+        thrust::device_vector<float> sparsePij; // Device
+        thrust::device_vector<int> pijRowPtr; // Device
+        thrust::device_vector<int> pijColInd; // Device
+        int sym_nnz;
+        Sparse::sym_mat_gpu(d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K);
 
-    // Normalize the pij matrix, we do this after post-processing to avoid issues
-    // in the distribution caused by exponentiation.
-    // normalize_pij(dense_handle, d_pij, N_POINTS, K);
+        // Clear some old memory
+        d_knn_indices.clear();
+        d_knn_indices.shrink_to_fit();
+        d_pij.clear();
+        d_pij.shrink_to_fit(); 
 
-    // Construct some additional descriptors for sparse matrix multiplication (for the symmetrization)
-    cusparseMatDescr_t descr;
-    cusparseCreateMatDescr(&descr);
-    cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ZERO);
-
-    // Symmetrize d_pij
-    thrust::device_vector<float> sparsePij; // Device
-    thrust::device_vector<int> pijRowPtr; // Device
-    thrust::device_vector<int> pijColInd; // Device
-    int sym_nnz;
-    Sparse::sym_mat_gpu(d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K);
-
-    // Clear some old memory
-    d_knn_indices.clear();
-    d_knn_indices.shrink_to_fit();
-    d_pij.clear();
-    d_pij.shrink_to_fit();  
-
-    cudaDeviceProp deviceProp;
-    cudaGetDeviceProperties(&deviceProp, 0);
-    if (deviceProp.warpSize != WARPSIZE) {
-      fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
-      exit(-1);
-    }
-
-    int blocks = deviceProp.multiProcessorCount;
-
-    int nnodes = N_POINTS * 2;
-    if (nnodes < 1024*blocks) nnodes = 1024*blocks;
-    while ((nnodes & (WARPSIZE-1)) != 0) nnodes++;
-    nnodes--;
-
-    thrust::device_vector<float> forceProd(sparsePij.size());
-    // thrust::device_vector<float> pts = Random::random_vector((nnodes + 1) * 2); //TODO: Rename this function
-
-    std::default_random_engine generator;
-    std::normal_distribution<double> distribution1(-10.0, 1.0);
-    thrust::host_vector<float> h_pts((nnodes + 1) * 2);
-    for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = distribution1(generator);
-    thrust::device_vector<float> pts((nnodes + 1) * 2);
-    thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
-    
+    end_time = std::chrono::high_resolution_clock::now();
+    times[3] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
 
 
-    thrust::device_vector<float> rep_forces((nnodes + 1) * 2, 0);
-    thrust::device_vector<float> attr_forces(N_POINTS * 2, 0);
-    thrust::device_vector<float> old_forces(N_POINTS * 2, 0); // for momentum
+    // Do setup for Barnes-Hut computation
+    start_time = start_time = std::chrono::high_resolution_clock::now();
 
-    thrust::device_vector<int> errl(1);
-    thrust::device_vector<int> startl(nnodes + 1);
-    thrust::device_vector<int> childl((nnodes + 1) * 4);
-    thrust::device_vector<float> massl(nnodes + 1, 1.0); // TODO: probably don't need massl
-    thrust::device_vector<int> countl(nnodes + 1);
-    thrust::device_vector<int> sortl(nnodes + 1);
-    thrust::device_vector<float> norml(nnodes + 1);
+        // Compute the CUDA device properties
+        cudaDeviceProp deviceProp;
+        cudaGetDeviceProperties(&deviceProp, 0);
+        if (deviceProp.warpSize != WARPSIZE) {
+        fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
+        exit(-1);
+        }
+        int blocks = deviceProp.multiProcessorCount;
 
-    thrust::device_vector<float> maxxl(blocks * FACTOR1);
-    thrust::device_vector<float> maxyl(blocks * FACTOR1);
-    thrust::device_vector<float> minxl(blocks * FACTOR1);
-    thrust::device_vector<float> minyl(blocks * FACTOR1);
-    
-    thrust::device_vector<float> ones(N_POINTS * 2, 1); // This is for reduce summing, etc.
+        // Figure out the number of nodes needed for the BH tree
+        int nnodes = N_POINTS * 2;
+        if (nnodes < 1024*blocks) nnodes = 1024*blocks;
+        while ((nnodes & (WARPSIZE-1)) != 0) nnodes++;
+        nnodes--;
 
-    float eta = learning_rate * early_ex;
-    float momentum = 0.1f;
-    float norm;
-    
-    // These variables currently govern the tolerance (whether it recurses on a cell)
-    float theta = 0.5f;
-    float epssq = 0.05 * 0.05;
-    // float itolsq = 1.0f / (0.5 * 0.5);
+        // Allocate memory for the barnes hut implementations
+        thrust::device_vector<float> forceProd(sparsePij.size());
+        thrust::device_vector<float> rep_forces((nnodes + 1) * 2, 0);
+        thrust::device_vector<float> attr_forces(N_POINTS * 2, 0);
+        thrust::device_vector<float> old_forces(N_POINTS * 2, 0); // for momentum
+        thrust::device_vector<int> errl(1);
+        thrust::device_vector<int> startl(nnodes + 1);
+        thrust::device_vector<int> childl((nnodes + 1) * 4);
+        thrust::device_vector<float> massl(nnodes + 1, 1.0); // TODO: probably don't need massl
+        thrust::device_vector<int> countl(nnodes + 1);
+        thrust::device_vector<int> sortl(nnodes + 1);
+        thrust::device_vector<float> norml(nnodes + 1);
+        thrust::device_vector<float> maxxl(blocks * FACTOR1);
+        thrust::device_vector<float> maxyl(blocks * FACTOR1);
+        thrust::device_vector<float> minxl(blocks * FACTOR1);
+        thrust::device_vector<float> minyl(blocks * FACTOR1);
+        thrust::device_vector<float> ones(N_POINTS * 2, 1); // This is for reduce summing, etc.
 
-    InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
-    gpuErrchk(cudaDeviceSynchronize());
-    
+        // Initialize the points with a gaussian
+        std::default_random_engine generator;
+        std::normal_distribution<double> distribution1(-10.0, 1.0);
+        thrust::host_vector<float> h_pts((nnodes + 1) * 2);
+        for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = distribution1(generator);
+        thrust::device_vector<float> pts((nnodes + 1) * 2);
+        thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
+
+        // Initialize the learning rates and momentums
+        float eta = learning_rate * early_ex;
+        float momentum = 0.1f;
+        float norm;
+        
+        // These variables currently govern the tolerance (whether it recurses on a cell)
+        float theta = 0.5f;
+        float epssq = 0.05 * 0.05;
+
+        // Initialize the GPU tree memory
+        InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
+        gpuErrchk(cudaDeviceSynchronize());
+
+    end_time = std::chrono::high_resolution_clock::now();
+    times[4] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+
+    // Dump file
     std::ofstream dump_file;
     dump_file.open("dump_ys.txt");
     float host_ys[(nnodes + 1) * 2];
     dump_file << N_POINTS << " " << 2 << std::endl;
-    
+
+    // Enter the barnes hut loop
     for (int step = 0; step < n_iter; step++) {
-        thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
-        
-        // Repulsive force with Barnes Hut
-        BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
-                                                          N_POINTS, 
-                                                          thrust::raw_pointer_cast(startl.data()), 
-                                                          thrust::raw_pointer_cast(childl.data()), 
-                                                          thrust::raw_pointer_cast(massl.data()), 
-                                                          thrust::raw_pointer_cast(pts.data()), 
-                                                          thrust::raw_pointer_cast(pts.data() + nnodes + 1), 
-                                                          thrust::raw_pointer_cast(maxxl.data()), 
-                                                          thrust::raw_pointer_cast(maxyl.data()), 
-                                                          thrust::raw_pointer_cast(minxl.data()), 
-                                                          thrust::raw_pointer_cast(minyl.data()));
 
-        gpuErrchk(cudaDeviceSynchronize());
+        // Do Force Reset
+        start_time = start_time = std::chrono::high_resolution_clock::now();
 
-        ClearKernel1<<<blocks * 1, 1024>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(childl.data()));
-        TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
-                                                                             thrust::raw_pointer_cast(childl.data()), 
-                                                                             thrust::raw_pointer_cast(pts.data()), 
-                                                                             thrust::raw_pointer_cast(pts.data() + nnodes + 1));
-        ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
-        gpuErrchk(cudaDeviceSynchronize());
-        
-        SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(countl.data()), 
-                                                                                      thrust::raw_pointer_cast(childl.data()), 
-                                                                                      thrust::raw_pointer_cast(massl.data()),
-                                                                                      thrust::raw_pointer_cast(pts.data()),
-                                                                                      thrust::raw_pointer_cast(pts.data() + nnodes + 1));
-        gpuErrchk(cudaDeviceSynchronize());
-        
-        SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(sortl.data()), 
-                                                                     thrust::raw_pointer_cast(countl.data()), 
-                                                                     thrust::raw_pointer_cast(startl.data()), 
-                                                                     thrust::raw_pointer_cast(childl.data()));
-        gpuErrchk(cudaDeviceSynchronize());
-        
-        ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
-                                                                    theta, epssq,
-                                                                    thrust::raw_pointer_cast(sortl.data()), 
-                                                                    thrust::raw_pointer_cast(childl.data()), 
-                                                                    thrust::raw_pointer_cast(massl.data()), 
-                                                                    thrust::raw_pointer_cast(pts.data()),
-                                                                    thrust::raw_pointer_cast(pts.data() + nnodes + 1),
-                                                                    thrust::raw_pointer_cast(rep_forces.data()),
-                                                                    thrust::raw_pointer_cast(rep_forces.data() + nnodes + 1),
-                                                                    thrust::raw_pointer_cast(norml.data()));
-        gpuErrchk(cudaDeviceSynchronize());
+            thrust::fill(attr_forces.begin(), attr_forces.end(), 0);
+            thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
 
-        // compute attractive forces
-        computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones);
-        gpuErrchk(cudaDeviceSynchronize());
+        end_time = std::chrono::high_resolution_clock::now();
+        times[5] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
         
-        norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
-        if (step % 10 == 0)
-            std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
-      
-        IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(N_POINTS, nnodes, eta, norm, momentum, 
-                                                                    thrust::raw_pointer_cast(pts.data()),
-                                                                    thrust::raw_pointer_cast(attr_forces.data()),
-                                                                    thrust::raw_pointer_cast(rep_forces.data()),
-                                                                    thrust::raw_pointer_cast(old_forces.data()));
 
+         // Bounding box kernel
+         start_time = start_time = std::chrono::high_resolution_clock::now();
 
-        if (step == 750) {eta /= early_ex; momentum = 0.8;}
-        // std::cout << "ATTR FORCES:" << std::endl;
-        // for (int i = 0; i < 128; i++) {
-            // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
-        // }
-        // std::cout << std::endl;
-        // std::cout << "REP FORCES:" << std::endl;
-        // for (int i = 0; i < N_POINTS; i++) {
-            // std::cout << rep_forces[i] / norm << ", " << rep_forces[i + nnodes + 1] / norm << std::endl;
-        // }
-        // Add resulting force vector to positions w/ normalization, mul by 4 and learning rate
-        // thrust::transform(rep_forces.begin(), rep_forces.begin() + N_POINTS, attr_forces.begin(), attr_forces.begin(), saxpy_functor(1 / norm));
-        // thrust::transform(rep_forces.begin() + nnodes + 1, rep_forces.begin() + nnodes + 1 + N_POINTS, attr_forces.begin() + N_POINTS, attr_forces.begin() + N_POINTS, saxpy_functor(1 / norm));
+            BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
+                                                            N_POINTS, 
+                                                            thrust::raw_pointer_cast(startl.data()), 
+                                                            thrust::raw_pointer_cast(childl.data()), 
+                                                            thrust::raw_pointer_cast(massl.data()), 
+                                                            thrust::raw_pointer_cast(pts.data()), 
+                                                            thrust::raw_pointer_cast(pts.data() + nnodes + 1), 
+                                                            thrust::raw_pointer_cast(maxxl.data()), 
+                                                            thrust::raw_pointer_cast(maxyl.data()), 
+                                                            thrust::raw_pointer_cast(minxl.data()), 
+                                                            thrust::raw_pointer_cast(minyl.data()));
 
-        // thrust::transform(attr_forces.begin(), attr_forces.begin() + N_POINTS, pts.begin(), pts.begin(), saxpy_functor(-eta * 4.0f));
-        // thrust::transform(attr_forces.begin() + N_POINTS, attr_forces.end(), pts.begin() + nnodes + 1, pts.begin() + nnodes + 1, saxpy_functor(-eta * 4.0f));
-        // for (int i = 0; i < N_POINTS; i++) {
-            // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
-        // }
+            gpuErrchk(cudaDeviceSynchronize());
+
+        end_time = std::chrono::high_resolution_clock::now();
+        times[6] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+
+        // Tree Building
+        start_time = start_time = std::chrono::high_resolution_clock::now();
+
+            ClearKernel1<<<blocks * 1, 1024>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(childl.data()));
+            TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
+                                                                                thrust::raw_pointer_cast(childl.data()), 
+                                                                                thrust::raw_pointer_cast(pts.data()), 
+                                                                                thrust::raw_pointer_cast(pts.data() + nnodes + 1));
+            ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
+            gpuErrchk(cudaDeviceSynchronize());
+
+        end_time = std::chrono::high_resolution_clock::now();
+        times[7] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+
+        // Tree Summarization
+        start_time = start_time = std::chrono::high_resolution_clock::now();
         
+            SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(countl.data()), 
+                                                                                        thrust::raw_pointer_cast(childl.data()), 
+                                                                                        thrust::raw_pointer_cast(massl.data()),
+                                                                                        thrust::raw_pointer_cast(pts.data()),
+                                                                                        thrust::raw_pointer_cast(pts.data() + nnodes + 1));
+            gpuErrchk(cudaDeviceSynchronize());
+
+        end_time = std::chrono::high_resolution_clock::now();
+        times[8] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+
+        // Force sorting
+        start_time = start_time = std::chrono::high_resolution_clock::now();
+        
+            SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(sortl.data()), 
+                                                                        thrust::raw_pointer_cast(countl.data()), 
+                                                                        thrust::raw_pointer_cast(startl.data()), 
+                                                                        thrust::raw_pointer_cast(childl.data()));
+            gpuErrchk(cudaDeviceSynchronize());
+
+        end_time = std::chrono::high_resolution_clock::now();
+        times[9] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+
+        // Repulsive force calculation
+        start_time = start_time = std::chrono::high_resolution_clock::now();
+        
+            ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
+                                                                        theta, epssq,
+                                                                        thrust::raw_pointer_cast(sortl.data()), 
+                                                                        thrust::raw_pointer_cast(childl.data()), 
+                                                                        thrust::raw_pointer_cast(massl.data()), 
+                                                                        thrust::raw_pointer_cast(pts.data()),
+                                                                        thrust::raw_pointer_cast(pts.data() + nnodes + 1),
+                                                                        thrust::raw_pointer_cast(rep_forces.data()),
+                                                                        thrust::raw_pointer_cast(rep_forces.data() + nnodes + 1),
+                                                                        thrust::raw_pointer_cast(norml.data()));
+            gpuErrchk(cudaDeviceSynchronize());
+
+        end_time = std::chrono::high_resolution_clock::now();
+        times[10] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+
+        // Attractive Force Computation
+        start_time = start_time = std::chrono::high_resolution_clock::now();
+
+            // compute attractive forces
+            computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones);
+            gpuErrchk(cudaDeviceSynchronize());
+
+        end_time = std::chrono::high_resolution_clock::now();
+        times[11] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+
+        // Move the particles
+        start_time = start_time = std::chrono::high_resolution_clock::now();
+        
+            norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
+            if (step % 10 == 0)
+                std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
+        
+            IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(N_POINTS, nnodes, eta, norm, momentum, 
+                                                                        thrust::raw_pointer_cast(pts.data()),
+                                                                        thrust::raw_pointer_cast(attr_forces.data()),
+                                                                        thrust::raw_pointer_cast(rep_forces.data()),
+                                                                        thrust::raw_pointer_cast(old_forces.data()));
+
+        end_time = std::chrono::high_resolution_clock::now();
+        times[12] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+
         thrust::copy(pts.begin(), pts.end(), host_ys);
         for (int i = 0; i < N_POINTS; i++) {
             dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
         }
-        // exit(1);
-        // Done (check progress, etc.)
-        // if (step >= 20)
-            // exit(1);
+
+        if (step == 750) {eta /= early_ex; momentum = 0.8;}
     }
+
     dump_file.close();
+
+    int p1_time = times[0] + times[1] + times[2] + times[3];
+    int p2_time = times[4] + times[5] + times[6] + times[7] + times[8] + times[9] + times[10] + times[11] + times[12];
+    std::cout << "Timing data: " << std::endl;
+    std::cout << "\t Phase 1 (" << p1_time  << "ms):" << std::endl;
+    std::cout << "\t\tKernel Setup: " << times[0] << "ms" << std::endl;
+    std::cout << "\t\tKNN Computation: " << times[1] << "ms" << std::endl;
+    std::cout << "\t\tPIJ Computation: " << times[2] << "ms" << std::endl;
+    std::cout << "\t\tPIJ Symmetrization: " << times[3] << "ms" << std::endl;
+    std::cout << "\t Phase 2 (" << p2_time << "ms):" << std::endl;
+    std::cout << "\t\tKernel Setup: " << times[4] << "ms" << std::endl;
+    std::cout << "\t\tForce Reset: " << times[5] << "ms" << std::endl;
+    std::cout << "\t\tBounding Box: " << times[6] << "ms" << std::endl;
+    std::cout << "\t\tTree Building: " << times[7] << "ms" << std::endl;
+    std::cout << "\t\tTree Summarization: " << times[8] << "ms" << std::endl;
+    std::cout << "\t\tSorting: " << times[9] << "ms" << std::endl;
+    std::cout << "\t\tRepulsive Force Calculation: " << times[10] << "ms" << std::endl;
+    std::cout << "\t\tAttractive Force Calculation: " << times[11] << "ms" << std::endl;
+    std::cout << "\t\tIntegration: " << times[12] << "ms" << std::endl;
+    std::cout << "Total Time: " << p1_time + p2_time << "ms" << std::endl << std::endl;
+
     std::cout << "Fin." << std::endl;
 
     return pts;
