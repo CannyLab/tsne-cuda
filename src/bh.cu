@@ -1146,12 +1146,27 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     float epssq = 0.05 * 0.05;
     // float itolsq = 1.0f / (0.5 * 0.5);
 
+    bool send_zmq = true;
+
+
     std::cout << "Initializing Connection...." << std::endl;
     zmq::context_t context(1);
     zmq::socket_t publisher(context, ZMQ_REQ);
-    std::cout << "Waiting for connection to visualization...." << std::endl;
+    publisher.setsockopt(ZMQ_RCVTIMEO, 10000);
+    publisher.setsockopt(ZMQ_SNDTIMEO, 10000);
+    std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
     publisher.connect("tcp://localhost:5556");
-    std::cout << "Visualization connected!" << std::endl;
+
+
+    send_zmq = publisher.send("Hello", 5);
+    zmq::message_t request;
+    send_zmq = publisher.recv (&request);
+
+    if (send_zmq) {
+      std::cout << "Visualization connected!" << std::endl;
+    } else {
+      std::cout << "No Visualization Terminal, continuing..." << std::endl;
+    }
 
     InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
     gpuErrchk(cudaDeviceSynchronize());
@@ -1241,19 +1256,26 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         // for (int i = 0; i < N_POINTS; i++) {
             // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
         // }
-        
-        
-        zmq::message_t message(sizeof(float)*N_POINTS*2);
-        thrust::copy(pts.begin(), pts.begin()+N_POINTS, static_cast<float*>(message.data()));
-        thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+N_POINTS, static_cast<float*>(message.data())+N_POINTS);
-        publisher.send(message);
+
+        if (send_zmq) {
+          zmq::message_t message(sizeof(float)*N_POINTS*2);
+          thrust::copy(pts.begin(), pts.begin()+N_POINTS, static_cast<float*>(message.data()));
+          thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+N_POINTS, static_cast<float*>(message.data())+N_POINTS);
+          bool res = false;
+          res = publisher.send(message);
+          zmq::message_t request;
+          res = publisher.recv(&request);
+          if (!res) {
+            std::cout << "Server Disconnected, Not sending anymore for this session." << std::endl;
+          }
+          send_zmq = res;
+        } 
+
         // exit(1);
         // Done (check progress, etc.)
         // if (step >= 20)
             // exit(1);
 
-        zmq::message_t request;
-        publisher.recv (&request);
     }
     std::cout << "Fin." << std::endl;
 
