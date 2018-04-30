@@ -14,7 +14,6 @@ min_particle = -1*float("inf")
 max_particle =float("inf")
 n_timesteps = 0
 
-
 with open('../build/dump_ys.txt') as f:
     lines = f.readlines()
     n_particles = int(lines[0].split()[0])
