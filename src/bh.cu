@@ -734,7 +734,7 @@ void computePijxQij(int N,
                     volatile float * __restrict pts)
 {
     register int TID, i, j, start, end;
-    register float ix, iy, jx, jy, dx, dy, tmp;
+    register float ix, iy, jx, jy, dx, dy;
     TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= nnz) return;
     start = 0; end = N + 1;
@@ -743,14 +743,8 @@ void computePijxQij(int N,
       j = pijRowPtr[i];
       end = (j <= TID) ? end : i;
       start = (j > TID) ? start : i;
-      // if (j > TID)
-          // end = i;
-      // else
-          // start = i;
       i = (start + end) >> 1;
     }
-    // if (!(pijRowPtr[i] <= TID && pijRowPtr[i + 1] > TID))
-        // printf("something's wrong!\n");
     
     j = pijColInd[TID];
     
@@ -758,9 +752,58 @@ void computePijxQij(int N,
     jx = pts[j]; jy = pts[nnodes + 1 + j];
     dx = ix - jx;
     dy = iy - jy;
-    tmp = (1 + dx*dx + dy*dy);
-    forceProd[TID] = pij[TID] / tmp;
+    forceProd[TID] = pij[TID] * 1 / (1 + dx*dx + dy*dy);
 }
+
+__global__
+void computePijxQij_alt(int N, int nnz, int nnodes, float *pij, int *pijRowPtr,int *pijColInd, float *forceProd,float *pts) {
+
+
+    register int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= N) return;
+    register int* end_val = pijColInd + pijRowPtr[i+1];
+    register int* j = pijColInd + pijRowPtr[i];
+    register int np1 = nnodes + 1;
+    register float* current_val = pij + pijRowPtr[i];
+    register float* current_force_prod = forceProd + pijRowPtr[i];
+    register float ix = pts[i]; register float iy = pts[np1 + i]; // This is the position of point i    
+    while (j != end_val) {
+        // Compute the pij (i) is sorted. (j) needs work
+        int jpt = *j;
+        float dx = ix - pts[jpt];
+        float dy = iy - pts[np1 + jpt];
+        (*current_force_prod) = (*current_val) * (1 / (1 + dx*dx + dy*dy));
+
+        current_val++;
+        current_force_prod++;
+        j++;
+    }
+}
+
+__global__
+void cpqs1(int N, int nnodes, int *pijRowPtr,int *pijColInd, int* indices) {
+    register int TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID >= N) return;
+    register int ev = pijRowPtr[TID+1];
+    // Fill the indices array with the info we need
+    for (int i = pijRowPtr[TID]; i < ev; i++) {
+        indices[2*i] = TID;
+        indices[2*i+1] = pijColInd[i];
+    }
+}
+__global__
+void cpqs2(int N, int nnz, int nnodes, int *indices, float* pij, float *forceProd,float *pts) {
+    register int TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID >= nnz) return;
+    int i = indices[TID];
+    int j = indices[TID+1];
+    // Compute the force
+    float dx = pts[i] - pts[j];
+    float dy = pts[i+nnodes+1] - pts[j+nnodes+1];
+    forceProd[TID] = pij[TID] * (1 / (1 + dx*dx + dy*dy));
+}
+
+float pijattrtimes[2];
 
 // computes unnormalized attractive forces
 void computeAttrForce(int N,
@@ -774,8 +817,13 @@ void computeAttrForce(int N,
                         thrust::device_vector<float> &forceProd, // NxL matrix
                         thrust::device_vector<float> &pts,       // (nnodes + 1) x 2 matrix
                         thrust::device_vector<float> &forces,    // N x 2 matrix
-                        thrust::device_vector<float> &ones)      // N x 2 matrix of ones
+                        thrust::device_vector<float> &ones,
+                        thrust::device_vector<int> &indices)      // N x 2 matrix of ones
 {
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    // Version 1
     const int BLOCKSIZE = 128;
     const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
     computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
@@ -785,6 +833,33 @@ void computeAttrForce(int N,
                                             thrust::raw_pointer_cast(forceProd.data()),
                                             thrust::raw_pointer_cast(pts.data()));
     gpuErrchk(cudaDeviceSynchronize());
+
+    // Version 2
+    // std::cout << "Computing pijxqij" << std::endl;
+    // const int BLOCKSIZE = 128;
+    // const int NBLOCKS = iDivUp(N, BLOCKSIZE);
+    // computePijxQij_alt<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
+    //                                         thrust::raw_pointer_cast(sparsePij.data()),
+    //                                         thrust::raw_pointer_cast(pijRowPtr.data()),
+    //                                         thrust::raw_pointer_cast(pijColInd.data()),
+    //                                         thrust::raw_pointer_cast(forceProd.data()),
+    //                                         thrust::raw_pointer_cast(pts.data()));
+    // gpuErrchk(cudaDeviceSynchronize());
+    // std::cout << "Done Computing pijxqij" << std::endl;
+
+    // Version 3
+    // const int BLOCKSIZE = 1024;
+    // const int NBLOCKS = iDivUp(N, BLOCKSIZE);
+    // cpqs2<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
+    //                                     thrust::raw_pointer_cast(indices.data()),
+    //                                     thrust::raw_pointer_cast(sparsePij.data()),
+    //                                     thrust::raw_pointer_cast(forceProd.data()),
+    //                                     thrust::raw_pointer_cast(pts.data()));
+    // gpuErrchk(cudaDeviceSynchronize());
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    pijattrtimes[0] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+
     // compute forces_i = sum_j pij*qij*normalization*yi
     float alpha = 1.0f;
     float beta = 0.0f;
@@ -1007,6 +1082,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     auto end_time = std::chrono::high_resolution_clock::now();
     auto start_time = std::chrono::high_resolution_clock::now();
     int times[30]; for (int i = 0; i < 30; i++) times[i] = 0;
+    pijattrtimes[0] = 0;
+    pijattrtimes[1] = 0;
 
     // Allocate Memory for the KNN problem and do some configuration
     start_time = std::chrono::high_resolution_clock::now();
@@ -1024,6 +1101,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
         #endif
         cudaFuncSetCacheConfig(IntegrationKernel, cudaFuncCachePreferL1);
+        cudaFuncSetCacheConfig(computePijxQij, cudaFuncCachePreferShared);
     
         // Allocate some memory
         const unsigned int K = 1023 < N_POINTS ? 1023 : N_POINTS - 1; 
@@ -1032,7 +1110,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         long *knn_indices = new long[N_POINTS*K]; // Allocate memory for the indices on the CPU
     
     end_time = std::chrono::high_resolution_clock::now();
-    times[0] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+    times[0] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
     // Compute the KNNs and distances
     start_time = std::chrono::high_resolution_clock::now();
@@ -1041,10 +1119,10 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         Distance::knn(points, knn_indices, knn_distances, N_DIMS, N_POINTS, K);
         
     end_time = std::chrono::high_resolution_clock::now();
-    times[1] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+    times[1] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
     // Copy the distances to the GPU and compute Pij
-    start_time = start_time = std::chrono::high_resolution_clock::now();
+    start_time = std::chrono::high_resolution_clock::now();
 
         // Allocate device distance memory
         thrust::device_vector<float> d_knn_distances(N_POINTS*K);
@@ -1075,10 +1153,10 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         delete[] knn_indices;
 
     end_time = std::chrono::high_resolution_clock::now();
-    times[2] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+    times[2] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
     // Symmetrize the Pij matrix
-    start_time = start_time = std::chrono::high_resolution_clock::now();
+    start_time = std::chrono::high_resolution_clock::now();
 
         // Construct sparse matrix descriptor
         cusparseMatDescr_t descr;
@@ -1100,11 +1178,11 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         d_pij.shrink_to_fit(); 
 
     end_time = std::chrono::high_resolution_clock::now();
-    times[3] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+    times[3] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
 
     // Do setup for Barnes-Hut computation
-    start_time = start_time = std::chrono::high_resolution_clock::now();
+    start_time = std::chrono::high_resolution_clock::now();
 
         // Compute the CUDA device properties
         cudaDeviceProp deviceProp;
@@ -1138,6 +1216,16 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         thrust::device_vector<float> minxl(blocks * FACTOR1);
         thrust::device_vector<float> minyl(blocks * FACTOR1);
         thrust::device_vector<float> ones(N_POINTS * 2, 1); // This is for reduce summing, etc.
+        thrust::device_vector<int> indices(sparsePij.size()*2);
+
+        // Compute the indices setup
+        const int SBS = 1024;
+        const int NBS = iDivUp(N_POINTS, SBS);
+        cpqs1<<<NBS, SBS>>>(N_POINTS, nnodes, 
+                                        thrust::raw_pointer_cast(pijRowPtr.data()),
+                                        thrust::raw_pointer_cast(pijColInd.data()),
+                                        thrust::raw_pointer_cast(indices.data()));
+        gpuErrchk(cudaDeviceSynchronize());
 
         // Initialize the points with a gaussian
         std::default_random_engine generator;
@@ -1161,7 +1249,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         gpuErrchk(cudaDeviceSynchronize());
 
     end_time = std::chrono::high_resolution_clock::now();
-    times[4] = std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+    times[4] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
     // Dump file
     std::ofstream dump_file;
@@ -1173,17 +1261,17 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     for (int step = 0; step < n_iter; step++) {
 
         // Do Force Reset
-        start_time = start_time = std::chrono::high_resolution_clock::now();
+        start_time = std::chrono::high_resolution_clock::now();
 
             thrust::fill(attr_forces.begin(), attr_forces.end(), 0);
             thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
 
         end_time = std::chrono::high_resolution_clock::now();
-        times[5] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+        times[5] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
         
 
          // Bounding box kernel
-         start_time = start_time = std::chrono::high_resolution_clock::now();
+         start_time = std::chrono::high_resolution_clock::now();
 
             BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
                                                             N_POINTS, 
@@ -1200,10 +1288,10 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             gpuErrchk(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
-        times[6] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+        times[6] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
         // Tree Building
-        start_time = start_time = std::chrono::high_resolution_clock::now();
+        start_time = std::chrono::high_resolution_clock::now();
 
             ClearKernel1<<<blocks * 1, 1024>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(childl.data()));
             TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
@@ -1214,10 +1302,10 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             gpuErrchk(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
-        times[7] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+        times[7] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
         // Tree Summarization
-        start_time = start_time = std::chrono::high_resolution_clock::now();
+        start_time =  std::chrono::high_resolution_clock::now();
         
             SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(countl.data()), 
                                                                                         thrust::raw_pointer_cast(childl.data()), 
@@ -1227,10 +1315,10 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             gpuErrchk(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
-        times[8] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+        times[8] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
         // Force sorting
-        start_time = start_time = std::chrono::high_resolution_clock::now();
+        start_time = std::chrono::high_resolution_clock::now();
         
             SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(sortl.data()), 
                                                                         thrust::raw_pointer_cast(countl.data()), 
@@ -1239,10 +1327,10 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             gpuErrchk(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
-        times[9] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+        times[9] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
         // Repulsive force calculation
-        start_time = start_time = std::chrono::high_resolution_clock::now();
+        start_time = std::chrono::high_resolution_clock::now();
         
             ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
                                                                         theta, epssq,
@@ -1257,20 +1345,20 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             gpuErrchk(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
-        times[10] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+        times[10] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
         // Attractive Force Computation
-        start_time = start_time = std::chrono::high_resolution_clock::now();
+        start_time = std::chrono::high_resolution_clock::now();
 
             // compute attractive forces
-            computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones);
+            computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
             gpuErrchk(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
-        times[11] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+        times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
         // Move the particles
-        start_time = start_time = std::chrono::high_resolution_clock::now();
+        start_time = std::chrono::high_resolution_clock::now();
         
             norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
             if (step % 10 == 0)
@@ -1281,9 +1369,10 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                                                         thrust::raw_pointer_cast(attr_forces.data()),
                                                                         thrust::raw_pointer_cast(rep_forces.data()),
                                                                         thrust::raw_pointer_cast(old_forces.data()));
+            gpuErrchk(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
-        times[12] += std::chrono::duration_cast<std::chrono::milliseconds>(end_time-start_time).count();
+        times[12] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
         thrust::copy(pts.begin(), pts.end(), host_ys);
         for (int i = 0; i < N_POINTS; i++) {
@@ -1298,22 +1387,24 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     int p1_time = times[0] + times[1] + times[2] + times[3];
     int p2_time = times[4] + times[5] + times[6] + times[7] + times[8] + times[9] + times[10] + times[11] + times[12];
     std::cout << "Timing data: " << std::endl;
-    std::cout << "\t Phase 1 (" << p1_time  << "ms):" << std::endl;
-    std::cout << "\t\tKernel Setup: " << times[0] << "ms" << std::endl;
-    std::cout << "\t\tKNN Computation: " << times[1] << "ms" << std::endl;
-    std::cout << "\t\tPIJ Computation: " << times[2] << "ms" << std::endl;
-    std::cout << "\t\tPIJ Symmetrization: " << times[3] << "ms" << std::endl;
-    std::cout << "\t Phase 2 (" << p2_time << "ms):" << std::endl;
-    std::cout << "\t\tKernel Setup: " << times[4] << "ms" << std::endl;
-    std::cout << "\t\tForce Reset: " << times[5] << "ms" << std::endl;
-    std::cout << "\t\tBounding Box: " << times[6] << "ms" << std::endl;
-    std::cout << "\t\tTree Building: " << times[7] << "ms" << std::endl;
-    std::cout << "\t\tTree Summarization: " << times[8] << "ms" << std::endl;
-    std::cout << "\t\tSorting: " << times[9] << "ms" << std::endl;
-    std::cout << "\t\tRepulsive Force Calculation: " << times[10] << "ms" << std::endl;
-    std::cout << "\t\tAttractive Force Calculation: " << times[11] << "ms" << std::endl;
-    std::cout << "\t\tIntegration: " << times[12] << "ms" << std::endl;
-    std::cout << "Total Time: " << p1_time + p2_time << "ms" << std::endl << std::endl;
+    std::cout << "\t Phase 1 (" << p1_time  << "us):" << std::endl;
+    std::cout << "\t\tKernel Setup: " << times[0] << "us" << std::endl;
+    std::cout << "\t\tKNN Computation: " << times[1] << "us" << std::endl;
+    std::cout << "\t\tPIJ Computation: " << times[2] << "us" << std::endl;
+    std::cout << "\t\tPIJ Symmetrization: " << times[3] << "us" << std::endl;
+    std::cout << "\t Phase 2 (" << p2_time << "us):" << std::endl;
+    std::cout << "\t\tKernel Setup: " << times[4] << "us" << std::endl;
+    std::cout << "\t\tForce Reset: " << times[5] << "us" << std::endl;
+    std::cout << "\t\tBounding Box: " << times[6] << "us" << std::endl;
+    std::cout << "\t\tTree Building: " << times[7] << "us" << std::endl;
+    std::cout << "\t\tTree Summarization: " << times[8] << "us" << std::endl;
+    std::cout << "\t\tSorting: " << times[9] << "us" << std::endl;
+    std::cout << "\t\tRepulsive Force Calculation: " << times[10] << "us" << std::endl;
+    std::cout << "\t\tAttractive Force Calculation: " << times[11] << "us" << std::endl;
+    std::cout << "\t\t\tk1: " << pijattrtimes[0] << "us" << std::endl;
+    std::cout << "\t\t\tk2: " << pijattrtimes[1] << "us" << std::endl;
+    std::cout << "\t\tIntegration: " << times[12] << "us" << std::endl;
+    std::cout << "Total Time: " << p1_time + p2_time << "us" << std::endl << std::endl;
 
     std::cout << "Fin." << std::endl;
 
