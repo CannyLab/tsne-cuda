@@ -167,8 +167,8 @@ void Sparse::sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_ve
 
     // Sum the arrays
     // std::cout << "Symmetrizing..." << std::endl;
-    float alpha = 1.0f / (2.0f * N_POINTS);
-    float beta = 1.0f / (2.0f * N_POINTS);
+    float alpha = 1.0f / (2.0f * K);
+    float beta = 1.0f / (2.0f * K);
     cusparseScsrgeam(handle, N_POINTS, N_POINTS, 
        &alpha, descr, N_POINTS*K, csrValA, csrRowPtrA, csrColPtrA,
         &beta, descr, N_POINTS*K, cscValAT, cscColPtrAT, cscRowIndAT,

@@ -555,7 +555,6 @@ void ForceCalculationKernel(int nnodesd,
                             int nbodiesd, 
                             volatile int * __restrict errd, 
                             float theta, 
-                            float epssqd, // correction for zero distance
                             volatile int * __restrict sortd, 
                             volatile int * __restrict childd, 
                             volatile float * __restrict massd, 
@@ -571,16 +570,11 @@ void ForceCalculationKernel(int nnodesd,
   __shared__ float dq[MAXDEPTH * THREADS5/WARPSIZE];
 
   if (0 == threadIdx.x) {
-    // tmp = radiusd * 2;
     // precompute values that depend only on tree level
-    dq[0] = radiusd * radiusd * theta; 
-    // dq[0] = tmp * tmp * itolsqd;
+    dq[0] = radiusd / theta; 
     for (i = 1; i < maxdepthd; i++) {
-      // dq[i] = dq[i - 1] * 0.5f; // radius is halved with every level of the tree
-        dq[i] = dq[i - 1] * 0.5f;
-        dq[i - 1] += epssqd;
+    	dq[i] = dq[i - 1] * 0.5f; // radius is halved with every level of the tree
     }
-    dq[i - 1] += epssqd;
 
     if (maxdepthd > MAXDEPTH) {
       *errd = maxdepthd;
@@ -632,22 +626,16 @@ void ForceCalculationKernel(int nnodesd,
           if (n >= 0) {
             dx = px - posxd[n];
             dy = py - posyd[n];
-            // tmp = dx*dx + dy*dy; // distance squared
-            tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
-              // if ((n >= nbodiesd) && (tmp < dq[depth])) {
-                    // printf("(%0.2f, %0.2f), (%0.2f, %0.2f), radius: %0.2f, tmp: %0.2f, dq: %0.2f\n, allzero: %d\n, mass: %0.2f\n", px, py, posxd[n], posyd[n], radiusd, tmp, dq[depth], __all(tmp < dq[depth]), massd[n]);
-                // }
-            if ((n < nbodiesd) || __all(tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
-            //   tmp = rsqrtf(tmp);  // compute distance
-              // from sptree.cpp
-              tmp = 1 / (1 + tmp);
-              mult = massd[n] * tmp;
-              // if (n >= nbodiesd)
-                // printf("%0.2f\n", massd[n]);
-              normsum += mult;
-              mult *= tmp;
-              vx += dx * mult;
-              vy += dy * mult;
+            tmp = dx*dx + dy*dy; // distance squared
+            // tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
+            if ((n < nbodiesd) || __all(sqrt(tmp) >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+	              // from sptree.cpp
+	            tmp = 1 / (1 + tmp);
+	            mult = massd[n] * tmp;
+	            normsum += mult;
+	            mult *= tmp;
+	            vx += dx * mult;
+	            vy += dy * mult;
             } else {
               // push cell onto stack
               if (sbase == threadIdx.x) {  // maybe don't push and inc if last child
@@ -667,10 +655,9 @@ void ForceCalculationKernel(int nnodesd,
 
       if (stepd >= 0) {
         // update velocity
-        // TODO: This is probably wrongish and depends on what I do in the attractive force calculation
-        velxd[i] += vx;
-        velyd[i] += vy;
-        normd[i] = normsum;
+        velxd[i] = vx;
+        velyd[i] = vy;
+        normd[i] = normsum - 1; // subtract one to deal with computation on self (mult i, i should be zero not one)
       }
     }
   }
@@ -691,23 +678,38 @@ void IntegrationKernel(int N,
                         volatile float * __restrict pts, // (nnodes + 1) x 2
                         volatile float * __restrict attr_forces, // (N x 2)
                         volatile float * __restrict rep_forces, // (nnodes + 1) x 2
+                        volatile float * __restrict gains,
                         volatile float * __restrict old_forces) // (N x 2)
 {
   register int i, inc;
-  register float tmpx, tmpy;
+  register float dx, dy, ux, uy, gx, gy;
 
   // iterate over all bodies assigned to thread
   // TODO: fix momentum at step 0
   inc = blockDim.x * gridDim.x;
   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
-      tmpx = 4.0f * (attr_forces[i] - (rep_forces[i] / norm));
-      tmpy = 4.0f * (attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm));
-      tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
-      tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
-      pts[i] -= eta * tmpx;
-      pts[i + nnodes + 1] -= eta * tmpy;
-      old_forces[i] = tmpx;
-      old_forces[i + N] = tmpy;
+      dx = 4.0f * (attr_forces[i] - (rep_forces[i] / norm));
+      dy = 4.0f * (attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm));
+      ux = old_forces[i];
+      uy = old_forces[i + N];
+      gx = gains[i];
+      gy = gains[i + N];
+
+      gx = (signbit(dx) != signbit(ux)) ? gx + 0.2 : gx * 0.8 + 0.01;
+      gy = (signbit(dy) != signbit(uy)) ? gy + 0.2 : gy * 0.2 + 0.01;
+      ux = momentum * ux - eta * gx * dx;
+      uy = momentum * uy - eta * gy * dy;
+      pts[i] += -eta * ux;
+      pts[i + nnodes + 1] += -eta * uy;
+
+      attr_forces[i] = 0;
+      attr_forces[i + N] = 0;
+      rep_forces[i] = 0;
+      rep_forces[i + nnodes + 1] = 0;
+      gains[i] = gx;
+      gains[i + N] = gy;
+      old_forces[i] = ux;
+      old_forces[i + N] = uy;
    }
 }
 
@@ -735,23 +737,17 @@ void computePijxQij(int N,
       j = pijRowPtr[i];
       end = (j <= TID) ? end : i;
       start = (j > TID) ? start : i;
-      // if (j > TID)
-          // end = i;
-      // else
-          // start = i;
       i = (start + end) >> 1;
     }
-    // if (!(pijRowPtr[i] <= TID && pijRowPtr[i + 1] > TID))
-        // printf("something's wrong!\n");
     
-    j = pijColInd[TID - i];
+    j = pijColInd[TID];
     
     ix = pts[i]; iy = pts[nnodes + 1 + i];
     jx = pts[j]; jy = pts[nnodes + 1 + j];
     dx = ix - jx;
     dy = iy - jy;
     tmp = (1 + dx*dx + dy*dy);
-    forceProd[TID] = pij[TID] / tmp;
+    forceProd[TID] = (i != j) ? pij[TID] / tmp : 0;
 }
 
 // computes unnormalized attractive forces
@@ -881,6 +877,7 @@ struct func_entropy_kernel {
 struct func_pow2 {
   __host__ __device__ float operator()(const float &x) const { return pow(2,x); }
 };
+
 
 __global__ void upper_lower_assign_bh(float * __restrict__ sigmas,
                                       float * __restrict__ lower_bound,
@@ -1024,24 +1021,12 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     // printarray<float>(d_knn_distances, N_POINTS, K);
 
     // Normalize the knn distances - this may not be necessary
-    // TODO: Need to filter out zeros from distances
-    // TODO: Some point is fucked up
-    // TODO: nprobe / nlist issue? Check if there are -1s floating around...
     Math::max_norm(d_knn_distances); // Here, the extra 0s floating around won't matter
-
-    // printarray<float>(d_knn_distances, N_POINTS, K);
     
     // Compute the pij of the KNN distribution
 
     //TODO: Make these arguments
     thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, perplexity, 1e-4, N_POINTS, K);
-
-    // thrust::device_vector<float> sigmas(N_POINTS, 0.3);
-    // thrust::device_vector<float> d_pij(N_POINTS*K);
-    // compute_pij(dense_handle, d_pij, d_knn_distances, sigmas, N_POINTS, K, N_DIMS);
-
-    // std::cout << std::endl;
-    // printarray<float>(d_pij, N_POINTS, K);
 
     // Clean up the d_knn_distances matrix
     d_knn_distances.clear();
@@ -1051,9 +1036,6 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<long> d_knn_indices_long(N_POINTS*K);
     thrust::device_vector<int> d_knn_indices(N_POINTS*K);
     thrust::copy(knn_indices, knn_indices + N_POINTS*K, d_knn_indices_long.begin());
-
-    // std::cout << std::endl;
-    // printarray<long>(d_knn_indices_long, N_POINTS, K);
 
     // Post-process the pij matrix-indives to remove zero elements/check for -1 elements
     const int NBLOCKS_PP = iDivUp(N_POINTS*K, 128);
@@ -1109,6 +1091,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> pts = Random::random_vector((nnodes + 1) * 2); //TODO: Rename this function
     thrust::device_vector<float> rep_forces((nnodes + 1) * 2, 0);
     thrust::device_vector<float> attr_forces(N_POINTS * 2, 0);
+    thrust::device_vector<float> gains(N_POINTS * 2, 0);
     thrust::device_vector<float> old_forces(N_POINTS * 2, 0); // for momentum
 
     thrust::device_vector<int> errl(1);
@@ -1131,9 +1114,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     float norm;
     
     // These variables currently govern the tolerance (whether it recurses on a cell)
-    float theta = 0.5f;
-    float epssq = 0.05 * 0.05;
-    // float itolsq = 1.0f / (0.5 * 0.5);
+    float theta = 0.0f;//0.5f;
 
     InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
     gpuErrchk(cudaDeviceSynchronize());
@@ -1144,8 +1125,6 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     dump_file << N_POINTS << " " << 2 << std::endl;
     
     for (int step = 0; step < n_iter; step++) {
-        thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
-        
         // Repulsive force with Barnes Hut
         BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
                                                           N_POINTS, 
@@ -1197,100 +1176,32 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         // compute attractive forces
         computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones);
         gpuErrchk(cudaDeviceSynchronize());
-        
+
         norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
+
         if (step % 10 == 0)
             std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
-      
+
         IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(N_POINTS, nnodes, eta, norm, momentum, 
                                                                     thrust::raw_pointer_cast(pts.data()),
                                                                     thrust::raw_pointer_cast(attr_forces.data()),
                                                                     thrust::raw_pointer_cast(rep_forces.data()),
+                                                                    thrust::raw_pointer_cast(gains.data()),
                                                                     thrust::raw_pointer_cast(old_forces.data()));
 
 
         if (step == 250) {eta /= early_ex;}
-        // std::cout << "ATTR FORCES:" << std::endl;
-        // for (int i = 0; i < 128; i++) {
-            // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
-        // }
-        // std::cout << std::endl;
-        // std::cout << "REP FORCES:" << std::endl;
-        // for (int i = 0; i < N_POINTS; i++) {
-            // std::cout << rep_forces[i] / norm << ", " << rep_forces[i + nnodes + 1] / norm << std::endl;
-        // }
-        // Add resulting force vector to positions w/ normalization, mul by 4 and learning rate
-        // thrust::transform(rep_forces.begin(), rep_forces.begin() + N_POINTS, attr_forces.begin(), attr_forces.begin(), saxpy_functor(1 / norm));
-        // thrust::transform(rep_forces.begin() + nnodes + 1, rep_forces.begin() + nnodes + 1 + N_POINTS, attr_forces.begin() + N_POINTS, attr_forces.begin() + N_POINTS, saxpy_functor(1 / norm));
-
-        // thrust::transform(attr_forces.begin(), attr_forces.begin() + N_POINTS, pts.begin(), pts.begin(), saxpy_functor(-eta * 4.0f));
-        // thrust::transform(attr_forces.begin() + N_POINTS, attr_forces.end(), pts.begin() + nnodes + 1, pts.begin() + nnodes + 1, saxpy_functor(-eta * 4.0f));
-        // for (int i = 0; i < N_POINTS; i++) {
-            // std::cout << attr_forces[i] << ", " << attr_forces[i + N_POINTS] << std::endl;
-        // }
         
         thrust::copy(pts.begin(), pts.end(), host_ys);
         for (int i = 0; i < N_POINTS; i++) {
             dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
         }
-        // exit(1);
-        // Done (check progress, etc.)
-        // if (step >= 20)
-            // exit(1);
     }
     dump_file.close();
     std::cout << "Fin." << std::endl;
 
     return pts;
 }
-
-/******************************************************************************/
-
-// static void CudaTest(const char *msg)
-// {
-//   cudaError_t e;
-
-//   cudaThreadSynchronize();
-//   if (cudaSuccess != (e = cudaGetLastError())) {
-//     fprintf(stderr, "%s: %d\n", msg, e);
-//     fprintf(stderr, "%s\n", cudaGetErrorString(e));
-//     exit(-1);
-//   }
-// }
-
-
-/******************************************************************************/
-
-// random number generator
-
-#define MULT 1103515245
-#define ADD 12345
-#define MASK 0x7FFFFFFF
-#define TWOTO31 2147483648.0
-
-// static int A = 1;
-// static int B = 0;
-// static int randx = 1;
-// static int lastrand;
-
-
-// static void drndset(int seed)
-// {
-//    A = 1;
-//    B = 0;
-//    randx = (A * seed + B) & MASK;
-//    A = (MULT * A) & MASK;
-//    B = (MULT * B + ADD) & MASK;
-// }
-
-
-// static double drnd()
-// {
-//    lastrand = randx;
-//    randx = (A * randx + B) & MASK;
-//    return (double)lastrand / TWOTO31;
-// }
-
 
 /******************************************************************************/
 
