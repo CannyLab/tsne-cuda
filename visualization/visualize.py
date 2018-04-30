@@ -11,8 +11,6 @@ dims = None
 min_particle = -1*float("inf")
 max_particle =float("inf")
 
-
-
 with open('../build/dump_ys.txt') as f:
     line = f.readline().split()
     n_particles = int(line[0])

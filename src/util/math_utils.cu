@@ -165,10 +165,23 @@ void Sparse::sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_ve
     // cudaMalloc((void**) sym_colind, sizeof(int)*nnzC);
     // cudaMalloc((void**) sym_values, sizeof(float)*nnzC);
 
+    // Basically, we want to compute the average sparsity of the indices
+    thrust::device_vector<int> sparsity(N_POINTS);
+    thrust::transform(sym_rowptr.begin()+1, sym_rowptr.end(),sym_rowptr.begin(), sparsity.begin(), thrust::minus<int>());
+    int sum = thrust::reduce(sparsity.begin(), sparsity.end(), 0, thrust::plus<int>());
+    int maxs = thrust::reduce(sparsity.begin(), sparsity.end(), 0, thrust::maximum<int>());
+    int mins = thrust::reduce(sparsity.begin(), sparsity.end(), N_POINTS, thrust::minimum<int>());
+
+    std::cout << "Average Sparsity: " << ((float)sum/N_POINTS) << std::endl;
+    std::cout << "Maximum Sparsity: " << maxs << std::endl;
+    std::cout << "Minimum Sparsity: " << mins << std::endl;
+    std::cout << "N_POINTS: " << N_POINTS << std::endl;
+    std::cout << "K: " << K << std::endl;
+
     // Sum the arrays
     // std::cout << "Symmetrizing..." << std::endl;
-    float alpha = 1.0f / (2.0f * K);
-    float beta = 1.0f / (2.0f * K);
+    float alpha = 1.0f / (2.0f * 5 * (maxs));
+    float beta = 1.0f / (2.0f * 5 * (maxs));
     cusparseScsrgeam(handle, N_POINTS, N_POINTS, 
        &alpha, descr, N_POINTS*K, csrValA, csrRowPtrA, csrColPtrA,
         &beta, descr, N_POINTS*K, cscValAT, cscColPtrAT, cscRowIndAT,
