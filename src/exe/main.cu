@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
         printf("Starting TSNE calculation with %u points.\n", num_images);
         BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_columns*num_rows,
                         2, FOPT(perplexity), FOPT(learning-rate), FOPT(early-ex), IOPT(num-steps),IOPT(num-steps), 0.0,
-                        BOPT(dump), BOPT(viz), FOPT(magnitude-factor), init_type, IOPT(nearest-neighbors), SOPT(connection)  );
+                        BOPT(dump), BOPT(viz), FOPT(magnitude-factor), init_type, IOPT(nearest-neighbors), SOPT(connection), nullptr  );
 
         // Clean up the data
         delete[] data;
@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
         printf("Starting TSNE calculation with %u points.\n", num_images);
         BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_channels*num_columns*num_rows,
                         2, FOPT(perplexity), FOPT(learning-rate), FOPT(early-ex), IOPT(num-steps),IOPT(num-steps), 0.0,
-                        BOPT(dump), BOPT(viz), FOPT(magnitude-factor), init_type, IOPT(nearest-neighbors), SOPT(connection) );
+                        BOPT(dump), BOPT(viz), FOPT(magnitude-factor), init_type, IOPT(nearest-neighbors), SOPT(connection), nullptr );
 
         // Clean up the data
         delete[] data;
@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
         printf("Starting TSNE calculation with %u points.\n", num_images);
         BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_channels*num_columns*num_rows,
                         2, FOPT(perplexity), FOPT(learning-rate), FOPT(early-ex), IOPT(num-steps),IOPT(num-steps), 0.0,
-                        BOPT(dump), BOPT(viz), FOPT(magnitude-factor), init_type, IOPT(nearest-neighbors), SOPT(connection) );
+                        BOPT(dump), BOPT(viz), FOPT(magnitude-factor), init_type, IOPT(nearest-neighbors), SOPT(connection), nullptr );
         
         // Clean up the data
         delete[] data;
@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
         printf("Starting TSNE calculation with %u points.\n",  IOPT(num-points));
         BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()),  IOPT(num-points), 50,
                         2, FOPT(perplexity), FOPT(learning-rate), FOPT(early-ex), IOPT(num-steps),IOPT(num-steps), 0.0,
-                        BOPT(dump), BOPT(viz), FOPT(magnitude-factor), init_type, IOPT(nearest-neighbors), SOPT(connection) );
+                        BOPT(dump), BOPT(viz), FOPT(magnitude-factor), init_type, IOPT(nearest-neighbors), SOPT(connection), nullptr );
 
 
     } else {

@@ -1096,7 +1096,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                           float magnitude_factor,
                                           int init_type,
                                           int NN,
-                                          std::string viz_server)
+                                          std::string viz_server,
+                                          float* preinit_data)
 {
 
     // Setup clock information
@@ -1249,13 +1250,19 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         // Initialize the points with a gaussian
         thrust::device_vector<float> pts((nnodes + 1) * 2);
         if (init_type == 0) {
-          pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
+            pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
+        } else if (init_type == 1) {
+            std::default_random_engine generator;
+            std::normal_distribution<double> distribution1(-10.0, 1.0);
+            thrust::host_vector<float> h_pts((nnodes + 1) * 2);
+            for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = distribution1(generator);
+            thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
+        } else if (init_type == 2) {
+            // Load from vector
+            thrust::copy(preinit_data, preinit_data+(nnodes+1)*2, pts.begin());
         } else {
-          std::default_random_engine generator;
-          std::normal_distribution<double> distribution1(-10.0, 1.0);
-          thrust::host_vector<float> h_pts((nnodes + 1) * 2);
-          for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = distribution1(generator);
-          thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
+            std::cout << "Invalid initialization type specified..." << std::endl;
+            exit(1);
         }
 
         // Initialize the learning rates and momentums

@@ -68,7 +68,8 @@ namespace BHTSNE {
                                           float magnitude_factor,
                                           int init_type,
                                           int NN,
-                                          std::string viz);
+                                          std::string viz,
+                                          float* preinit_data);
 }
 
 #endif
