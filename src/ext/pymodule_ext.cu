@@ -111,7 +111,7 @@ void pymodule_bh_tsne(float *points, float *result, ssize_t *dims, int proj_dim,
     // Do the t-SNE
     thrust::device_vector<float> tsne_results = BHTSNE::tsne(dense_handle, sparse_handle, points, 
                                                               N_POINTS, N_DIMS, 2, perplexity, early_ex, learning_rate, 
-                                                              n_iter, n_iter_np, min_g_norm, false, false, 5.0, 0, 1023);
+                                                              n_iter, n_iter_np, min_g_norm, false, false, 5.0, 0, 1023, "tcp://localhost:5556");
 
     // Copy the data back from the GPU
     thrust::copy(tsne_results.begin(), tsne_results.end(), result);

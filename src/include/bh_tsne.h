@@ -67,7 +67,8 @@ namespace BHTSNE {
                                           bool interactive,
                                           float magnitude_factor,
                                           int init_type,
-                                          int NN);
+                                          int NN,
+                                          std::string viz);
 }
 
 #endif

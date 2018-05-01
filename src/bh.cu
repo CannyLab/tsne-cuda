@@ -1095,7 +1095,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                           bool interactive,
                                           float magnitude_factor,
                                           int init_type,
-                                          int NN)
+                                          int NN,
+                                          std::string viz_server)
 {
 
     // Setup clock information
@@ -1292,7 +1293,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
       publisher.setsockopt(ZMQ_RCVTIMEO, 10000);
       publisher.setsockopt(ZMQ_SNDTIMEO, 10000);
       std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
-      publisher.connect("tcp://localhost:5556");
+      publisher.connect(viz_server);
 
       // Send the number of points we should be expecting to the server
       std::string message = std::to_string(N_POINTS);
