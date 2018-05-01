@@ -42,10 +42,17 @@ int main(int argc, char** argv) {
         ("d,dump", "Dump the output points", cxxopts::value<bool>()->default_value("false"))
         ("m,magnitude-factor", "Magnitude factor for KNN", cxxopts::value<float>()->default_value("5.0"))
         ("t,init", "What kind of initialization to use <unif,gauss>", cxxopts::value<std::string>()->default_value("unif"))
-        ("f,fname", "File name for loaded data...", cxxopts::value<std::string>()->default_value("../train-images.idx3-ubyte"));
+        ("f,fname", "File name for loaded data...", cxxopts::value<std::string>()->default_value("../train-images.idx3-ubyte"))
+        ("h,help", "Print help");
     
     // Parse command line options
     auto result = options.parse(argc, argv);
+
+    if (result.count("help"))
+    {
+      std::cout << options.help({""}) << std::endl;
+      exit(0);
+    }
 
     // Common initialization
     srand (time(NULL));
