@@ -15,6 +15,12 @@ if (NOT NTHREADS)
 endif()
 #-------------------------------------------------------------------------------
 
+# Options
+#-------------------------------------------------------------------------------
+option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" ON)
+option(BUILD_TEST "Build tests if ON" OFF)
+option(BUILD_PYTHON "Build python if ON" OFF)
+#-------------------------------------------------------------------------------
 
 # CUDA Configuration
 #-------------------------------------------------------------------------------
@@ -49,7 +55,6 @@ find_package(OpenMP REQUIRED)
 
 # BLAS configuration
 #-------------------------------------------------------------------------------
-option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" ON)
 if(WITH_MKL)
     find_package(MKL REQUIRED)
     include_directories(${MKL_INCLUDE_DIRS})
@@ -134,67 +139,76 @@ set(SOURCES
 
 # Shared Library for Python Binding
 #-------------------------------------------------------------------------------
+if(BUILD_PYTHON)
+    set(PYTHON_SOURCES 
+        src/python/pyctsne/TSNE.py
+    )
 
-set(PYTHON_SOURCES 
-    src/python/pyctsne/TSNE.py
-)
+    cuda_add_library(pyctsne
+                    SHARED
+                    ${SOURCES})
+    add_dependencies(pyctsne gtest)
+    add_dependencies(pyctsne faiss)
+    target_link_libraries(pyctsne ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} zmq)
+    set_target_properties(pyctsne PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-cuda_add_library(pyctsne
-                 SHARED
-                 ${SOURCES})
-add_dependencies(pyctsne gtest)
-add_dependencies(pyctsne faiss)
-target_link_libraries(pyctsne ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} zmq)
-set_target_properties(pyctsne PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    add_custom_command(TARGET pyctsne POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory
+                        ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:pyctsne>/python)
+    add_custom_command(TARGET pyctsne POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:pyctsne> $<TARGET_FILE_DIR:pyctsne>/python/pyctsne)
 
-add_custom_command(TARGET pyctsne POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_directory
-                       ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:pyctsne>/python)
-add_custom_command(TARGET pyctsne POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:pyctsne> $<TARGET_FILE_DIR:pyctsne>/python/pyctsne)
-
-ADD_CUSTOM_TARGET(copy_pyctsne DEPENDS ${PYTHON_SOURCES})
-ADD_DEPENDENCIES(pyctsne copy_pyctsne)
-add_dependencies(copy_pyctsne gtest)
-add_dependencies(copy_pyctsne faiss)
-
+    ADD_CUSTOM_TARGET(copy_pyctsne DEPENDS ${PYTHON_SOURCES})
+    ADD_DEPENDENCIES(pyctsne copy_pyctsne)
+    add_dependencies(copy_pyctsne gtest)
+    add_dependencies(copy_pyctsne faiss)
+else()
+    message("-- Not building python libraries. To build python libraries use -DBUILD_PYTHON=ON")
+endif()
 #-------------------------------------------------------------------------------
 
 # Test Target
 #-------------------------------------------------------------------------------
-cuda_add_executable(tsne_test
-    ${SOURCES}
-    src/test/test.cu
-)
-add_dependencies(tsne_test gtest)
-add_dependencies(tsne_test faiss)
-target_link_libraries(tsne_test
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-    ${CUDA_LIBRARIES}
-    ${OpenMP_CXX_FLAGS}
-    ${CUDA_CUBLAS_LIBRARIES}
-    ${CUDA_cusparse_LIBRARY}
-    #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-    ${CUDA_cudadevrt_LIBRARY}
-    libfaiss.a
-    libgpufaiss.a
-    pthread
-    zmq
-    ${BLAS_LIB}
-)
+if(BUILD_TEST)
+    cuda_add_executable(tsne_test
+        ${SOURCES}
+        src/test/test.cu
+    )
+    add_dependencies(tsne_test gtest)
+    add_dependencies(tsne_test faiss)
+    target_link_libraries(tsne_test
+        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
+        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
+        ${CUDA_LIBRARIES}
+        ${OpenMP_CXX_FLAGS}
+        ${CUDA_CUBLAS_LIBRARIES}
+        ${CUDA_cusparse_LIBRARY}
+        #/usr/local/cuda-8.0/lib64/libcudaevrt.a
+        ${CUDA_cudadevrt_LIBRARY}
+        libfaiss.a
+        libgpufaiss.a
+        pthread
+        zmq
+        ${BLAS_LIB}
+    )
+    enable_testing()
+    add_test(
+        NAME tsne_test
+        COMMAND tsne_test
+    )
+else()
+    message("-- Not building tests. To build tests use -DBUILD_TEST=ON")
+endif()
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
-# Testing Executable
+# Main Executable
 #-------------------------------------------------------------------------------
 cuda_add_executable(tsne
     ${SOURCES}
     src/exe/main.cu
 )
-add_dependencies(tsne gtest)
-add_dependencies(tsne faiss)
-add_dependencies(tsne cxxopts)
+add_dependencies(tsne gtest faiss cxxopts)
 target_link_libraries(tsne
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
@@ -209,15 +223,6 @@ target_link_libraries(tsne
     pthread
     zmq
     ${BLAS_LIB}
-)
-#-------------------------------------------------------------------------------
-
-# Testing
-#-------------------------------------------------------------------------------
-enable_testing()
-add_test(
-    NAME tsne_test
-    COMMAND tsne_test
 )
 #-------------------------------------------------------------------------------
 
@@ -242,7 +247,7 @@ if (DOXYGEN_FOUND AND BUILD_DOC)
         COMMENT "Generating API documentation with Doxygen"
         VERBATIM )
 elseif(NOT DOXYGEN_FOUND AND BUILD_DOC)
-    message("Doxygen need to be installed to generate the doxygen documentation")
+    message("-- Doxygen need to be installed to generate the doxygen documentation")
 else (DOXYGEN_FOUND AND BUILD_DOC)
-    message("Not building documentation. To build documentation use -DBUILD_DOC=ON")
+    message("-- Not building documentation. To build documentation use -DBUILD_DOC=ON")
 endif (DOXYGEN_FOUND AND BUILD_DOC)
