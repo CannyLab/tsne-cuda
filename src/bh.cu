@@ -1094,7 +1094,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                           bool dump_points,
                                           bool interactive,
                                           float magnitude_factor,
-                                          int init_type)
+                                          int init_type,
+                                          int NN)
 {
 
     // Setup clock information
@@ -1121,7 +1122,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         cudaFuncSetCacheConfig(computePijxQij, cudaFuncCachePreferShared);
     
         // Allocate some memory
-        const unsigned int K = 1023 < N_POINTS ? 1023 : N_POINTS - 1; 
+        const unsigned int K = NN < N_POINTS ? NN : N_POINTS - 1; 
         float *knn_distances = new float[N_POINTS*K];
         memset(knn_distances, 0, N_POINTS * K * sizeof(float));
         long *knn_indices = new long[N_POINTS*K]; // Allocate memory for the indices on the CPU

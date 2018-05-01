@@ -272,7 +272,7 @@ void test_bhtsne(int N, int NDIMS) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", N);
     cudaEventRecord(start);
-    BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()), N, NDIMS, 2, 64.0, 1e-3, 12.0, 1000, 1000, 0.0, false, false, 5.0, 0);
+    BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()), N, NDIMS, 2, 64.0, 1e-3, 12.0, 1000, 1000, 0.0, false, false, 5.0, 0, 1023);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;
@@ -329,7 +329,7 @@ void test_bhtsne_full_mnist(std::string fname) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", num_images);
     cudaEventRecord(start);
-    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_columns*num_rows, 2, 45.0, 500.0, 12.0, 1000, 1000, 0.0, false, false, 5.0, 0);
+    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_columns*num_rows, 2, 45.0, 500.0, 12.0, 1000, 1000, 0.0, false, false, 5.0, 0, 1023);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;
@@ -361,7 +361,7 @@ void test_bhtsne_full_cifar10(std::string fname) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", num_images);
     cudaEventRecord(start);
-    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_channels*num_columns*num_rows, 2, 250.0, 1000.0, 24.0, 1000, 1000, 0.0, false, false, 5.0, 0);
+    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_channels*num_columns*num_rows, 2, 250.0, 1000.0, 24.0, 1000, 1000, 0.0, false, false, 5.0, 0, 1023);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;
@@ -393,7 +393,7 @@ void test_bhtsne_full_cifar100(std::string fname) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", num_images);
     cudaEventRecord(start);
-    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_channels*num_columns*num_rows, 2, 45.0, 500.0, 12.0, 1000, 1000, 0.0, false, false, 5.0, 0);
+    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_channels*num_columns*num_rows, 2, 45.0, 500.0, 12.0, 1000, 1000, 0.0, false, false, 5.0, 0, 1023);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;

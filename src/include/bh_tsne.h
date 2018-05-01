@@ -66,7 +66,8 @@ namespace BHTSNE {
                                           bool dump_points,
                                           bool interactive,
                                           float magnitude_factor,
-                                          int init_type);
+                                          int init_type,
+                                          int NN);
 }
 
 #endif
