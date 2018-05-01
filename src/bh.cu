@@ -1312,7 +1312,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
 
     // Support for infinite iteration
 
-    for (int step = 0; step < n_iter; step++) {
+    for (int step = 0; step != n_iter; step++) {
 
       // Setup learning rate schedule
       if (step == 250) {
