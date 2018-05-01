@@ -22,7 +22,7 @@ Todo :)
 - OpenMP: On ubuntu this is likely already installed with your version of GCC. For other distributions, be sure your compiler has OpenMP support.
 - Python (for Python bindings): Python is not required, however to build the python bindings you must install Python. This library was tested with Python 3, however it is possible that Python 2 will work as well (though it is untested). 
 - Doxygen: To build the documentation, a working version of doxygen is required (which can be obtained using `sudo apt install doxygen` on debian/ubuntu systems).
-- ZMQ: Necessary for building the interactive visualization. TODO: Add CMake flags to turn this off.
+- ZMQ: Necessary for building the interactive visualization. TODO: Add CMake flags to turn this off. On ubuntu you can obtain ZMQ by using `sudo apt install libzmq-dev`.
 
 This package contains no distribution specific code - thus it should compile and run on other Linux distros (and possibly even OSX) however do so at your own peril, as it has not been tested.
 
@@ -132,3 +132,5 @@ This library is built on top of the following technology, without this tech, non
 [FAISS](https://github.com/facebookresearch/faiss)
 
 [GTest](https://github.com/google/googletest)
+
+[CXXopts](https://github.com/jarro2783/cxxopts)
