@@ -781,26 +781,45 @@ void computePijxQij_alt(int N, int nnz, int nnodes, float *pij, int *pijRowPtr,i
 }
 
 __global__
-void cpqs1(int N, int nnodes, int *pijRowPtr,int *pijColInd, int* indices) {
-    register int TID = threadIdx.x + blockIdx.x * blockDim.x;
-    if (TID >= N) return;
-    register int ev = pijRowPtr[TID+1];
-    // Fill the indices array with the info we need
-    for (int i = pijRowPtr[TID]; i < ev; i++) {
-        indices[2*i] = TID;
-        indices[2*i+1] = pijColInd[i];
-    }
-}
-__global__
-void cpqs2(int N, int nnz, int nnodes, int *indices, float* pij, float *forceProd,float *pts) {
-    register int TID = threadIdx.x + blockIdx.x * blockDim.x;
+void cpsq3(int N, int nnz, 
+                    volatile int   * __restrict pijRowPtr,
+                    volatile int   * __restrict pijColInd,
+                    volatile int   * __restrict indices)
+{
+    register int TID, i, j, start, end;
+    TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= nnz) return;
-    int i = indices[TID];
-    int j = indices[TID+1];
-    // Compute the force
-    float dx = pts[i] - pts[j];
-    float dy = pts[i+nnodes+1] - pts[j+nnodes+1];
-    forceProd[TID] = pij[TID] * (1 / (1 + dx*dx + dy*dy));
+    start = 0; end = N + 1;
+    i = (N + 1) >> 1;
+    while (end - start > 1) {
+      j = pijRowPtr[i];
+      end = (j <= TID) ? end : i;
+      start = (j > TID) ? start : i;
+      i = (start + end) >> 1;
+    }
+    j = pijColInd[TID];
+    indices[2*TID] = i;
+    indices[2*TID+1] = j;
+}
+
+__global__
+void cpsq4(int N, int nnz, int nnodes,
+                    volatile int   * indices,
+                    volatile float * __restrict pij,
+                    volatile float * __restrict forceProd,
+                    volatile float * __restrict pts)
+{
+    register int TID, i, j;
+    register float ix, iy, jx, jy, dx, dy;
+    TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID >= nnz) return;
+    i = indices[2*TID];
+    j = indices[2*TID+1];
+    ix = pts[i]; iy = pts[nnodes + 1 + i];
+    jx = pts[j]; jy = pts[nnodes + 1 + j];
+    dx = ix - jx;
+    dy = iy - jy;
+    forceProd[TID] = pij[TID] * 1 / (1 + dx*dx + dy*dy);
 }
 
 float pijattrtimes[2];
@@ -824,15 +843,15 @@ void computeAttrForce(int N,
     auto start_time = std::chrono::high_resolution_clock::now();
 
     // Version 1
-    const int BLOCKSIZE = 128;
-    const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
-    computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
-                                            thrust::raw_pointer_cast(sparsePij.data()),
-                                            thrust::raw_pointer_cast(pijRowPtr.data()),
-                                            thrust::raw_pointer_cast(pijColInd.data()),
-                                            thrust::raw_pointer_cast(forceProd.data()),
-                                            thrust::raw_pointer_cast(pts.data()));
-    gpuErrchk(cudaDeviceSynchronize());
+    // const int BLOCKSIZE = 128;
+    // const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
+    // computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
+    //                                         thrust::raw_pointer_cast(sparsePij.data()),
+    //                                         thrust::raw_pointer_cast(pijRowPtr.data()),
+    //                                         thrust::raw_pointer_cast(pijColInd.data()),
+    //                                         thrust::raw_pointer_cast(forceProd.data()),
+    //                                         thrust::raw_pointer_cast(pts.data()));
+    // gpuErrchk(cudaDeviceSynchronize());
 
     // Version 2
     // std::cout << "Computing pijxqij" << std::endl;
@@ -848,14 +867,14 @@ void computeAttrForce(int N,
     // std::cout << "Done Computing pijxqij" << std::endl;
 
     // Version 3
-    // const int BLOCKSIZE = 1024;
-    // const int NBLOCKS = iDivUp(N, BLOCKSIZE);
-    // cpqs2<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
-    //                                     thrust::raw_pointer_cast(indices.data()),
-    //                                     thrust::raw_pointer_cast(sparsePij.data()),
-    //                                     thrust::raw_pointer_cast(forceProd.data()),
-    //                                     thrust::raw_pointer_cast(pts.data()));
-    // gpuErrchk(cudaDeviceSynchronize());
+    const int BLOCKSIZE = 128;
+    const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
+    cpsq4<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
+                                        thrust::raw_pointer_cast(indices.data()),
+                                        thrust::raw_pointer_cast(sparsePij.data()),
+                                        thrust::raw_pointer_cast(forceProd.data()),
+                                        thrust::raw_pointer_cast(pts.data()));
+    gpuErrchk(cudaDeviceSynchronize());
 
     auto end_time = std::chrono::high_resolution_clock::now();
     pijattrtimes[0] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1220,8 +1239,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
 
         // Compute the indices setup
         const int SBS = 1024;
-        const int NBS = iDivUp(N_POINTS, SBS);
-        cpqs1<<<NBS, SBS>>>(N_POINTS, nnodes, 
+        const int NBS = iDivUp(sparsePij.size(), SBS);
+        cpsq3<<<NBS, SBS>>>(N_POINTS, sparsePij.size(), 
                                         thrust::raw_pointer_cast(pijRowPtr.data()),
                                         thrust::raw_pointer_cast(pijColInd.data()),
                                         thrust::raw_pointer_cast(indices.data()));
