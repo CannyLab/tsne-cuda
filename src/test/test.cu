@@ -63,6 +63,7 @@ namespace {
     // Test the BHTSNE
     // TEST(BhTSNE, friendship) {test_bhtsne(70000, 784);}
     TEST(BhTSNE, friendship) {test_bhtsne(5000, 50);}
+    TEST(BhTSNE, friendship) {test_rings(5000);}
 
     //Test the BHTSNE on MNIST
     // TEST(BhTSNEMnist, friendship) {test_bhtsne_mnist("../mnist2500x768.txt");}

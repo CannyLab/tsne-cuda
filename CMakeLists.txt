@@ -20,7 +20,15 @@ endif()
 option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" ON)
 option(BUILD_TEST "Build tests if ON" OFF)
 option(BUILD_PYTHON "Build python if ON" OFF)
+option(WITH_ZMQ "Build with interactive viz if ON" ON)
 #-------------------------------------------------------------------------------
+
+
+# ZMQ Configuration
+if(NOT WITH_ZMQ)
+    ADD_DEFINITIONS(-DNO_ZMQ)
+    message("-- Not building with ZMQ. Why the fuck are you doing this?")
+endif()
 
 # CUDA Configuration
 #-------------------------------------------------------------------------------
@@ -149,7 +157,11 @@ if(BUILD_PYTHON)
                     ${SOURCES})
     add_dependencies(pyctsne gtest)
     add_dependencies(pyctsne faiss)
-    target_link_libraries(pyctsne ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} zmq)
+    if(WITH_ZMQ)
+        target_link_libraries(pyctsne ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} zmq)
+    else()
+        target_link_libraries(pyctsne ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
+    endif()
     set_target_properties(pyctsne PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
     add_custom_command(TARGET pyctsne POST_BUILD
@@ -176,21 +188,40 @@ if(BUILD_TEST)
     )
     add_dependencies(tsne_test gtest)
     add_dependencies(tsne_test faiss)
-    target_link_libraries(tsne_test
-        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
-        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-        ${CUDA_LIBRARIES}
-        ${OpenMP_CXX_FLAGS}
-        ${CUDA_CUBLAS_LIBRARIES}
-        ${CUDA_cusparse_LIBRARY}
-        #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-        ${CUDA_cudadevrt_LIBRARY}
-        libfaiss.a
-        libgpufaiss.a
-        pthread
-        zmq
-        ${BLAS_LIB}
-    )
+
+    if(WITH_ZMQ)
+        target_link_libraries(tsne_test
+            ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
+            ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
+            ${CUDA_LIBRARIES}
+            ${OpenMP_CXX_FLAGS}
+            ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_cusparse_LIBRARY}
+            #/usr/local/cuda-8.0/lib64/libcudaevrt.a
+            ${CUDA_cudadevrt_LIBRARY}
+            libfaiss.a
+            libgpufaiss.a
+            pthread
+            zmq
+            ${BLAS_LIB}
+        )
+    else()
+        target_link_libraries(tsne_test
+            ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
+            ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
+            ${CUDA_LIBRARIES}
+            ${OpenMP_CXX_FLAGS}
+            ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_cusparse_LIBRARY}
+            #/usr/local/cuda-8.0/lib64/libcudaevrt.a
+            ${CUDA_cudadevrt_LIBRARY}
+            libfaiss.a
+            libgpufaiss.a
+            pthread
+            ${BLAS_LIB}
+        )
+    endif()
+
     enable_testing()
     add_test(
         NAME tsne_test
@@ -209,21 +240,39 @@ cuda_add_executable(tsne
     src/exe/main.cu
 )
 add_dependencies(tsne gtest faiss cxxopts)
-target_link_libraries(tsne
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-    ${CUDA_LIBRARIES}
-    ${OpenMP_CXX_FLAGS}
-    ${CUDA_CUBLAS_LIBRARIES}
-    ${CUDA_cusparse_LIBRARY}
-    #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-    ${CUDA_cudadevrt_LIBRARY}
-    libfaiss.a
-    libgpufaiss.a
-    pthread
-    zmq
-    ${BLAS_LIB}
-)
+
+if(WITH_ZMQ)
+    target_link_libraries(tsne
+        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
+        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
+        ${CUDA_LIBRARIES}
+        ${OpenMP_CXX_FLAGS}
+        ${CUDA_CUBLAS_LIBRARIES}
+        ${CUDA_cusparse_LIBRARY}
+        #/usr/local/cuda-8.0/lib64/libcudaevrt.a
+        ${CUDA_cudadevrt_LIBRARY}
+        libfaiss.a
+        libgpufaiss.a
+        pthread
+        zmq
+        ${BLAS_LIB}
+    )
+else()
+    target_link_libraries(tsne
+        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
+        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
+        ${CUDA_LIBRARIES}
+        ${OpenMP_CXX_FLAGS}
+        ${CUDA_CUBLAS_LIBRARIES}
+        ${CUDA_cusparse_LIBRARY}
+        #/usr/local/cuda-8.0/lib64/libcudaevrt.a
+        ${CUDA_cudadevrt_LIBRARY}
+        libfaiss.a
+        libgpufaiss.a
+        pthread
+        ${BLAS_LIB}
+    )
+endif()
 #-------------------------------------------------------------------------------
 
 # Documentation

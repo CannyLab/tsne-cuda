@@ -43,8 +43,9 @@ Author: Martin Burtscher <burtscher@txstate.edu>
 #include <chrono>
 #include "bh_tsne.h"
 
-#include <zmq.hpp>
-
+#ifndef NO_ZMQ
+	#include <zmq.hpp>
+#endif
 
 
 #ifdef __KEPLER__
@@ -1289,35 +1290,45 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
       host_ys = new float[(nnodes + 1) * 2];
       dump_file << N_POINTS << " " << 2 << std::endl;
     }
+
+    #ifndef NO_ZMQ
     
-    bool send_zmq = interactive;
-    zmq::context_t context(1);
-    zmq::socket_t publisher(context, ZMQ_REQ);
-    if (interactive) {
+	    bool send_zmq = interactive;
+	    zmq::context_t context(1);
+	    zmq::socket_t publisher(context, ZMQ_REQ);
+	    if (interactive) {
 
-      // Try to connect to the socket
-      std::cout << "Initializing Connection...." << std::endl;
-      publisher.setsockopt(ZMQ_RCVTIMEO, 10000);
-      publisher.setsockopt(ZMQ_SNDTIMEO, 10000);
-      std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
-      publisher.connect(viz_server);
+	      // Try to connect to the socket
+	      std::cout << "Initializing Connection...." << std::endl;
+	      publisher.setsockopt(ZMQ_RCVTIMEO, 10000);
+	      publisher.setsockopt(ZMQ_SNDTIMEO, 10000);
+	      std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
+	      publisher.connect(viz_server);
 
-      // Send the number of points we should be expecting to the server
-      std::string message = std::to_string(N_POINTS);
-      send_zmq = publisher.send(message.c_str(), message.length());
+	      // Send the number of points we should be expecting to the server
+	      std::string message = std::to_string(N_POINTS);
+	      send_zmq = publisher.send(message.c_str(), message.length());
 
-      // Wait for server reply
-      zmq::message_t request;
-      send_zmq = publisher.recv (&request);
+	      // Wait for server reply
+	      zmq::message_t request;
+	      send_zmq = publisher.recv (&request);
+	      
 
-      // If there's a time-out, don't bother.
-      if (send_zmq) {
-        std::cout << "Visualization connected!" << std::endl;
-      } else {
-        std::cout << "No Visualization Terminal, continuing..." << std::endl;
-        send_zmq = false;
-      }
-    }
+	      
+
+	      // If there's a time-out, don't bother.
+	      if (send_zmq) {
+	        std::cout << "Visualization connected!" << std::endl;
+	      } else {
+	        std::cout << "No Visualization Terminal, continuing..." << std::endl;
+	        send_zmq = false;
+	      }
+	    }
+	#endif
+
+	#ifdef NO_ZMQ
+	    if (interactive) std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
+	#endif
 
     // Support for infinite iteration
 
@@ -1450,19 +1461,21 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         }
       }
 
-      if (send_zmq) {
-        zmq::message_t message(sizeof(float)*N_POINTS*2);
-        thrust::copy(pts.begin(), pts.begin()+N_POINTS, static_cast<float*>(message.data()));
-        thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+N_POINTS, static_cast<float*>(message.data())+N_POINTS);
-        bool res = false;
-        res = publisher.send(message);
-        zmq::message_t request;
-        res = publisher.recv(&request);
-        if (!res) {
-          std::cout << "Server Disconnected, Not sending anymore for this session." << std::endl;
-        }
-        send_zmq = res;
-      }
+      #ifndef NO_ZMQ
+	      if (send_zmq) {
+	        zmq::message_t message(sizeof(float)*N_POINTS*2);
+	        thrust::copy(pts.begin(), pts.begin()+N_POINTS, static_cast<float*>(message.data()));
+	        thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+N_POINTS, static_cast<float*>(message.data())+N_POINTS);
+	        bool res = false;
+	        res = publisher.send(message);
+	        zmq::message_t request;
+	        res = publisher.recv(&request);
+	        if (!res) {
+	          std::cout << "Server Disconnected, Not sending anymore for this session." << std::endl;
+	        }
+	        send_zmq = res;
+	      }
+      #endif
     }
 
     if (dump_points){

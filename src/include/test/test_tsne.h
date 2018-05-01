@@ -251,7 +251,7 @@ void test_bhtsne(int N, int NDIMS) {
     std::default_random_engine generator;
     std::normal_distribution<double> distribution1(-10.0, 1.0);
     std::normal_distribution<double> distribution2(10.0, 1.0);
-
+    
     thrust::host_vector<float> h_X(NDIMS * N);
     for (int i = 0; i < NDIMS * N; i ++) {
         if (i < ((N / 2) * NDIMS)) {
@@ -281,6 +281,48 @@ void test_bhtsne(int N, int NDIMS) {
     EXPECT_EQ(0, 0);
 }
 
+void test_rings(int N) {
+    srand (time(NULL));
+    const int NDIMS = 3;
+
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution1(-10.0, 1.0);
+    std::normal_distribution<double> distribution2(10.0, 1.0);
+    std::uniform_real_distribution<double> unif_rand(0.0, 2*M_PI);
+    
+    thrust::host_vector<float> h_X(NDIMS * N);
+    for (int i = 0; i < NDIMS * N; i ++) {
+        double angle = unif_rand(generator); 
+        if (i < (NDIMS * N) / 2) {
+            h_X[i] = distribution1(generator);
+            h_X[0] += 5 * std::cos(angle);
+            h_X[1] += 5 * std::sin(angle);
+        } else {
+            h_X[i] = distribution2(generator);
+            h_X[1] += 5 * std::cos(angle);
+            h_X[2] += 5 * std::sin(angle);
+        }
+    }
+
+    // --- Matrices allocation and initialization
+    cublasHandle_t dense_handle;
+    cublasSafeCall(cublasCreate(&dense_handle));
+    cusparseHandle_t sparse_handle;
+    cusparseSafeCall(cusparseCreate(&sparse_handle));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    printf("Starting TSNE calculation with %u points.\n", N);
+    cudaEventRecord(start);
+    BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()), N, NDIMS, 2, 64.0, 1e-3, 12.0, 1000, 1000, 0.0, false, false, 5.0, 0, 1023, "tcp://localhost:5556", nullptr);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Elapsed time: %f (ms)\n", milliseconds);
+    EXPECT_EQ(0, 0);
+}
 
 void test_bhtsne_ref(int N, int NDIMS) {
     std::default_random_engine generator;
