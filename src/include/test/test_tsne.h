@@ -361,7 +361,7 @@ void test_bhtsne_full_cifar10(std::string fname) {
     cudaEventCreate(&stop);
     printf("Starting TSNE calculation with %u points.\n", num_images);
     cudaEventRecord(start);
-    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_channels*num_columns*num_rows, 2, 45.0, 200.0, 12.0, 1000, 1000, 0.0);
+    BHTSNE::tsne(dense_handle, sparse_handle, data, num_images, num_channels*num_columns*num_rows, 2, 250.0, 1000.0, 24.0, 1000, 1000, 0.0);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds = 0;

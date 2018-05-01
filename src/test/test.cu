@@ -61,7 +61,7 @@ namespace {
     // TEST(MatrixSymmetry, 70000x784) {test_sym_mat(70000,784);}
 
     // Test the BHTSNE
-    TEST(BhTSNE, friendship) {test_bhtsne(70000, 784);}
+    // TEST(BhTSNE, friendship) {test_bhtsne(70000, 784);}
     // TEST(BhTSNE, friendship) {test_bhtsne(5000, 50);}
 
     //Test the BHTSNE on MNIST
@@ -69,7 +69,7 @@ namespace {
     // TEST(BhTSNEMnist, training_set) {test_bhtsne_full_mnist("../train-images.idx3-ubyte");}
 
     // Test the BHTSNE on CIFAR
-   // TEST(BhTSNECifar, train_set_cifar10) {test_bhtsne_full_cifar10("../cifar-10/bin_data");}
+   TEST(BhTSNECifar, train_set_cifar10) {test_bhtsne_full_cifar10("../cifar-10/bin_data");}
     //TEST(BhTSNECifar, train_set_cifar100) {test_bhtsne_full_cifar100("../cifar-100/train.bin");}
     // Test the BHTSNE_Ref
     //TEST(BhTSNERef, friendship) {test_bhtsne_ref(300, 50);}
