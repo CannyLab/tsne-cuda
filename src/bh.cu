@@ -1088,7 +1088,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                           float perplexity, 
                                           float learning_rate, 
                                           float early_ex, 
-                                          unsigned int n_iter, 
+                                          int n_iter, 
                                           unsigned int n_iter_np, 
                                           float min_g_norm,
                                           bool dump_points,
@@ -1309,6 +1309,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         send_zmq = false;
       }
     }
+
+    // Support for infinite iteration
 
     for (int step = 0; step < n_iter; step++) {
 

@@ -60,7 +60,7 @@ namespace BHTSNE {
                                           float perplexity, 
                                           float early_ex, 
                                           float learning_rate, 
-                                          unsigned int n_iter, 
+                                          int n_iter, 
                                           unsigned int n_iter_np, 
                                           float min_g_norm,
                                           bool dump_points,

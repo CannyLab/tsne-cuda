@@ -25,6 +25,7 @@ socket.send(b"hi")
 print('Plotted initial.')
 
 def animate(i):
+    global num_points
     recv_data = socket.recv()
     if len(recv_data) > 10:
         data = np.fromstring(recv_data, dtype='float32', count=num_points*2).reshape(2,num_points)
