@@ -25,8 +25,6 @@
 #define IOPT(x) result[STRINGIFY(x)].as<int>()
 #define BOPT(x) result[STRINGIFY(x)].as<bool>()
 
-
-
 int main(int argc, char** argv) {
 
     // Setup command line options

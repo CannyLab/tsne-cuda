@@ -43,6 +43,10 @@ Author: Martin Burtscher <burtscher@txstate.edu>
 #include <chrono>
 #include "bh_tsne.h"
 
+#include <zmq.hpp>
+
+
+
 #ifdef __KEPLER__
 
 // thread count
@@ -701,8 +705,8 @@ void IntegrationKernel(int N,
   // TODO: fix momentum at step 0
   inc = blockDim.x * gridDim.x;
   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
-      tmpx = 4.0f * (attr_forces[i] - (rep_forces[i] / norm));
-      tmpy = 4.0f * (attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm));
+      tmpx = 4.0f * (attr_forces[i] * 1/((float)N) - (rep_forces[i] / norm));
+      tmpy = 4.0f * (attr_forces[i + N] * 1/((float)N) - (rep_forces[nnodes + 1 + i] / norm));
       tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
       tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
 
@@ -1276,133 +1280,178 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
       host_ys = new float[(nnodes + 1) * 2];
       dump_file << N_POINTS << " " << 2 << std::endl;
     }
+    
+    bool send_zmq = interactive;
+    zmq::context_t context(1);
+    zmq::socket_t publisher(context, ZMQ_REQ);
+    if (interactive) {
 
-    // Enter the barnes hut loop
+      // Try to connect to the socket
+      std::cout << "Initializing Connection...." << std::endl;
+      publisher.setsockopt(ZMQ_RCVTIMEO, 10000);
+      publisher.setsockopt(ZMQ_SNDTIMEO, 10000);
+      std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
+      publisher.connect("tcp://localhost:5556");
+
+      // Send the number of points we should be expecting to the server
+      std::string message = std::to_string(N_POINTS);
+      send_zmq = publisher.send(message.c_str(), message.length());
+
+      // Wait for server reply
+      zmq::message_t request;
+      send_zmq = publisher.recv (&request);
+
+      // If there's a time-out, don't bother.
+      if (send_zmq) {
+        std::cout << "Visualization connected!" << std::endl;
+      } else {
+        std::cout << "No Visualization Terminal, continuing..." << std::endl;
+        send_zmq = false;
+      }
+    }
+
     for (int step = 0; step < n_iter; step++) {
 
-        // Do Force Reset
+      // Setup learning rate schedule
+      if (step == 250) {
+          eta /= early_ex; 
+          momentum = 0.8;
+      }
+
+      // Do Force Reset
+      start_time = std::chrono::high_resolution_clock::now();
+
+          thrust::fill(attr_forces.begin(), attr_forces.end(), 0);
+          thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
+
+      end_time = std::chrono::high_resolution_clock::now();
+      times[5] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+      
+
+        // Bounding box kernel
         start_time = std::chrono::high_resolution_clock::now();
 
-            thrust::fill(attr_forces.begin(), attr_forces.end(), 0);
-            thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
+          BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
+                                                          N_POINTS, 
+                                                          thrust::raw_pointer_cast(startl.data()), 
+                                                          thrust::raw_pointer_cast(childl.data()), 
+                                                          thrust::raw_pointer_cast(massl.data()), 
+                                                          thrust::raw_pointer_cast(pts.data()), 
+                                                          thrust::raw_pointer_cast(pts.data() + nnodes + 1), 
+                                                          thrust::raw_pointer_cast(maxxl.data()), 
+                                                          thrust::raw_pointer_cast(maxyl.data()), 
+                                                          thrust::raw_pointer_cast(minxl.data()), 
+                                                          thrust::raw_pointer_cast(minyl.data()));
 
-        end_time = std::chrono::high_resolution_clock::now();
-        times[5] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
-        
+          gpuErrchk(cudaDeviceSynchronize());
 
-         // Bounding box kernel
-         start_time = std::chrono::high_resolution_clock::now();
+      end_time = std::chrono::high_resolution_clock::now();
+      times[6] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-            BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
-                                                            N_POINTS, 
-                                                            thrust::raw_pointer_cast(startl.data()), 
-                                                            thrust::raw_pointer_cast(childl.data()), 
-                                                            thrust::raw_pointer_cast(massl.data()), 
-                                                            thrust::raw_pointer_cast(pts.data()), 
-                                                            thrust::raw_pointer_cast(pts.data() + nnodes + 1), 
-                                                            thrust::raw_pointer_cast(maxxl.data()), 
-                                                            thrust::raw_pointer_cast(maxyl.data()), 
-                                                            thrust::raw_pointer_cast(minxl.data()), 
-                                                            thrust::raw_pointer_cast(minyl.data()));
+      // Tree Building
+      start_time = std::chrono::high_resolution_clock::now();
 
-            gpuErrchk(cudaDeviceSynchronize());
+          ClearKernel1<<<blocks * 1, 1024>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(childl.data()));
+          TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
+                                                                              thrust::raw_pointer_cast(childl.data()), 
+                                                                              thrust::raw_pointer_cast(pts.data()), 
+                                                                              thrust::raw_pointer_cast(pts.data() + nnodes + 1));
+          ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
+          gpuErrchk(cudaDeviceSynchronize());
 
-        end_time = std::chrono::high_resolution_clock::now();
-        times[6] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+      end_time = std::chrono::high_resolution_clock::now();
+      times[7] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-        // Tree Building
-        start_time = std::chrono::high_resolution_clock::now();
+      // Tree Summarization
+      start_time =  std::chrono::high_resolution_clock::now();
+      
+          SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(countl.data()), 
+                                                                                      thrust::raw_pointer_cast(childl.data()), 
+                                                                                      thrust::raw_pointer_cast(massl.data()),
+                                                                                      thrust::raw_pointer_cast(pts.data()),
+                                                                                      thrust::raw_pointer_cast(pts.data() + nnodes + 1));
+          gpuErrchk(cudaDeviceSynchronize());
 
-            ClearKernel1<<<blocks * 1, 1024>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(childl.data()));
-            TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
-                                                                                thrust::raw_pointer_cast(childl.data()), 
-                                                                                thrust::raw_pointer_cast(pts.data()), 
-                                                                                thrust::raw_pointer_cast(pts.data() + nnodes + 1));
-            ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+      end_time = std::chrono::high_resolution_clock::now();
+      times[8] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-        end_time = std::chrono::high_resolution_clock::now();
-        times[7] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+      // Force sorting
+      start_time = std::chrono::high_resolution_clock::now();
+      
+          SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(sortl.data()), 
+                                                                      thrust::raw_pointer_cast(countl.data()), 
+                                                                      thrust::raw_pointer_cast(startl.data()), 
+                                                                      thrust::raw_pointer_cast(childl.data()));
+          gpuErrchk(cudaDeviceSynchronize());
 
-        // Tree Summarization
-        start_time =  std::chrono::high_resolution_clock::now();
-        
-            SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(countl.data()), 
-                                                                                        thrust::raw_pointer_cast(childl.data()), 
-                                                                                        thrust::raw_pointer_cast(massl.data()),
-                                                                                        thrust::raw_pointer_cast(pts.data()),
-                                                                                        thrust::raw_pointer_cast(pts.data() + nnodes + 1));
-            gpuErrchk(cudaDeviceSynchronize());
+      end_time = std::chrono::high_resolution_clock::now();
+      times[9] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-        end_time = std::chrono::high_resolution_clock::now();
-        times[8] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+      // Repulsive force calculation
+      start_time = std::chrono::high_resolution_clock::now();
+      
+          ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
+                                                                      theta, epssq,
+                                                                      thrust::raw_pointer_cast(sortl.data()), 
+                                                                      thrust::raw_pointer_cast(childl.data()), 
+                                                                      thrust::raw_pointer_cast(massl.data()), 
+                                                                      thrust::raw_pointer_cast(pts.data()),
+                                                                      thrust::raw_pointer_cast(pts.data() + nnodes + 1),
+                                                                      thrust::raw_pointer_cast(rep_forces.data()),
+                                                                      thrust::raw_pointer_cast(rep_forces.data() + nnodes + 1),
+                                                                      thrust::raw_pointer_cast(norml.data()));
+          gpuErrchk(cudaDeviceSynchronize());
 
-        // Force sorting
-        start_time = std::chrono::high_resolution_clock::now();
-        
-            SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(sortl.data()), 
-                                                                        thrust::raw_pointer_cast(countl.data()), 
-                                                                        thrust::raw_pointer_cast(startl.data()), 
-                                                                        thrust::raw_pointer_cast(childl.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+      end_time = std::chrono::high_resolution_clock::now();
+      times[10] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-        end_time = std::chrono::high_resolution_clock::now();
-        times[9] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+      // Attractive Force Computation
+      start_time = std::chrono::high_resolution_clock::now();
 
-        // Repulsive force calculation
-        start_time = std::chrono::high_resolution_clock::now();
-        
-            ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
-                                                                        theta, epssq,
-                                                                        thrust::raw_pointer_cast(sortl.data()), 
-                                                                        thrust::raw_pointer_cast(childl.data()), 
-                                                                        thrust::raw_pointer_cast(massl.data()), 
-                                                                        thrust::raw_pointer_cast(pts.data()),
-                                                                        thrust::raw_pointer_cast(pts.data() + nnodes + 1),
-                                                                        thrust::raw_pointer_cast(rep_forces.data()),
-                                                                        thrust::raw_pointer_cast(rep_forces.data() + nnodes + 1),
-                                                                        thrust::raw_pointer_cast(norml.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+          // compute attractive forces
+          computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
+          gpuErrchk(cudaDeviceSynchronize());
 
-        end_time = std::chrono::high_resolution_clock::now();
-        times[10] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+      end_time = std::chrono::high_resolution_clock::now();
+      times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-        // Attractive Force Computation
-        start_time = std::chrono::high_resolution_clock::now();
+      // Move the particles
+      start_time = std::chrono::high_resolution_clock::now();
+      
+          norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
+          if (step % 10 == 0)
+              std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
+      
+          IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(N_POINTS, nnodes, eta, norm, momentum, 
+                                                                      thrust::raw_pointer_cast(pts.data()),
+                                                                      thrust::raw_pointer_cast(attr_forces.data()),
+                                                                      thrust::raw_pointer_cast(rep_forces.data()),
+                                                                      thrust::raw_pointer_cast(old_forces.data()));
+          gpuErrchk(cudaDeviceSynchronize());
 
-            // compute attractive forces
-            computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
-            gpuErrchk(cudaDeviceSynchronize());
+      end_time = std::chrono::high_resolution_clock::now();
+      times[12] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-        end_time = std::chrono::high_resolution_clock::now();
-        times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
-
-        // Move the particles
-        start_time = std::chrono::high_resolution_clock::now();
-        
-            norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
-            if (step % 10 == 0)
-                std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
-        
-            IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(N_POINTS, nnodes, eta, norm, momentum, 
-                                                                        thrust::raw_pointer_cast(pts.data()),
-                                                                        thrust::raw_pointer_cast(attr_forces.data()),
-                                                                        thrust::raw_pointer_cast(rep_forces.data()),
-                                                                        thrust::raw_pointer_cast(old_forces.data()));
-            gpuErrchk(cudaDeviceSynchronize());
-
-        end_time = std::chrono::high_resolution_clock::now();
-        times[12] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
-
-        if (dump_points) {
-          thrust::copy(pts.begin(), pts.end(), host_ys);
-          for (int i = 0; i < N_POINTS; i++) {
-              dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
-          }
+      if (dump_points) {
+        thrust::copy(pts.begin(), pts.end(), host_ys);
+        for (int i = 0; i < N_POINTS; i++) {
+            dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
         }
-        
+      }
 
-        if (step == 250) {eta /= early_ex; momentum = 0.8;}
+      if (send_zmq) {
+        zmq::message_t message(sizeof(float)*N_POINTS*2);
+        thrust::copy(pts.begin(), pts.begin()+N_POINTS, static_cast<float*>(message.data()));
+        thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+N_POINTS, static_cast<float*>(message.data())+N_POINTS);
+        bool res = false;
+        res = publisher.send(message);
+        zmq::message_t request;
+        res = publisher.recv(&request);
+        if (!res) {
+          std::cout << "Server Disconnected, Not sending anymore for this session." << std::endl;
+        }
+        send_zmq = res;
+      }
     }
 
     if (dump_points){
