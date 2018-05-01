@@ -574,14 +574,14 @@ void ForceCalculationKernel(int nnodesd,
   if (0 == threadIdx.x) {
     // tmp = radiusd * 2;
     // precompute values that depend only on tree level
-    dq[0] = radiusd * radiusd * theta; 
+    dq[0] = (radiusd * radiusd) / (theta * theta); 
     // dq[0] = tmp * tmp * itolsqd;
     for (i = 1; i < maxdepthd; i++) {
       // dq[i] = dq[i - 1] * 0.5f; // radius is halved with every level of the tree
-        dq[i] = dq[i - 1] * 0.5f;
-        dq[i - 1] += epssqd;
+        dq[i] = dq[i - 1] * 0.25f; // radius is halved so squared radius is quartered
+        // dq[i - 1] += epssqd;
     }
-    dq[i - 1] += epssqd;
+    // dq[i - 1] += epssqd;
 
     if (maxdepthd > MAXDEPTH) {
       *errd = maxdepthd;
@@ -633,8 +633,8 @@ void ForceCalculationKernel(int nnodesd,
           if (n >= 0) {
             dx = px - posxd[n];
             dy = py - posyd[n];
-            // tmp = dx*dx + dy*dy; // distance squared
-            tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
+            tmp = dx*dx + dy*dy; // distance squared
+            // tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
               // if ((n >= nbodiesd) && (tmp < dq[depth])) {
                     // printf("(%0.2f, %0.2f), (%0.2f, %0.2f), radius: %0.2f, tmp: %0.2f, dq: %0.2f\n, allzero: %d\n, mass: %0.2f\n", px, py, posxd[n], posyd[n], radiusd, tmp, dq[depth], __all(tmp < dq[depth]), massd[n]);
                 // }
@@ -671,7 +671,7 @@ void ForceCalculationKernel(int nnodesd,
         // TODO: This is probably wrongish and depends on what I do in the attractive force calculation
         velxd[i] += vx;
         velyd[i] += vy;
-        normd[i] = normsum;
+        normd[i] = normsum - 1; // need to subtract 1 for the evaulation of a point with itself
       }
     }
   }
