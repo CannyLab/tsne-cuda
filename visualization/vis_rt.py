@@ -31,6 +31,8 @@ def animate(i):
         mat.set_data(data[0], data[1])
         axes.set_xlim([np.amin(data[0]),np.amax(data[0])])
         axes.set_ylim([np.amin(data[1]),np.amax(data[1])])
+    else:
+        num_points = int(recv_data)
     socket.send(b"hi")
     return mat,
 
