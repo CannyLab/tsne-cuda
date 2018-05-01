@@ -85,6 +85,21 @@ ExternalProject_Add(faiss
 )
 #-------------------------------------------------------------------------------
 
+# CXXOpts Configuration
+#-------------------------------------------------------------------------------
+ExternalProject_Add(cxxopts
+  GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third_party/cxxopts
+  CMAKE_COMMAND ""
+  CMAKE_ARGS ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+)
+include_directories(
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/cxxopts/src/cxxopts/include
+)
+#-------------------------------------------------------------------------------
+
 # Project Setup
 #-------------------------------------------------------------------------------
 include_directories(
@@ -154,6 +169,32 @@ cuda_add_executable(tsne_test
 add_dependencies(tsne_test gtest)
 add_dependencies(tsne_test faiss)
 target_link_libraries(tsne_test
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
+    ${CUDA_LIBRARIES}
+    ${OpenMP_CXX_FLAGS}
+    ${CUDA_CUBLAS_LIBRARIES}
+    ${CUDA_cusparse_LIBRARY}
+    #/usr/local/cuda-8.0/lib64/libcudaevrt.a
+    ${CUDA_cudadevrt_LIBRARY}
+    libfaiss.a
+    libgpufaiss.a
+    pthread
+    ${BLAS_LIB}
+)
+#-------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------
+# Testing Executable
+#-------------------------------------------------------------------------------
+cuda_add_executable(tsne
+    ${SOURCES}
+    src/exe/main.cu
+)
+add_dependencies(tsne gtest)
+add_dependencies(tsne faiss)
+add_dependencies(tsne cxxopts)
+target_link_libraries(tsne
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
     ${CUDA_LIBRARIES}

@@ -65,7 +65,7 @@ void Math::max_norm(thrust::device_vector<float> &vec) {
 
 void Sparse::sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_vector<int> &indices, thrust::device_vector<float> &sym_values,  
                                 thrust::device_vector<int> &sym_colind, thrust::device_vector<int> &sym_rowptr, int* sym_nnz, 
-                                unsigned int N_POINTS, unsigned int K) {
+                                unsigned int N_POINTS, unsigned int K, float magnitude_factor) {
     // Allocate memory
     // std::cout << "Allocating initial memory on GPU..." << std::endl;
     int* csrRowPtrA = nullptr;
@@ -180,8 +180,8 @@ void Sparse::sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_ve
 
     // Sum the arrays
     // std::cout << "Symmetrizing..." << std::endl;
-    float alpha = 1.0f / (2.0f * 1 * (maxs+1));
-    float beta = 1.0f / (2.0f  * 1 * (maxs+1));
+    float alpha = 1.0f / (2.0f * magnitude_factor * maxs );
+    float beta = 1.0f / (2.0f * magnitude_factor * maxs );
     cusparseScsrgeam(handle, N_POINTS, N_POINTS, 
        &alpha, descr, N_POINTS*K, csrValA, csrRowPtrA, csrColPtrA,
         &beta, descr, N_POINTS*K, cscValAT, cscColPtrAT, cscRowIndAT,

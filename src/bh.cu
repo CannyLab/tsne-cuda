@@ -1077,16 +1077,20 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
 
 thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle, 
                                           cusparseHandle_t &sparse_handle,
-                                            float* points, 
-                                            unsigned int N_POINTS, 
-                                            unsigned int N_DIMS, 
-                                            unsigned int PROJDIM, 
-                                            float perplexity, 
-                                            float learning_rate, 
-                                            float early_ex, 
-                                            unsigned int n_iter, 
-                                            unsigned int n_iter_np, 
-                                            float min_g_norm)
+                                          float* points, 
+                                          unsigned int N_POINTS, 
+                                          unsigned int N_DIMS, 
+                                          unsigned int PROJDIM, 
+                                          float perplexity, 
+                                          float learning_rate, 
+                                          float early_ex, 
+                                          unsigned int n_iter, 
+                                          unsigned int n_iter_np, 
+                                          float min_g_norm,
+                                          bool dump_points,
+                                          bool interactive,
+                                          float magnitude_factor,
+                                          int init_type)
 {
 
     // Setup clock information
@@ -1178,7 +1182,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         thrust::device_vector<int> pijRowPtr; // Device
         thrust::device_vector<int> pijColInd; // Device
         int sym_nnz;
-        Sparse::sym_mat_gpu(d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K);
+        Sparse::sym_mat_gpu(d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K, magnitude_factor);
 
         // Clear some old memory
         d_knn_indices.clear();
@@ -1237,13 +1241,16 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         gpuErrchk(cudaDeviceSynchronize());
 
         // Initialize the points with a gaussian
-        // std::default_random_engine generator;
-        // std::normal_distribution<double> distribution1(-10.0, 1.0);
-        // thrust::host_vector<float> h_pts((nnodes + 1) * 2);
-        // for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = distribution1(generator);
-        // thrust::device_vector<float> pts((nnodes + 1) * 2);
-        // thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
-        thrust::device_vector<float> pts =  Random::rand_in_range((nnodes+1)*2, -100, 100);
+        thrust::device_vector<float> pts((nnodes + 1) * 2);
+        if (init_type == 0) {
+          pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
+        } else {
+          std::default_random_engine generator;
+          std::normal_distribution<double> distribution1(-10.0, 1.0);
+          thrust::host_vector<float> h_pts((nnodes + 1) * 2);
+          for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = distribution1(generator);
+          thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
+        }
 
         // Initialize the learning rates and momentums
         float eta = learning_rate * early_ex;
@@ -1262,10 +1269,13 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     times[4] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
     // Dump file
+    float *host_ys = nullptr;
     std::ofstream dump_file;
-    dump_file.open("dump_ys.txt");
-    float host_ys[(nnodes + 1) * 2];
-    dump_file << N_POINTS << " " << 2 << std::endl;
+    if (dump_points) {
+      dump_file.open("dump_ys.txt");
+      host_ys = new float[(nnodes + 1) * 2];
+      dump_file << N_POINTS << " " << 2 << std::endl;
+    }
 
     // Enter the barnes hut loop
     for (int step = 0; step < n_iter; step++) {
@@ -1384,15 +1394,21 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         end_time = std::chrono::high_resolution_clock::now();
         times[12] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-        thrust::copy(pts.begin(), pts.end(), host_ys);
-        for (int i = 0; i < N_POINTS; i++) {
-            dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
+        if (dump_points) {
+          thrust::copy(pts.begin(), pts.end(), host_ys);
+          for (int i = 0; i < N_POINTS; i++) {
+              dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
+          }
         }
+        
 
-        if (step == 750) {eta /= early_ex; momentum = 0.8;}
+        if (step == 250) {eta /= early_ex; momentum = 0.8;}
     }
 
-    dump_file.close();
+    if (dump_points){
+      delete[] host_ys;
+      dump_file.close();
+    }
 
     int p1_time = times[0] + times[1] + times[2] + times[3];
     int p2_time = times[4] + times[5] + times[6] + times[7] + times[8] + times[9] + times[10] + times[11] + times[12];

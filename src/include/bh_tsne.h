@@ -53,16 +53,20 @@
 namespace BHTSNE {
     thrust::device_vector<float> tsne(cublasHandle_t &dense_handle, 
                                           cusparseHandle_t &sparse_handle,
-                                            float* points, 
-                                            unsigned int N_POINTS, 
-                                            unsigned int N_DIMS, 
-                                            unsigned int PROJDIM, 
-                                            float perplexity, 
-                                            float early_ex, 
-                                            float learning_rate, 
-                                            unsigned int n_iter, 
-                                            unsigned int n_iter_np, 
-                                            float min_g_norm);
+                                          float* points, 
+                                          unsigned int N_POINTS, 
+                                          unsigned int N_DIMS, 
+                                          unsigned int PROJDIM, 
+                                          float perplexity, 
+                                          float early_ex, 
+                                          float learning_rate, 
+                                          unsigned int n_iter, 
+                                          unsigned int n_iter_np, 
+                                          float min_g_norm,
+                                          bool dump_points,
+                                          bool interactive,
+                                          float magnitude_factor,
+                                          int init_type);
 }
 
 #endif

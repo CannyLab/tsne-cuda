@@ -80,10 +80,11 @@
          * @param sym_nnz The returned sparse matrix number of non-zeros (CSR format, HOST)
          * @param N_POINTS The number of points
          * @param K The number of nearest neighbors
+         * @param magnitude_factor Floating point attractive force magnitude
          */
         void sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_vector<int> &indices, thrust::device_vector<float> &sym_values,  
                                 thrust::device_vector<int> &sym_colind, thrust::device_vector<int> &sym_rowptr, int* sym_nnz, 
-                                unsigned int N_POINTS, unsigned int K);
+                                unsigned int N_POINTS, unsigned int K, float magnitude_factor);
 
     }
 
