@@ -117,9 +117,6 @@ float * Data::load_cifar100(std::string fname) {
 
 	// Construct the file stream
     std::ifstream cifar_data_file(fname, std::ios::in | std::ios::binary);
-   
-   
-    
   
     std::cout << "Reading pixels from file..." << std::endl;
     uint8_t pixel_val = 0;
@@ -136,4 +133,41 @@ float * Data::load_cifar100(std::string fname) {
     cifar_data_file.close();
 	
 	return data;
+}
+
+void Data::save(std::string fname, const float * const points, const unsigned int N, const unsigned int NDIMS) {
+    std::ofstream save_file(fname, std::ios::out | std::ios::binary);
+    save_file << N << NDIMS;
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < NDIMS; j++) {
+            save_file << points[i * NDIMS + j];
+        }
+    }
+    save_file.close();
+}
+
+void Data::save(std::string fname, thrust::device_vector<float> points, const unsigned int N, const unsigned int NDIMS) {
+    float *data = new float[N * NDIMS];
+    thrust::copy(points.begin(), points.end(), data);
+    Data::save(fname, data, N, NDIMS);
+}
+
+float * Data::load(std::string fname) {
+    std::ifstream load_file(fname, std::ios::in | std::ios::binary);
+    unsigned int N;
+    unsigned int NDIMS;
+    float pt;
+
+    load_file.read(reinterpret_cast<char *>(&N), sizeof(unsigned int));
+    load_file.read(reinterpret_cast<char *>(&NDIMS), sizeof(unsigned int));
+    float *data = new float[N * NDIMS];
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < NDIMS; j++) {
+            load_file.read(reinterpret_cast<char *>(&pt), sizeof(unsigned int));
+            data[i * NDIMS + j] = pt;
+        }
+    }
+
+    load_file.close();
+    return data;
 }

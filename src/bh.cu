@@ -1079,7 +1079,6 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
     return pij;
 }
 
-
 thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle, 
                                           cusparseHandle_t &sparse_handle,
                                           float* points, 
