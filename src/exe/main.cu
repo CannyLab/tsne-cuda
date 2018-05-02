@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
         ("t,init", "What kind of initialization to use <unif,gauss>", cxxopts::value<std::string>()->default_value("unif"))
         ("f,fname", "File name for loaded data...", cxxopts::value<std::string>()->default_value("../train-images.idx3-ubyte"))
         ("c,connection", "Address for connection to vis server", cxxopts::value<std::string>()->default_value("tcp://localhost:5556"))
+        ("q,dim", "Point Dimensions", cxxopts::value<int>()->default_value("50"))
         ("h,help", "Print help");
     
     // Parse command line options
@@ -130,9 +131,9 @@ int main(int argc, char** argv) {
         std::normal_distribution<double> distribution1(-10.0, 1.0);
         std::normal_distribution<double> distribution2(10.0, 1.0);
 
-        thrust::host_vector<float> h_X(50 * IOPT(num-points));
-        for (int i = 0; i < 50 *  IOPT(num-points); i ++) {
-            if (i < ((IOPT(num-points) / 2) * 50)) {
+        thrust::host_vector<float> h_X(IOPT(dim) * IOPT(num-points));
+        for (int i = 0; i < IOPT(dim) *  IOPT(num-points); i ++) {
+            if (i < ((IOPT(num-points) / 2) * IOPT(dim))) {
                 h_X[i] = distribution1(generator);
             } else {
                 h_X[i] = distribution2(generator);
@@ -141,7 +142,7 @@ int main(int argc, char** argv) {
 
         // Do the T-SNE
         printf("Starting TSNE calculation with %u points.\n",  IOPT(num-points));
-        BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()),  IOPT(num-points), 50,
+        BHTSNE::tsne(dense_handle, sparse_handle, thrust::raw_pointer_cast(h_X.data()),  IOPT(num-points), IOPT(dim),
                         2, FOPT(perplexity), FOPT(learning-rate), FOPT(early-ex), IOPT(num-steps),IOPT(num-steps), 0.0,
                         BOPT(dump), BOPT(viz), FOPT(magnitude-factor), init_type, IOPT(nearest-neighbors), SOPT(connection), nullptr );
 
