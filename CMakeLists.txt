@@ -11,6 +11,7 @@ option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" ON)
 option(BUILD_TEST "Build tests if ON" OFF)
 option(BUILD_PYTHON "Build python if ON" OFF)
 option(WITH_ZMQ "Build with interactive viz if ON" ON)
+option(WITH_FAISS_GPU_STANDALONE "Build standalone gpufaiss library ON" OFF)
 #-------------------------------------------------------------------------------
 
 
@@ -18,6 +19,11 @@ option(WITH_ZMQ "Build with interactive viz if ON" ON)
 if(NOT WITH_ZMQ)
     ADD_DEFINITIONS(-DNO_ZMQ)
     message("-- Not building with ZMQ. Why the fuck are you doing this?")
+endif()
+
+if(NOT WITH_FAISS_GPU_STANDALONE)
+    ADD_DEFINITIONS(-DNO_ZMQ)
+    message("-- Not building standalone gpufaiss lib.")
 endif()
 
 # CUDA Configuration
@@ -72,6 +78,15 @@ add_subdirectory(third_party/gtest)
 # FAISS Configuration
 #-------------------------------------------------------------------------------
 add_subdirectory(third_party/faiss)
+if(WITH_FAISS_GPU_STANDALONE)
+    add_subdirectory(third_party/faiss/gpu)
+endif()
+
+# specify header and cpp files
+file(GLOB_RECURSE faiss_gpu_headers third_party/faiss/gpu/*.h)
+file(GLOB_RECURSE faiss_gpu_cpp third_party/faiss/gpu/*.cpp)
+file(GLOB_RECURSE faiss_gpu_cuh third_party/faiss/gpu/*.cuh)
+file(GLOB_RECURSE faiss_gpu_cu third_party/faiss/gpu/*.cu)
 #-------------------------------------------------------------------------------
 
 # Project Setup
@@ -210,14 +225,6 @@ endif()
 #-------------------------------------------------------------------------------
 # Main Executable
 #-------------------------------------------------------------------------------
-
-
-# specify header and cpp files
-file(GLOB_RECURSE faiss_gpu_headers third_party/faiss/gpu/*.h)
-file(GLOB_RECURSE faiss_gpu_cpp third_party/faiss/gpu/*.cpp)
-file(GLOB_RECURSE faiss_gpu_cuh third_party/faiss/gpu/*.cuh)
-file(GLOB_RECURSE faiss_gpu_cu third_party/faiss/gpu/*.cu)
-
 cuda_add_executable(tsne
     ${faiss_gpu_headers} ${faiss_gpu_cpp} ${faiss_gpu_cuh} ${faiss_gpu_cu}
     ${SOURCES}
