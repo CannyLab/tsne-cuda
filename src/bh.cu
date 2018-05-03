@@ -1097,7 +1097,8 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                           int init_type,
                                           int NN,
                                           std::string viz_server,
-                                          float* preinit_data)
+                                          float* preinit_data,
+                                          float* copy_back)
 {
 
     // Setup clock information
@@ -1503,6 +1504,12 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     std::cout << "Total Time: " << p1_time + p2_time << "us" << std::endl << std::endl;
 
     std::cout << "Fin." << std::endl;
+
+    // TODO: Clean this up.
+    if (copy_back != nullptr) {
+      thrust::copy(pts.begin(), pts.begin()+N_POINTS, copy_back);
+      thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+N_POINTS, copy_back+N_POINTS);
+    }
 
     return pts;
 }
