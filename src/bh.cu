@@ -326,8 +326,8 @@ void TreeBuildingKernel(int nnodesd,
             y += dy;
             ch = childd[n*4+j];
             // repeat until the two bodies are different children
-            if (depth >= 100)
-                printf("parent: %d, child: %d, depth: %d, pos_parent: (%0.5f, %0.5f), pos_child: (%0.5f, %0.5f), dir: %d\n", n, ch, cell, depth, x, y, px, py, j);
+            // if (depth >= 100)
+            //     printf("parent: %d, child: %d, depth: %d, pos_parent: (%0.5f, %0.5f), pos_child: (%0.5f, %0.5f), dir: %d\n", n, ch, cell, depth, x, y, px, py, j);
           } while (ch >= 0 && r > 1e-10);
           childd[n*4+j] = i;
 
@@ -348,7 +348,7 @@ void TreeBuildingKernel(int nnodesd,
 }
 
 
-__global__
+__global__p
 __launch_bounds__(1024, 1)
 void ClearKernel2(int nnodesd, volatile int * __restrict startd, volatile float * __restrict massd)
 {
@@ -697,30 +697,54 @@ void IntegrationKernel(int N,
                         volatile float * __restrict pts, // (nnodes + 1) x 2
                         volatile float * __restrict attr_forces, // (N x 2)
                         volatile float * __restrict rep_forces, // (nnodes + 1) x 2
+                        volatile float * __restrict gains,
                         volatile float * __restrict old_forces) // (N x 2)
 {
   register int i, inc;
-  register float tmpx, tmpy;
+  register float dx, dy, ux, uy, gx, xy;
 
   // iterate over all bodies assigned to thread
   // TODO: fix momentum at step 0
   inc = blockDim.x * gridDim.x;
   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
-      tmpx = 4.0f * (exaggeration*attr_forces[i] - (rep_forces[i] / norm));
-      tmpy = 4.0f * (exaggeration*attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm));
-      tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
-      tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
+        ux = old_forces[i];
+        uy = old_forces[N + i];
+        gx = gains[i];
+        gy = gains[N + i];
+        dx = 4.0f * (exaggeration*attr_forces[i] - (rep_forces[i] / norm));
+        dy = 4.0f * (exaggeration*attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm));
 
-      // If the point is screwed up, just put it in the middle of the screen
-      if (pts[i] != pts[i] || isinf(pts[i])) 
-        pts[i] = 0;
-      if (pts[i + nnodes + 1] != pts[i + nnodes + 1] || isinf(pts[i + nnodes + 1])) 
-        pts[i + nnodes + 1] = 0;
+        gx = (signbit(dx) != signbit(ux)) ? gx + 0.2 : gx * 0.8;
+        gy = (signbit(dy) != signbit(uy)) ? gy + 0.2 : gy * 0.8;
+        gx = (gx < 0.01) ? 0.01 : gx;
+        gy = (gy < 0.01) ? 0.01 : gy;
+
+        ux = momentum * ux - eta * gx * dx;
+        uy = momentum * uy - eta * gy * dy;
+
+        pts[i] += ux;
+        pts[i + nnodes + 1] += uy;
+
+        old_forces[i] = ux;
+        old_forces[N + i] = uy;
+        gains[i] = gx;
+        gains[N + i] = gy;
+
         
-      pts[i] -= eta * tmpx;
-      pts[i + nnodes + 1] -= eta * tmpy;
-      old_forces[i] = tmpx;
-      old_forces[i + N] = tmpy;
+
+        // tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
+        // tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
+
+        // // If the point is screwed up, just put it in the middle of the screen
+        // if (pts[i] != pts[i] || isinf(pts[i])) 
+        // pts[i] = 0;
+        // if (pts[i + nnodes + 1] != pts[i + nnodes + 1] || isinf(pts[i + nnodes + 1])) 
+        // pts[i + nnodes + 1] = 0;
+
+        // pts[i] -= eta * tmpx;
+        // pts[i + nnodes + 1] -= eta * tmpy;
+        // old_forces[i] = tmpx;
+        // old_forces[i + N] = tmpy;
    }
 }
 
@@ -1224,6 +1248,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         thrust::device_vector<float> forceProd(sparsePij.size());
         thrust::device_vector<float> rep_forces((nnodes + 1) * 2, 0);
         thrust::device_vector<float> attr_forces(N_POINTS * 2, 0);
+        thrust::device_vector<float> gains(N_POINTS * 2, 1);
         thrust::device_vector<float> old_forces(N_POINTS * 2, 0); // for momentum
         thrust::device_vector<int> errl(1);
         thrust::device_vector<int> startl(nnodes + 1);
@@ -1271,7 +1296,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
 
         // Initialize the learning rates and momentums
         float eta = learning_rate;
-        float momentum = 0.1f;
+        float momentum = 0.5f;
         float norm;
         
         // These variables currently govern the tolerance (whether it recurses on a cell)
@@ -1339,7 +1364,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
 
       // Setup learning rate schedule
       if (step == STOP_LYING_ITER) {
-          eta /= early_ex; 
+          // eta /= early_ex; 
           momentum = 0.8;
           attr_exaggeration = 1.0f;
       }
@@ -1454,6 +1479,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                                                       thrust::raw_pointer_cast(pts.data()),
                                                                       thrust::raw_pointer_cast(attr_forces.data()),
                                                                       thrust::raw_pointer_cast(rep_forces.data()),
+                                                                      thrust::raw_pointer_cast(gains.data()),
                                                                       thrust::raw_pointer_cast(old_forces.data()));
           gpuErrchk(cudaDeviceSynchronize());
           thrust::transform(pts.begin(), pts.end(), random_vec.begin(), pts.begin(), thrust::plus<float>());
