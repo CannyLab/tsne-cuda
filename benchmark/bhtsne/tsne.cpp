@@ -35,6 +35,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
+#include <fstream>
 #include <ctime>
 #include "vptree.h"
 #include "sptree.h"
@@ -57,6 +59,7 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
           srand(time(NULL));
       }
     }
+    fprintf(stderr, "stop_lying_iter: %d\n", stop_lying_iter);
 
     // Determine whether we are using an exact algorithm
     if(N - 1 < 3 * perplexity) { printf("Perplexity too large for the number of data points!\n"); exit(1); }
@@ -124,7 +127,14 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
         symmetrizeMatrix(&row_P, &col_P, &val_P, N);
         double sum_P = .0;
         for(int i = 0; i < row_P[N]; i++) sum_P += val_P[i];
+        // for (int i = 0; i < 10; i++)
+            // fprintf(stderr, "pij: %0.5f\n", val_P[i]);
+        // fprintf(stderr, "sum_P: %0.5f\n", sum_P);
         for(int i = 0; i < row_P[N]; i++) val_P[i] /= sum_P;
+        
+        // DEBUG:
+        // for (int i = 0; i < 10; i++)
+            // fprintf(stderr, "pij: %0.5f\n", val_P[i]);
     }
     end = clock();
 
@@ -142,6 +152,10 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
     else printf("Input similarities computed in %4.2f seconds (sparsity = %f)!\nLearning embedding...\n", (float) (end - start) / CLOCKS_PER_SEC, (double) row_P[N] / ((double) N * (double) N));
     start = clock();
 
+    // DEBUG:
+    std::ofstream dump_file;
+    dump_file.open("/home/rmrao/class/parallel/tsne-cuda/benchmark/bhtsne/dump_ys.txt");
+    dump_file << N << " " << 2 << std::endl;
 	for(int iter = 0; iter < max_iter; iter++) {
 
         // Compute (approximate) gradient
@@ -158,7 +172,10 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
 
         // Make solution zero-mean
 		zeroMean(Y, N, no_dims);
-
+        // DEBUG:
+        for (int i = 0; i < N; i++) {
+            dump_file << Y[2*i] << " " << Y[2*i + 1] << std::endl;
+        }
         // Stop lying about the P-values after a while, and switch momentum
         if(iter == stop_lying_iter) {
             if(exact) { for(int i = 0; i < N * N; i++)        P[i] /= 12.0; }
@@ -181,6 +198,7 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
 			start = clock();
         }
     }
+    dump_file.close();
     end = clock(); total_time += (float) (end - start) / CLOCKS_PER_SEC;
 
     // Clean up memory
@@ -211,6 +229,13 @@ void TSNE::computeGradient(double* P, unsigned int* inp_row_P, unsigned int* inp
     if(pos_f == NULL || neg_f == NULL) { printf("Memory allocation failed!\n"); exit(1); }
     tree->computeEdgeForces(inp_row_P, inp_col_P, inp_val_P, N, pos_f);
     for(int n = 0; n < N; n++) tree->computeNonEdgeForces(n, theta, neg_f + n * D, &sum_Q);
+
+    fprintf(stderr, "\nsum_Q: %0.5f\n", sum_Q);
+    // for(int i = 0; i < 40; i++) {
+        // fprintf(stderr, "pos_f: %0.8f, neg_f: %0.8f, ", pos_f[i], neg_f[i] / sum_Q);
+        // if (i % 2 == 0)
+            // fprintf(stderr, "\n");
+    // }
 
     // Compute final t-SNE gradient
     for(int i = 0; i < N * D; i++) {

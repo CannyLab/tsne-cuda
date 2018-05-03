@@ -182,7 +182,7 @@ void BoundingBoxKernel(int nnodesd,
       }
 
       // compute 'radius'
-      radiusd = fmaxf(maxx - minx, maxy - miny) * 0.5f;
+      radiusd = fmaxf(maxx - minx, maxy - miny) * 0.5f + 1e-5f;
 
       // create root node
       k = nnodesd;
@@ -312,12 +312,10 @@ void TreeBuildingKernel(int nnodesd,
               childd[n*4+j] = cell;
             }
             patch = max(patch, cell);
-
             j = 0;
             if (x < posxd[ch]) j = 1;
             if (y < posyd[ch]) j |= 2;
             childd[cell*4+j] = ch;
-
             n = cell;
             r *= 0.5f;
             dx = dy = -r;
@@ -326,10 +324,11 @@ void TreeBuildingKernel(int nnodesd,
             if (y < py) {j |= 2; dy = r;}
             x += dx;
             y += dy;
-
             ch = childd[n*4+j];
             // repeat until the two bodies are different children
-          } while (ch >= 0);
+            if (depth >= 100)
+                printf("parent: %d, child: %d, depth: %d, pos_parent: (%0.5f, %0.5f), pos_child: (%0.5f, %0.5f), dir: %d\n", n, ch, cell, depth, x, y, px, py, j);
+          } while (ch >= 0 && r > 1e-10);
           childd[n*4+j] = i;
 
           localmaxdepth = max(depth, localmaxdepth);
@@ -338,7 +337,7 @@ void TreeBuildingKernel(int nnodesd,
         }
       }
     }
-    __syncthreads();  // __threadfence();
+    __threadfence();
 
     if (skip == 2) {
       childd[locked] = patch;
@@ -579,11 +578,11 @@ void ForceCalculationKernel(int nnodesd,
   if (0 == threadIdx.x) {
     // tmp = radiusd * 2;
     // precompute values that depend only on tree level
-    dq[0] = radiusd * radiusd * theta; 
+    dq[0] = (radiusd * radiusd) / (theta * theta); 
     // dq[0] = tmp * tmp * itolsqd;
     for (i = 1; i < maxdepthd; i++) {
       // dq[i] = dq[i - 1] * 0.5f; // radius is halved with every level of the tree
-        dq[i] = dq[i - 1] * 0.5f;
+        dq[i] = dq[i - 1] * 0.25f;
         dq[i - 1] += epssqd;
     }
     dq[i - 1] += epssqd;
@@ -676,7 +675,7 @@ void ForceCalculationKernel(int nnodesd,
         // TODO: This is probably wrongish and depends on what I do in the attractive force calculation
         velxd[i] += vx;
         velyd[i] += vy;
-        normd[i] = normsum;
+        normd[i] = normsum - 1.0f; // subtract one for self computation (qii)
       }
     }
   }
@@ -694,6 +693,7 @@ void IntegrationKernel(int N,
                         float eta,
                         float norm,
                         float momentum,
+                        float exaggeration,
                         volatile float * __restrict pts, // (nnodes + 1) x 2
                         volatile float * __restrict attr_forces, // (N x 2)
                         volatile float * __restrict rep_forces, // (nnodes + 1) x 2
@@ -706,8 +706,8 @@ void IntegrationKernel(int N,
   // TODO: fix momentum at step 0
   inc = blockDim.x * gridDim.x;
   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
-      tmpx = 4.0f * (attr_forces[i] * 1/((float)N) - (rep_forces[i] / norm));
-      tmpy = 4.0f * (attr_forces[i + N] * 1/((float)N) - (rep_forces[nnodes + 1 + i] / norm));
+      tmpx = 4.0f * (exaggeration*attr_forces[i] - (rep_forces[i] / norm));
+      tmpy = 4.0f * (exaggeration*attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm));
       tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
       tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
 
@@ -761,7 +761,7 @@ void computePijxQij(int N,
 }
 
 __global__
-void computePijxQij_alt(int N, int nnz, int nnodes, float *pij, int *pijRowPtr,int *pijColInd, float *forceProd,float *pts) {
+void computePijxQij_alt(int N, int nnz, int nnodes, float *pij, int *pijRowPtr,int *pijColInd, float *forceProd, float *pts) {
 
 
     register int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -974,7 +974,7 @@ struct func_kl {
 };
 
 struct func_entropy_kernel {
-  __host__ __device__ float operator()(const float &x) const { float val = x*log2(x); return (val != val || isinf(val)) ? 0 : val; }
+  __host__ __device__ float operator()(const float &x) const { float val = x*log(x); return (val != val || isinf(val)) ? 0 : val; }
 };
 
 struct func_pow2 {
@@ -1024,7 +1024,7 @@ void thrust_search_perplexity(cublasHandle_t &handle,
 //   printarray(neg_entropy, 1, N);
 //   std::cout << std::endl;
   
-  thrust::transform(neg_entropy.begin(), neg_entropy.end(), perplexity.begin(), func_pow2());
+  thrust::transform(neg_entropy.begin(), neg_entropy.end(), perplexity.begin(), func_exp());
  
 //   std::cout << "perplexity:" << std::endl;
 //   printarray(perplexity, 1, N);
@@ -1100,6 +1100,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
                                           float* preinit_data)
 {
 
+	const int STOP_LYING_ITER = (init_type == 2) ? 0 : 250; // This should probably be an argument
     // Setup clock information
     auto end_time = std::chrono::high_resolution_clock::now();
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -1249,14 +1250,17 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
 
         // Initialize the points with a gaussian
         thrust::device_vector<float> pts((nnodes + 1) * 2);
+        thrust::device_vector<float> random_vec(pts.size());
         if (init_type == 0) {
             pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
         } else if (init_type == 1) {
             std::default_random_engine generator;
-            std::normal_distribution<double> distribution1(-10.0, 1.0);
+            std::normal_distribution<double> distribution1(0.0, 1.0);
             thrust::host_vector<float> h_pts((nnodes + 1) * 2);
-            for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = distribution1(generator);
+            for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = 0.0001 * distribution1(generator);
             thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
+            thrust::constant_iterator<float> mult(10);
+            thrust::transform(pts.begin(), pts.end(), mult, random_vec.begin(), thrust::multiplies<float>());
         } else if (init_type == 2) {
             // Load from vector
             thrust::copy(preinit_data, preinit_data+(nnodes+1)*2, pts.begin());
@@ -1266,7 +1270,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         }
 
         // Initialize the learning rates and momentums
-        float eta = learning_rate * early_ex;
+        float eta = learning_rate;
         float momentum = 0.1f;
         float norm;
         
@@ -1330,13 +1334,14 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
 	#endif
 
     // Support for infinite iteration
-
+	float attr_exaggeration = early_ex;
     for (int step = 0; step != n_iter; step++) {
 
       // Setup learning rate schedule
-      if (step == 250) {
+      if (step == STOP_LYING_ITER) {
           eta /= early_ex; 
           momentum = 0.8;
+          attr_exaggeration = 1.0f;
       }
 
       // Do Force Reset
@@ -1436,29 +1441,32 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
       end_time = std::chrono::high_resolution_clock::now();
       times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
+
+
       // Move the particles
       start_time = std::chrono::high_resolution_clock::now();
       
           norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
           if (step % 10 == 0)
               std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
-      
-          IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(N_POINTS, nnodes, eta, norm, momentum, 
+      		
+          IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(N_POINTS, nnodes, eta, norm, momentum, attr_exaggeration,
                                                                       thrust::raw_pointer_cast(pts.data()),
                                                                       thrust::raw_pointer_cast(attr_forces.data()),
                                                                       thrust::raw_pointer_cast(rep_forces.data()),
                                                                       thrust::raw_pointer_cast(old_forces.data()));
           gpuErrchk(cudaDeviceSynchronize());
+          thrust::transform(pts.begin(), pts.end(), random_vec.begin(), pts.begin(), thrust::plus<float>());
 
       end_time = std::chrono::high_resolution_clock::now();
       times[12] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-      if (dump_points) {
-        thrust::copy(pts.begin(), pts.end(), host_ys);
-        for (int i = 0; i < N_POINTS; i++) {
-            dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
-        }
-      }
+      // if (dump_points) {
+      //   thrust::copy(pts.begin(), pts.end(), host_ys);
+      //   for (int i = 0; i < N_POINTS; i++) {
+      //       dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
+      //   }
+      // }
 
       #ifndef NO_ZMQ
 	      if (send_zmq) {
@@ -1476,6 +1484,13 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
 	      }
       #endif
     }
+
+    if (dump_points) {
+        thrust::copy(pts.begin(), pts.end(), host_ys);
+        for (int i = 0; i < N_POINTS; i++) {
+            dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
+        }
+      }
 
     if (dump_points){
       delete[] host_ys;

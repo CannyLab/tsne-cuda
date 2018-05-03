@@ -1,3 +1,4 @@
+import sys
 import itertools
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -14,7 +15,11 @@ min_particle = -1*float("inf")
 max_particle =float("inf")
 n_timesteps = 0
 
-with open('../build/dump_ys.txt') as f:
+filename = '../build/dump_ys.txt'
+if len(sys.argv) > 1:
+	filename = sys.argv[1]
+
+with open(filename) as f:
     lines = f.readlines()
     n_particles = int(lines[0].split()[0])
     particles = np.array([[float(el) for el in line.split()] for line in lines[1:]])

@@ -180,8 +180,10 @@ void Sparse::sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_ve
 
     // Sum the arrays
     // std::cout << "Symmetrizing..." << std::endl;
-    float alpha = 1.0f / (2.0f * magnitude_factor * maxs );
-    float beta = 1.0f / (2.0f * magnitude_factor * maxs );
+    // float alpha = 1.0f / (2.0f * magnitude_factor * maxs );
+    // float beta = 1.0f / (2.0f * magnitude_factor * maxs );
+    float alpha = 0.5f;
+    float beta = 0.5f;
     cusparseScsrgeam(handle, N_POINTS, N_POINTS, 
        &alpha, descr, N_POINTS*K, csrValA, csrRowPtrA, csrColPtrA,
         &beta, descr, N_POINTS*K, cscValAT, cscColPtrAT, cscRowIndAT,
@@ -190,6 +192,11 @@ void Sparse::sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_ve
                 thrust::raw_pointer_cast(sym_colind.data())
     );
     cudaDeviceSynchronize();
+
+    float sum_P = thrust::reduce(sym_values.begin(), sym_values.end(), 0.0f, thrust::plus<float>()); // TODO: This actually should equal N so we can just do it in the previous step
+    thrust::constant_iterator<float> normalization(sum_P);
+    thrust::transform(sym_values.begin(), sym_values.end(), normalization, sym_values.begin(), thrust::divides<float>());
+    std::cout << "sum_P: " << sum_P << std::endl;
 
     // Free the memory we were using...
     cudaFree(csrValA);
