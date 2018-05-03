@@ -348,7 +348,7 @@ void TreeBuildingKernel(int nnodesd,
 }
 
 
-__global__p
+__global__
 __launch_bounds__(1024, 1)
 void ClearKernel2(int nnodesd, volatile int * __restrict startd, volatile float * __restrict massd)
 {
@@ -701,7 +701,7 @@ void IntegrationKernel(int N,
                         volatile float * __restrict old_forces) // (N x 2)
 {
   register int i, inc;
-  register float dx, dy, ux, uy, gx, xy;
+  register float dx, dy, ux, uy, gx, gy;
 
   // iterate over all bodies assigned to thread
   // TODO: fix momentum at step 0
@@ -722,8 +722,8 @@ void IntegrationKernel(int N,
         ux = momentum * ux - eta * gx * dx;
         uy = momentum * uy - eta * gy * dy;
 
-        pts[i] += ux;
-        pts[i + nnodes + 1] += uy;
+        pts[i] += -eta * dx;
+        pts[i + nnodes + 1] += -eta * dy;
 
         old_forces[i] = ux;
         old_forces[N + i] = uy;
