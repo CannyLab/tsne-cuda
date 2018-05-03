@@ -1,0 +1,9 @@
+[submodule "cxxopts"]
+	path = third_party/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
+[submodule "gtest"]
+	path = third_party/gtest
+	url = https://github.com/google/googletest.git
+[submodule "faiss"]
+	path = third_party/faiss
+	url = https://github.com/DavidMChan/faiss.git
