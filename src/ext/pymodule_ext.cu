@@ -145,7 +145,6 @@ void pymodule_bhsnapshot(float *points, float *result, ssize_t *dims, int proj_d
     // Return data setup
     opt.return_style = BHTSNE::RETURN_STYLE::SNAPSHOT;
     opt.num_snapshots = num_snapshots;
-    opt.enable_dump("test.txt", 500);
 
     // Do the t-SNE
     BHTSNE::tsne(dense_handle, sparse_handle, opt);
