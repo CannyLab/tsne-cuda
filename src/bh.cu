@@ -1103,29 +1103,14 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
     return pij;
 }
 
-thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle, 
-                                          cusparseHandle_t &sparse_handle,
-                                          float* points, 
-                                          unsigned int N_POINTS, 
-                                          unsigned int N_DIMS, 
-                                          unsigned int PROJDIM, 
-                                          float perplexity, 
-                                          float learning_rate, 
-                                          float early_ex, 
-                                          int n_iter, 
-                                          unsigned int n_iter_np, 
-                                          float min_g_norm,
-                                          bool dump_points,
-                                          bool interactive,
-                                          float magnitude_factor,
-                                          int init_type,
-                                          int NN,
-                                          std::string viz_server,
-                                          float* preinit_data,
-                                          float* copy_back)
-{
+void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle, BHTSNE::Options &opt) {
 
-	const int STOP_LYING_ITER = (init_type == 2) ? 0 : 250; // This should probably be an argument
+    // Check the validity of the options file
+    if (!opt.validate()) {
+        std::cout << "E: Invalid options file. Terminating." << std::endl;
+        return;
+    }
+
     // Setup clock information
     auto end_time = std::chrono::high_resolution_clock::now();
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -1150,10 +1135,10 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         cudaFuncSetCacheConfig(computePijxQij, cudaFuncCachePreferShared);
     
         // Allocate some memory
-        const unsigned int K = NN < N_POINTS ? NN : N_POINTS - 1; 
-        float *knn_distances = new float[N_POINTS*K];
-        memset(knn_distances, 0, N_POINTS * K * sizeof(float));
-        long *knn_indices = new long[N_POINTS*K]; // Allocate memory for the indices on the CPU
+        const unsigned int K = opt.n_neighbors < opt.n_points ? opt.n_neighbors : opt.n_points - 1; 
+        float *knn_distances = new float[opt.n_points*K];
+        memset(knn_distances, 0, opt.n_points * K * sizeof(float));
+        long *knn_indices = new long[opt.n_points*K]; // Allocate memory for the indices on the CPU
     
     end_time = std::chrono::high_resolution_clock::now();
     times[0] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1162,7 +1147,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     start_time = std::chrono::high_resolution_clock::now();
 
         // Do KNN Call
-        Distance::knn(points, knn_indices, knn_distances, N_DIMS, N_POINTS, K);
+        Distance::knn(opt.points, knn_indices, knn_distances, opt.n_dims, opt.n_points, K);
         
     end_time = std::chrono::high_resolution_clock::now();
     times[1] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1171,25 +1156,25 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     start_time = std::chrono::high_resolution_clock::now();
 
         // Allocate device distance memory
-        thrust::device_vector<float> d_knn_distances(N_POINTS*K);
-        thrust::copy(knn_distances, knn_distances + N_POINTS*K, d_knn_distances.begin());
+        thrust::device_vector<float> d_knn_distances(opt.n_points*K);
+        thrust::copy(knn_distances, knn_distances + (opt.n_points*K), d_knn_distances.begin());
         Math::max_norm(d_knn_distances); // Here, the extra 0s floating around won't matter
-        thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, perplexity, 1e-4, N_POINTS, K);
+        thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, opt.perplexity, opt.perplexity_search_epsilon, opt.n_points, K);
 
         // Clean up distance memory
         d_knn_distances.clear();
         d_knn_distances.shrink_to_fit();
 
         // Copy the distances back to the GPU
-        thrust::device_vector<long> d_knn_indices_long(N_POINTS*K);
-        thrust::device_vector<int> d_knn_indices(N_POINTS*K);
-        thrust::copy(knn_indices, knn_indices + N_POINTS*K, d_knn_indices_long.begin());
+        thrust::device_vector<long> d_knn_indices_long(opt.n_points*K);
+        thrust::device_vector<int> d_knn_indices(opt.n_points*K);
+        thrust::copy(knn_indices, knn_indices + opt.n_points*K, d_knn_indices_long.begin());
 
         // Post-process the floating point matrix
-        const int NBLOCKS_PP = iDivUp(N_POINTS*K, 128);
+        const int NBLOCKS_PP = iDivUp(opt.n_points*K, 128);
         postprocess_matrix<<< NBLOCKS_PP, 128 >>>(thrust::raw_pointer_cast(d_pij.data()), 
                                                 thrust::raw_pointer_cast(d_knn_indices_long.data()), 
-                                                thrust::raw_pointer_cast(d_knn_indices.data()),  N_POINTS, K);
+                                                thrust::raw_pointer_cast(d_knn_indices.data()),  opt.n_points, K);
         cudaDeviceSynchronize();
 
         // Clean up extra memory
@@ -1215,7 +1200,7 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         thrust::device_vector<int> pijRowPtr; // Device
         thrust::device_vector<int> pijColInd; // Device
         int sym_nnz;
-        Sparse::sym_mat_gpu(d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, N_POINTS, K, magnitude_factor);
+        Sparse::sym_mat_gpu(d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, opt.n_points, K, opt.magnitude_factor);
 
         // Clear some old memory
         d_knn_indices.clear();
@@ -1240,17 +1225,19 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         int blocks = deviceProp.multiProcessorCount;
 
         // Figure out the number of nodes needed for the BH tree
-        int nnodes = N_POINTS * 2;
+        int nnodes = opt.n_points * 2;
         if (nnodes < 1024*blocks) nnodes = 1024*blocks;
         while ((nnodes & (WARPSIZE-1)) != 0) nnodes++;
         nnodes--;
 
+        opt.n_nodes = nnodes;
+
         // Allocate memory for the barnes hut implementations
         thrust::device_vector<float> forceProd(sparsePij.size());
         thrust::device_vector<float> rep_forces((nnodes + 1) * 2, 0);
-        thrust::device_vector<float> attr_forces(N_POINTS * 2, 0);
-        thrust::device_vector<float> gains(N_POINTS * 2, 1);
-        thrust::device_vector<float> old_forces(N_POINTS * 2, 0); // for momentum
+        thrust::device_vector<float> attr_forces(opt.n_points * 2, 0);
+        thrust::device_vector<float> gains(opt.n_points * 2, 1);
+        thrust::device_vector<float> old_forces(opt.n_points * 2, 0); // for momentum
         thrust::device_vector<int> errl(1);
         thrust::device_vector<int> startl(nnodes + 1);
         thrust::device_vector<int> childl((nnodes + 1) * 4);
@@ -1262,24 +1249,25 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
         thrust::device_vector<float> maxyl(blocks * FACTOR1);
         thrust::device_vector<float> minxl(blocks * FACTOR1);
         thrust::device_vector<float> minyl(blocks * FACTOR1);
-        thrust::device_vector<float> ones(N_POINTS * 2, 1); // This is for reduce summing, etc.
+        thrust::device_vector<float> ones(opt.n_points * 2, 1); // This is for reduce summing, etc.
         thrust::device_vector<int> indices(sparsePij.size()*2);
 
         // Compute the indices setup
         const int SBS = 1024;
         const int NBS = iDivUp(sparsePij.size(), SBS);
-        cpsq3<<<NBS, SBS>>>(N_POINTS, sparsePij.size(), 
+        cpsq3<<<NBS, SBS>>>(opt.n_points, sparsePij.size(), 
                                         thrust::raw_pointer_cast(pijRowPtr.data()),
                                         thrust::raw_pointer_cast(pijColInd.data()),
                                         thrust::raw_pointer_cast(indices.data()));
         gpuErrchk(cudaDeviceSynchronize());
 
-        // Initialize the points with a gaussian
+        // Point initialization
         thrust::device_vector<float> pts((nnodes + 1) * 2);
         thrust::device_vector<float> random_vec(pts.size());
-        if (init_type == 0) {
+        
+        if (opt.initialization == BHTSNE::TSNE_INIT::UNIFORM) { // Random uniform initialization
             pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
-        } else if (init_type == 1) {
+        } else if (opt.initialization == BHTSNE::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
             std::default_random_engine generator;
             std::normal_distribution<double> distribution1(0.0, 1.0);
             thrust::host_vector<float> h_pts((nnodes + 1) * 2);
@@ -1287,22 +1275,38 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
             thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
             thrust::constant_iterator<float> mult(10);
             thrust::transform(pts.begin(), pts.end(), mult, random_vec.begin(), thrust::multiplies<float>());
-        } else if (init_type == 2) {
+        } else if (opt.initialization == BHTSNE::TSNE_INIT::RESUME) { // Preinit from vector
             // Load from vector
-            thrust::copy(preinit_data, preinit_data+(nnodes+1)*2, pts.begin());
-        } else {
-            std::cout << "Invalid initialization type specified..." << std::endl;
+            if(opt.preinit_data != nullptr) {
+              thrust::copy(opt.preinit_data, opt.preinit_data+(nnodes+1)*2, pts.begin());
+            }
+            else {
+              std::cout << "E: Invalid initialization. Initialization points are null." << std::endl;
+            }
+        } else if (opt.initialization == BHTSNE::TSNE_INIT::VECTOR) { // Preinit from vector points only
+            // Load only the poitns into the pre-init vector
+            pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
+            // Copy the pre-init data
+            if(opt.preinit_data != nullptr) {
+              thrust::copy(opt.preinit_data, opt.preinit_data+opt.n_points, pts.begin());
+              thrust::copy(opt.preinit_data+opt.n_points+1, opt.preinit_data+opt.n_points*2 , pts.begin()+(nnodes+1));
+            }
+            else {
+              std::cout << "E: Invalid initialization. Initialization points are null." << std::endl;
+            }
+        } else { // Invalid initialization
+            std::cout << "E: Invalid initialization type specified." << std::endl;
             exit(1);
         }
 
         // Initialize the learning rates and momentums
-        float eta = learning_rate;
-        float momentum = 0.5f;
+        float eta = opt.learning_rate;
+        float momentum = opt.pre_exaggeration_momentum;
         float norm;
         
         // These variables currently govern the tolerance (whether it recurses on a cell)
-        float theta = 0.5f;
-        float epssq = 0.05 * 0.05;
+        float theta = opt.theta;
+        float epssq = opt.epssq;
 
         // Initialize the GPU tree memory
         InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
@@ -1314,245 +1318,242 @@ thrust::device_vector<float> BHTSNE::tsne(cublasHandle_t &dense_handle,
     // Dump file
     float *host_ys = nullptr;
     std::ofstream dump_file;
-    if (dump_points) {
-      dump_file.open("dump_ys.txt");
-      host_ys = new float[(nnodes + 1) * 2];
-      dump_file << N_POINTS << " " << 2 << std::endl;
+    if (opt.get_dump_points()) {
+        dump_file.open(opt.get_dump_file());
+        host_ys = new float[(nnodes + 1) * 2];
+        dump_file << opt.n_points << " " << 2 << std::endl;
     }
 
     #ifndef NO_ZMQ
     
-	    bool send_zmq = interactive;
+	    bool send_zmq = opt.get_use_interactive();
 	    zmq::context_t context(1);
 	    zmq::socket_t publisher(context, ZMQ_REQ);
-	    if (interactive) {
+	    if (opt.use_interactive) {
 
-	      // Try to connect to the socket
-	      std::cout << "Initializing Connection...." << std::endl;
-	      publisher.setsockopt(ZMQ_RCVTIMEO, 10000);
-	      publisher.setsockopt(ZMQ_SNDTIMEO, 10000);
-	      std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
-	      publisher.connect(viz_server);
+        // Try to connect to the socket
+        if (opt.verbosity >= 1)
+            std::cout << "Initializing Connection...." << std::endl;
+            publisher.setsockopt(ZMQ_RCVTIMEO, opt.get_viz_timeout());
+            publisher.setsockopt(ZMQ_SNDTIMEO, opt.get_viz_timeout());
+        if (opt.verbosity >= 1)
+            std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
+            publisher.connect(opt.viz_server);
 
-	      // Send the number of points we should be expecting to the server
-	      std::string message = std::to_string(N_POINTS);
-	      send_zmq = publisher.send(message.c_str(), message.length());
+            // Send the number of points we should be expecting to the server
+            std::string message = std::to_string(opt.n_points);
+            send_zmq = publisher.send(message.c_str(), message.length());
 
-	      // Wait for server reply
-	      zmq::message_t request;
-	      send_zmq = publisher.recv (&request);
-	      
-
-	      
-
-	      // If there's a time-out, don't bother.
-	      if (send_zmq) {
-	        std::cout << "Visualization connected!" << std::endl;
-	      } else {
-	        std::cout << "No Visualization Terminal, continuing..." << std::endl;
-	        send_zmq = false;
-	      }
+            // Wait for server reply
+            zmq::message_t request;
+            send_zmq = publisher.recv (&request);
+            
+            // If there's a time-out, don't bother.
+            if (send_zmq) {
+                if (opt.verbosity >= 1)
+                    std::cout << "Visualization connected!" << std::endl;
+            } else {
+                std::cout << "No Visualization Terminal, continuing..." << std::endl;
+                send_zmq = false;
+            }
 	    }
 	#endif
 
 	#ifdef NO_ZMQ
-	    if (interactive) std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
+      if (opt.get_use_interactive()) 
+        std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
 	#endif
 
     // Support for infinite iteration
-	float attr_exaggeration = early_ex;
-    for (int step = 0; step != n_iter; step++) {
+  float attr_exaggeration = opt.early_exaggeration;
+  
+    for (int step = 0; step != opt.iterations; step++) {
 
-      // Setup learning rate schedule
-      if (step == STOP_LYING_ITER) {
-          // eta /= early_ex; 
-          momentum = 0.8;
-          attr_exaggeration = 1.0f;
-      }
+        // Setup learning rate schedule
+        if (step == opt.force_magnify_iters) {
+            // eta /= early_ex; 
+            momentum = opt.post_exaggeration_momentum;
+            attr_exaggeration = 1.0f;
+        }
 
-      // Do Force Reset
-      start_time = std::chrono::high_resolution_clock::now();
+        // Do Force Reset
+        start_time = std::chrono::high_resolution_clock::now();
 
-          thrust::fill(attr_forces.begin(), attr_forces.end(), 0);
-          thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
+            thrust::fill(attr_forces.begin(), attr_forces.end(), 0);
+            thrust::fill(rep_forces.begin(), rep_forces.end(), 0);
 
-      end_time = std::chrono::high_resolution_clock::now();
-      times[5] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
-      
+        end_time = std::chrono::high_resolution_clock::now();
+        times[5] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+        
 
         // Bounding box kernel
         start_time = std::chrono::high_resolution_clock::now();
 
-          BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
-                                                          N_POINTS, 
-                                                          thrust::raw_pointer_cast(startl.data()), 
-                                                          thrust::raw_pointer_cast(childl.data()), 
-                                                          thrust::raw_pointer_cast(massl.data()), 
-                                                          thrust::raw_pointer_cast(pts.data()), 
-                                                          thrust::raw_pointer_cast(pts.data() + nnodes + 1), 
-                                                          thrust::raw_pointer_cast(maxxl.data()), 
-                                                          thrust::raw_pointer_cast(maxyl.data()), 
-                                                          thrust::raw_pointer_cast(minxl.data()), 
-                                                          thrust::raw_pointer_cast(minyl.data()));
+            BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, 
+                                                            opt.n_points, 
+                                                            thrust::raw_pointer_cast(startl.data()), 
+                                                            thrust::raw_pointer_cast(childl.data()), 
+                                                            thrust::raw_pointer_cast(massl.data()), 
+                                                            thrust::raw_pointer_cast(pts.data()), 
+                                                            thrust::raw_pointer_cast(pts.data() + nnodes + 1), 
+                                                            thrust::raw_pointer_cast(maxxl.data()), 
+                                                            thrust::raw_pointer_cast(maxyl.data()), 
+                                                            thrust::raw_pointer_cast(minxl.data()), 
+                                                            thrust::raw_pointer_cast(minyl.data()));
 
-          gpuErrchk(cudaDeviceSynchronize());
+            gpuErrchk(cudaDeviceSynchronize());
 
-      end_time = std::chrono::high_resolution_clock::now();
-      times[6] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+        end_time = std::chrono::high_resolution_clock::now();
+        times[6] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-      // Tree Building
-      start_time = std::chrono::high_resolution_clock::now();
+        // Tree Building
+        start_time = std::chrono::high_resolution_clock::now();
 
-          ClearKernel1<<<blocks * 1, 1024>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(childl.data()));
-          TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
-                                                                              thrust::raw_pointer_cast(childl.data()), 
-                                                                              thrust::raw_pointer_cast(pts.data()), 
-                                                                              thrust::raw_pointer_cast(pts.data() + nnodes + 1));
-          ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
-          gpuErrchk(cudaDeviceSynchronize());
+            ClearKernel1<<<blocks * 1, 1024>>>(nnodes, opt.n_points, thrust::raw_pointer_cast(childl.data()));
+            TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, opt.n_points, thrust::raw_pointer_cast(errl.data()), 
+                                                                                thrust::raw_pointer_cast(childl.data()), 
+                                                                                thrust::raw_pointer_cast(pts.data()), 
+                                                                                thrust::raw_pointer_cast(pts.data() + nnodes + 1));
+            ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
+            gpuErrchk(cudaDeviceSynchronize());
 
-      end_time = std::chrono::high_resolution_clock::now();
-      times[7] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+        end_time = std::chrono::high_resolution_clock::now();
+        times[7] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-      // Tree Summarization
-      start_time =  std::chrono::high_resolution_clock::now();
-      
-          SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(countl.data()), 
-                                                                                      thrust::raw_pointer_cast(childl.data()), 
-                                                                                      thrust::raw_pointer_cast(massl.data()),
-                                                                                      thrust::raw_pointer_cast(pts.data()),
-                                                                                      thrust::raw_pointer_cast(pts.data() + nnodes + 1));
-          gpuErrchk(cudaDeviceSynchronize());
+        // Tree Summarization
+        start_time =  std::chrono::high_resolution_clock::now();
+        
+            SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, opt.n_points, thrust::raw_pointer_cast(countl.data()), 
+                                                                                        thrust::raw_pointer_cast(childl.data()), 
+                                                                                        thrust::raw_pointer_cast(massl.data()),
+                                                                                        thrust::raw_pointer_cast(pts.data()),
+                                                                                        thrust::raw_pointer_cast(pts.data() + nnodes + 1));
+            gpuErrchk(cudaDeviceSynchronize());
 
-      end_time = std::chrono::high_resolution_clock::now();
-      times[8] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+        end_time = std::chrono::high_resolution_clock::now();
+        times[8] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-      // Force sorting
-      start_time = std::chrono::high_resolution_clock::now();
-      
-          SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(sortl.data()), 
-                                                                      thrust::raw_pointer_cast(countl.data()), 
-                                                                      thrust::raw_pointer_cast(startl.data()), 
-                                                                      thrust::raw_pointer_cast(childl.data()));
-          gpuErrchk(cudaDeviceSynchronize());
+        // Force sorting
+        start_time = std::chrono::high_resolution_clock::now();
+        
+            SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, opt.n_points, thrust::raw_pointer_cast(sortl.data()), 
+                                                                        thrust::raw_pointer_cast(countl.data()), 
+                                                                        thrust::raw_pointer_cast(startl.data()), 
+                                                                        thrust::raw_pointer_cast(childl.data()));
+            gpuErrchk(cudaDeviceSynchronize());
 
-      end_time = std::chrono::high_resolution_clock::now();
-      times[9] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+        end_time = std::chrono::high_resolution_clock::now();
+        times[9] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-      // Repulsive force calculation
-      start_time = std::chrono::high_resolution_clock::now();
-      
-          ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, N_POINTS, thrust::raw_pointer_cast(errl.data()), 
-                                                                      theta, epssq,
-                                                                      thrust::raw_pointer_cast(sortl.data()), 
-                                                                      thrust::raw_pointer_cast(childl.data()), 
-                                                                      thrust::raw_pointer_cast(massl.data()), 
-                                                                      thrust::raw_pointer_cast(pts.data()),
-                                                                      thrust::raw_pointer_cast(pts.data() + nnodes + 1),
-                                                                      thrust::raw_pointer_cast(rep_forces.data()),
-                                                                      thrust::raw_pointer_cast(rep_forces.data() + nnodes + 1),
-                                                                      thrust::raw_pointer_cast(norml.data()));
-          gpuErrchk(cudaDeviceSynchronize());
+        // Repulsive force calculation
+        start_time = std::chrono::high_resolution_clock::now();
+        
+            ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, opt.n_points, thrust::raw_pointer_cast(errl.data()), 
+                                                                        theta, epssq,
+                                                                        thrust::raw_pointer_cast(sortl.data()), 
+                                                                        thrust::raw_pointer_cast(childl.data()), 
+                                                                        thrust::raw_pointer_cast(massl.data()), 
+                                                                        thrust::raw_pointer_cast(pts.data()),
+                                                                        thrust::raw_pointer_cast(pts.data() + nnodes + 1),
+                                                                        thrust::raw_pointer_cast(rep_forces.data()),
+                                                                        thrust::raw_pointer_cast(rep_forces.data() + nnodes + 1),
+                                                                        thrust::raw_pointer_cast(norml.data()));
+            gpuErrchk(cudaDeviceSynchronize());
 
-      end_time = std::chrono::high_resolution_clock::now();
-      times[10] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+        end_time = std::chrono::high_resolution_clock::now();
+        times[10] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-      // Attractive Force Computation
-      start_time = std::chrono::high_resolution_clock::now();
+        // Attractive Force Computation
+        start_time = std::chrono::high_resolution_clock::now();
 
-          // compute attractive forces
-          computeAttrForce(N_POINTS, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
-          gpuErrchk(cudaDeviceSynchronize());
+            // compute attractive forces
+            computeAttrForce(opt.n_points, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
+            gpuErrchk(cudaDeviceSynchronize());
 
-      end_time = std::chrono::high_resolution_clock::now();
-      times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+        end_time = std::chrono::high_resolution_clock::now();
+        times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
 
 
-      // Move the particles
-      start_time = std::chrono::high_resolution_clock::now();
-      
-          norm = thrust::reduce(norml.begin(), norml.begin() + N_POINTS, 0.0f, thrust::plus<float>());
-          if (step % 10 == 0)
-              std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
-      		
-          IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(N_POINTS, nnodes, eta, norm, momentum, attr_exaggeration,
-                                                                      thrust::raw_pointer_cast(pts.data()),
-                                                                      thrust::raw_pointer_cast(attr_forces.data()),
-                                                                      thrust::raw_pointer_cast(rep_forces.data()),
-                                                                      thrust::raw_pointer_cast(gains.data()),
-                                                                      thrust::raw_pointer_cast(old_forces.data()));
-          gpuErrchk(cudaDeviceSynchronize());
-          thrust::transform(pts.begin(), pts.end(), random_vec.begin(), pts.begin(), thrust::plus<float>());
+        // Move the particles
+        start_time = std::chrono::high_resolution_clock::now();
+        
+            norm = thrust::reduce(norml.begin(), norml.begin() + opt.n_points, 0.0f, thrust::plus<float>());
+            if (opt.verbosity >= 1 && step % opt.print_interval == 0)
+                std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
+            
+            IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(opt.n_points, nnodes, eta, norm, momentum, attr_exaggeration,
+                                                                        thrust::raw_pointer_cast(pts.data()),
+                                                                        thrust::raw_pointer_cast(attr_forces.data()),
+                                                                        thrust::raw_pointer_cast(rep_forces.data()),
+                                                                        thrust::raw_pointer_cast(gains.data()),
+                                                                        thrust::raw_pointer_cast(old_forces.data()));
+            gpuErrchk(cudaDeviceSynchronize());
+            thrust::transform(pts.begin(), pts.end(), random_vec.begin(), pts.begin(), thrust::plus<float>());
 
-      end_time = std::chrono::high_resolution_clock::now();
-      times[12] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
+        end_time = std::chrono::high_resolution_clock::now();
+        times[12] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
-      // if (dump_points) {
-      //   thrust::copy(pts.begin(), pts.end(), host_ys);
-      //   for (int i = 0; i < N_POINTS; i++) {
-      //       dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
-      //   }
-      // }
+        #ifndef NO_ZMQ
+            if (send_zmq) {
+            zmq::message_t message(sizeof(float)*opt.n_points*2);
+            thrust::copy(pts.begin(), pts.begin()+opt.n_points, static_cast<float*>(message.data()));
+            thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+opt.n_points, static_cast<float*>(message.data())+opt.n_points);
+            bool res = false;
+            res = publisher.send(message);
+            zmq::message_t request;
+            res = publisher.recv(&request);
+            if (!res) {
+                std::cout << "Server Disconnected, Not sending anymore for this session." << std::endl;
+            }
+            send_zmq = res;
+            }
+        #endif
 
-      #ifndef NO_ZMQ
-	      if (send_zmq) {
-	        zmq::message_t message(sizeof(float)*N_POINTS*2);
-	        thrust::copy(pts.begin(), pts.begin()+N_POINTS, static_cast<float*>(message.data()));
-	        thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+N_POINTS, static_cast<float*>(message.data())+N_POINTS);
-	        bool res = false;
-	        res = publisher.send(message);
-	        zmq::message_t request;
-	        res = publisher.recv(&request);
-	        if (!res) {
-	          std::cout << "Server Disconnected, Not sending anymore for this session." << std::endl;
-	        }
-	        send_zmq = res;
-	      }
-      #endif
+        if (opt.get_dump_points() && step % opt.get_dump_interval() == 0) {
+            thrust::copy(pts.begin(), pts.end(), host_ys);
+            for (int i = 0; i < opt.n_points; i++) {
+                dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
+            }
+        }
+
     }
 
-    if (dump_points) {
-        thrust::copy(pts.begin(), pts.end(), host_ys);
-        for (int i = 0; i < N_POINTS; i++) {
-            dump_file << host_ys[i] << " " << host_ys[i + nnodes + 1] << std::endl;
-        }
-      }
-
-    if (dump_points){
+    if (opt.get_dump_points()){
       delete[] host_ys;
       dump_file.close();
     }
 
-    int p1_time = times[0] + times[1] + times[2] + times[3];
-    int p2_time = times[4] + times[5] + times[6] + times[7] + times[8] + times[9] + times[10] + times[11] + times[12];
-    std::cout << "Timing data: " << std::endl;
-    std::cout << "\t Phase 1 (" << p1_time  << "us):" << std::endl;
-    std::cout << "\t\tKernel Setup: " << times[0] << "us" << std::endl;
-    std::cout << "\t\tKNN Computation: " << times[1] << "us" << std::endl;
-    std::cout << "\t\tPIJ Computation: " << times[2] << "us" << std::endl;
-    std::cout << "\t\tPIJ Symmetrization: " << times[3] << "us" << std::endl;
-    std::cout << "\t Phase 2 (" << p2_time << "us):" << std::endl;
-    std::cout << "\t\tKernel Setup: " << times[4] << "us" << std::endl;
-    std::cout << "\t\tForce Reset: " << times[5] << "us" << std::endl;
-    std::cout << "\t\tBounding Box: " << times[6] << "us" << std::endl;
-    std::cout << "\t\tTree Building: " << times[7] << "us" << std::endl;
-    std::cout << "\t\tTree Summarization: " << times[8] << "us" << std::endl;
-    std::cout << "\t\tSorting: " << times[9] << "us" << std::endl;
-    std::cout << "\t\tRepulsive Force Calculation: " << times[10] << "us" << std::endl;
-    std::cout << "\t\tAttractive Force Calculation: " << times[11] << "us" << std::endl;
-    std::cout << "\t\tIntegration: " << times[12] << "us" << std::endl;
-    std::cout << "Total Time: " << p1_time + p2_time << "us" << std::endl << std::endl;
-
-    std::cout << "Fin." << std::endl;
-
-    // TODO: Clean this up.
-    if (copy_back != nullptr) {
-      thrust::copy(pts.begin(), pts.begin()+N_POINTS, copy_back);
-      thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+N_POINTS, copy_back+N_POINTS);
+    if (opt.verbosity >= 2) {
+      int p1_time = times[0] + times[1] + times[2] + times[3];
+      int p2_time = times[4] + times[5] + times[6] + times[7] + times[8] + times[9] + times[10] + times[11] + times[12];
+      std::cout << "Timing data: " << std::endl;
+      std::cout << "\t Phase 1 (" << p1_time  << "us):" << std::endl;
+      std::cout << "\t\tKernel Setup: " << times[0] << "us" << std::endl;
+      std::cout << "\t\tKNN Computation: " << times[1] << "us" << std::endl;
+      std::cout << "\t\tPIJ Computation: " << times[2] << "us" << std::endl;
+      std::cout << "\t\tPIJ Symmetrization: " << times[3] << "us" << std::endl;
+      std::cout << "\t Phase 2 (" << p2_time << "us):" << std::endl;
+      std::cout << "\t\tKernel Setup: " << times[4] << "us" << std::endl;
+      std::cout << "\t\tForce Reset: " << times[5] << "us" << std::endl;
+      std::cout << "\t\tBounding Box: " << times[6] << "us" << std::endl;
+      std::cout << "\t\tTree Building: " << times[7] << "us" << std::endl;
+      std::cout << "\t\tTree Summarization: " << times[8] << "us" << std::endl;
+      std::cout << "\t\tSorting: " << times[9] << "us" << std::endl;
+      std::cout << "\t\tRepulsive Force Calculation: " << times[10] << "us" << std::endl;
+      std::cout << "\t\tAttractive Force Calculation: " << times[11] << "us" << std::endl;
+      std::cout << "\t\tIntegration: " << times[12] << "us" << std::endl;
+      std::cout << "Total Time: " << p1_time + p2_time << "us" << std::endl << std::endl;
     }
 
-    return pts;
+    if (opt.verbosity >= 1) std::cout << "Fin." << std::endl;
+    
+    if (opt.return_style == BHTSNE::RETURN_STYLE::ONCE && opt.return_data != nullptr) {
+      thrust::copy(pts.begin(), pts.begin()+opt.n_points, opt.return_data);
+      thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+opt.n_points, opt.return_data+opt.n_points);
+    }
+
+    return;
 }
 
 /******************************************************************************/

@@ -82,19 +82,6 @@ void pymodule_compute_pij(float *points, float* sigmas, float *result, ssize_t *
 
 }
 
-thrust::device_vector<float> tsne(cublasHandle_t &dense_handle, 
-    cusparseHandle_t &sparse_handle,
-      float* points, 
-      unsigned int N_POINTS, 
-      unsigned int N_DIMS, 
-      unsigned int PROJDIM, 
-      float perplexity, 
-      float early_ex, 
-      float learning_rate, 
-      unsigned int n_iter, 
-      unsigned int n_iter_np, 
-      float min_g_norm);
-
 void pymodule_bh_tsne(float *points, float *result, ssize_t *dims, int proj_dim, float perplexity, float early_ex, 
     float learning_rate, int n_iter,  int n_iter_np, float min_g_norm) {
 
@@ -108,10 +95,21 @@ void pymodule_bh_tsne(float *points, float *result, ssize_t *dims, int proj_dim,
     cusparseHandle_t sparse_handle;
     cusparseSafeCall(cusparseCreate(&sparse_handle));
 
+    // Construct the options
+    BHTSNE::Options opt(result, points, N_POINTS, N_DIMS);
+    opt.perplexity = perplexity;
+    opt.learning_rate = learning_rate;
+    opt.early_exaggeration = early_ex;
+    opt.iterations = n_iter;
+    opt.iterations_no_progress = n_iter_np;
+    opt.n_neighbors = 32;
+    opt.min_gradient_norm = min_g_norm;
+    
+    // Return data setup
+    opt.return_style = BHTSNE::RETURN_STYLE::ONCE;
+
     // Do the t-SNE
-    thrust::device_vector<float> tsne_results = BHTSNE::tsne(dense_handle, sparse_handle, points, 
-                                                              N_POINTS, N_DIMS, 2, perplexity, early_ex, learning_rate, 
-                                                              n_iter, n_iter_np, min_g_norm, false, false, 5.0, 0, 1023, "tcp://localhost:5556", nullptr, result);
+    BHTSNE::tsne(dense_handle, sparse_handle, opt);
 
     // Copy the data back from the GPU
     cudaDeviceSynchronize();
