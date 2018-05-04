@@ -7,7 +7,7 @@ import ctypes
 import os
 import pkg_resources
 
-_path = pkg_resources.resource_filename('pyctsne','') # Load from current location
+_path = pkg_resources.resource_filename('pyctsne','') # Load from current locationn
 _lib = N.ctypeslib.load_library('libpyctsne', _path) # Load the ctypes library
 
 
