@@ -52,6 +52,9 @@
                                 int proj_dim, float perplexity, float early_ex, 
                                 float learning_rate, int n_iter, int n_iter_np,
                                 float min_g_norm);
+
+        void pymodule_bhsnapshot(float *points, float *result, ssize_t *dims, int proj_dim, float perplexity, float early_ex, 
+                float learning_rate, int n_iter,  int n_iter_np, float min_g_norm, float* preinit_data, int num_snapshots);
     }
 
 #endif

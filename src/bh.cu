@@ -1111,6 +1111,13 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         return;
     }
 
+    // Setup some return information if we're working on snapshots
+    int snap_interval;
+    int snap_num = 0;
+    if (opt.return_style == BHTSNE::RETURN_STYLE::SNAPSHOT) {
+      snap_interval = opt.iterations / (opt.num_snapshots-1);
+    }
+
     // Setup clock information
     auto end_time = std::chrono::high_resolution_clock::now();
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -1517,13 +1524,26 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
             }
         }
 
+        // Handle snapshoting
+        if (opt.return_style == BHTSNE::RETURN_STYLE::SNAPSHOT && step % snap_interval == 0 && opt.return_data != nullptr) {
+          thrust::copy(pts.begin(),
+                       pts.begin()+opt.n_points, 
+                       snap_num*opt.n_points*2 + opt.return_data);
+          thrust::copy(pts.begin()+nnodes+1, 
+                       pts.begin()+nnodes+1+opt.n_points,
+                       snap_num*opt.n_points*2 + opt.return_data+opt.n_points);
+          snap_num += 1;
+        }
+
     }
 
+    // Clean up the dump file if we are dumping points
     if (opt.get_dump_points()){
       delete[] host_ys;
       dump_file.close();
     }
 
+    // With verbosity 2, print the timing data
     if (opt.verbosity >= 2) {
       int p1_time = times[0] + times[1] + times[2] + times[3];
       int p2_time = times[4] + times[5] + times[6] + times[7] + times[8] + times[9] + times[10] + times[11] + times[12];
@@ -1548,10 +1568,21 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 
     if (opt.verbosity >= 1) std::cout << "Fin." << std::endl;
     
+    // Handle a once off return type
     if (opt.return_style == BHTSNE::RETURN_STYLE::ONCE && opt.return_data != nullptr) {
       thrust::copy(pts.begin(), pts.begin()+opt.n_points, opt.return_data);
       thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+opt.n_points, opt.return_data+opt.n_points);
     }
+
+    // Handle snapshoting
+    if (opt.return_style == BHTSNE::RETURN_STYLE::SNAPSHOT && opt.return_data != nullptr) {
+      thrust::copy(pts.begin(), pts.begin()+opt.n_points, snap_num*opt.n_points*2 + opt.return_data);
+      thrust::copy(pts.begin()+nnodes+1, pts.begin()+nnodes+1+opt.n_points, snap_num*opt.n_points*2 + opt.return_data+opt.n_points);
+    }
+
+    // Return some final values
+    opt.trained = true;
+    opt.trained_norm = norm;
 
     return;
 }

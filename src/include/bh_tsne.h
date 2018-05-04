@@ -26,7 +26,7 @@ namespace BHTSNE {
     };
 
     enum RETURN_STYLE {
-        ONCE, SNAPSHOTS
+        ONCE, SNAPSHOT
     };
     
     class Options {
@@ -141,6 +141,10 @@ namespace BHTSNE {
                 if (this->points == nullptr) return false;
                 if (this->n_points == 0) return false;
                 if (this->n_dims == 0) return false;
+                if (this->num_snapshots < 2 && this->return_style == RETURN_STYLE::SNAPSHOT) {
+                    std::cout << "E: Need to record more than 1 snapshot when using snapshot capture. Use 'once' capture if you only want one return." << std::endl;
+                    return false;
+                }
 
                 // Perhaps in the future this will be more exciting
                 // and do much cleaner evaluation

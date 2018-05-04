@@ -24,11 +24,17 @@ if(NOT WITH_FAISS_GPU_STANDALONE)
 endif()
 #-------------------------------------------------------------------------------
 
+# CXX Configuration
+#-------------------------------------------------------------------------------
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+#-------------------------------------------------------------------------------
+
 # CUDA Configuration
 #-------------------------------------------------------------------------------
 SET(CUDA_SEPARABLE_COMPILATION ON)
 find_package(CUDA REQUIRED)
 SET(CUDA_HOST_COMPILER ${CXX})
+SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
                     -O3 
                     #-gencode=arch=compute_30,code=sm_30
