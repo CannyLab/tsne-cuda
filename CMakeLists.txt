@@ -12,27 +12,23 @@ option(BUILD_TEST "Build tests if ON" OFF)
 option(BUILD_PYTHON "Build python if ON" OFF)
 option(WITH_ZMQ "Build with interactive viz if ON" ON)
 option(WITH_FAISS_GPU_STANDALONE "Build standalone gpufaiss library ON" OFF)
-#-------------------------------------------------------------------------------
 
-
-# ZMQ Configuration
 if(NOT WITH_ZMQ)
     ADD_DEFINITIONS(-DNO_ZMQ)
-    message("-- Not building with ZMQ. Why the fuck are you doing this?")
+    message("-- Not building with ZMQ. Interactive visualization disabled. To build with ZMQ use -DWITH_ZMQ=ON")
 endif()
 
+# Do we want to build FAISS as a standalone library as well. 
 if(NOT WITH_FAISS_GPU_STANDALONE)
-    ADD_DEFINITIONS(-DNO_ZMQ)
-    message("-- Not building standalone gpufaiss lib.")
+    message("-- Not building standalone gpufaiss lib. To build gpufaiss standalone use -DWITH_FAISS_GPU_STANDALONE=ON")
 endif()
+#-------------------------------------------------------------------------------
 
 # CUDA Configuration
 #-------------------------------------------------------------------------------
-
 SET(CUDA_SEPARABLE_COMPILATION ON)
 find_package(CUDA REQUIRED)
 SET(CUDA_HOST_COMPILER ${CXX})
-#-------------------------------------------------------------------------------
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
                     -O3 
                     #-gencode=arch=compute_30,code=sm_30
@@ -172,51 +168,49 @@ endif()
 # Test Target
 #-------------------------------------------------------------------------------
 if(BUILD_TEST)
-    #cuda_add_executable(tsne_test
-    #    ${SOURCES}
-    #    src/test/test.cu
-    #)
-    #add_dependencies(tsne_test gtest)
-    #add_dependencies(tsne_test faiss)
-    #
-    #if(WITH_ZMQ)
-    #    target_link_libraries(tsne_test
-    #        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
-    #        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-    #        ${CUDA_LIBRARIES}
-    #        ${OpenMP_CXX_FLAGS}
-    #        ${CUDA_CUBLAS_LIBRARIES}
-    #        ${CUDA_cusparse_LIBRARY}
-    #        #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-    #        ${CUDA_cudadevrt_LIBRARY}
-    #        libfaiss.a
-    #        libgpufaiss.a
-    #        pthread
-    #        zmq
-    #        ${BLAS_LIB}
-    #    )
-    #else()
-    #    target_link_libraries(tsne_test
-    #        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest.a
-    #        ${CMAKE_CURRENT_BINARY_DIR}/third_party/gtest/src/gtest-build/googlemock/gtest/libgtest_main.a
-    #        ${CUDA_LIBRARIES}
-    #        ${OpenMP_CXX_FLAGS}
-    #        ${CUDA_CUBLAS_LIBRARIES}
-    #        ${CUDA_cusparse_LIBRARY}
-    #        #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-    #        ${CUDA_cudadevrt_LIBRARY}
-    #        libfaiss.a
-    #        libgpufaiss.a
-    #        pthread
-    #        ${BLAS_LIB}
-    #    )
-    #endif()
-    #
-    #enable_testing()
-    #add_test(
-    #    NAME tsne_test
-    #    COMMAND tsne_test
-    #)
+    cuda_add_executable(tsne_test
+        ${faiss_gpu_headers} ${faiss_gpu_cpp} ${faiss_gpu_cuh} ${faiss_gpu_cu}
+        ${SOURCES}
+        src/test/test.cu
+    )
+    add_dependencies(tsne_test gtest faiss)
+    if(WITH_ZMQ)
+        target_link_libraries(tsne_test
+            faiss
+            gtest
+            gtest_main
+            ${CUDA_LIBRARIES}
+            ${OpenMP_CXX_FLAGS}
+            ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_cusparse_LIBRARY}
+            #/usr/local/cuda-8.0/lib64/libcudaevrt.a
+            ${CUDA_cudadevrt_LIBRARY}
+            pthread
+            zmq
+            ${BLAS_LIB}
+            -Wl,--allow-multiple-definition
+        )
+    else()
+        target_link_libraries(tsne_test
+            faiss
+            gtest
+            gtest_main
+            ${CUDA_LIBRARIES}
+            ${OpenMP_CXX_FLAGS}
+            ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_cusparse_LIBRARY}
+            #/usr/local/cuda-8.0/lib64/libcudaevrt.a
+            ${CUDA_cudadevrt_LIBRARY}
+            pthread
+            ${BLAS_LIB}
+            -Wl,--allow-multiple-definition
+        )
+endif()
+    enable_testing()
+    add_test(
+        NAME tsne_test
+        COMMAND tsne_test
+    )
 else()
     message("-- Not building tests. To build tests use -DBUILD_TEST=ON")
 endif()
@@ -261,8 +255,6 @@ else()
         -Wl,--allow-multiple-definition
     )
 endif()
-
-
 #-------------------------------------------------------------------------------
 
 # Documentation
@@ -290,3 +282,4 @@ elseif(NOT DOXYGEN_FOUND AND BUILD_DOC)
 else (DOXYGEN_FOUND AND BUILD_DOC)
     message("-- Not building documentation. To build documentation use -DBUILD_DOC=ON")
 endif (DOXYGEN_FOUND AND BUILD_DOC)
+#-------------------------------------------------------------------------------
