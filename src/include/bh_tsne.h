@@ -69,7 +69,8 @@ namespace BHTSNE {
                                           int init_type,
                                           int NN,
                                           std::string viz,
-                                          float* preinit_data);
+                                          float* preinit_data,
+                                          float* copy_back = nullptr);
 }
 
 #endif
