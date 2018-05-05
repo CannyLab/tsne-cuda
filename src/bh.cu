@@ -1022,7 +1022,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         d_knn_distances.shrink_to_fit();
 
         // Copy the distances back to the GPU
-        thrust::device_vector<long> d_knn_indices_long(opt.n_points*K);
+        thrust::device_vector<long> d_knn_indices_long(knn_indices, knn_indices + opt.n_points*K);
         thrust::device_vector<int> d_knn_indices(opt.n_points*K);
 
         // Post-process the floating point matrix
