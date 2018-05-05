@@ -17,7 +17,7 @@ Like many of the libraries available, the python wrappers subscribe to the same 
 You can run it as follows:
 
 ```
-from pyctsne import TSNE
+from tsnecuda import TSNE
 X_embedded = TSNE(n_components=2, perplexity=15, learning_rate=10).fit_transform(X)
 ```
 
