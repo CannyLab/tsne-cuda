@@ -1186,7 +1186,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 	    bool send_zmq = opt.get_use_interactive();
 	    zmq::context_t context(1);
 	    zmq::socket_t publisher(context, ZMQ_REQ);
-	    if (opt.use_interactive) {
+	    if (opt.get_use_interactive()) {
 
         // Try to connect to the socket
         if (opt.verbosity >= 1)
@@ -1195,7 +1195,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
             publisher.setsockopt(ZMQ_SNDTIMEO, opt.get_viz_timeout());
         if (opt.verbosity >= 1)
             std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
-            publisher.connect(opt.viz_server);
+            publisher.connect(opt.get_viz_server());
 
             // Send the number of points we should be expecting to the server
             std::string message = std::to_string(opt.n_points);

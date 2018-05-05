@@ -4,5 +4,5 @@ LICENSE.txt
 README.txt
 setup.py
 docs/FAQ.txt
-pyctsne/__init__.py
-pyctsne/test/__init__.py
+tsnecuda/__init__.py
+tsnecuda/test/__init__.py
