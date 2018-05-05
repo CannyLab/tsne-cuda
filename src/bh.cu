@@ -1186,7 +1186,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 	    bool send_zmq = opt.get_use_interactive();
 	    zmq::context_t context(1);
 	    zmq::socket_t publisher(context, ZMQ_REQ);
-	    if (opt.use_interactive) {
+	    if (opt.get_use_interactive()) {
 
         // Try to connect to the socket
         if (opt.verbosity >= 1)
