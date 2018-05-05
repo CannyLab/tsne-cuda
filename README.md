@@ -1,69 +1,14 @@
-# CUDA TSNE
+# TSNE-CUDA
 
-This repo is a roof-line optimized CUDA version of [Barnes-Hut t-SNE](https://github.com/lvdmaaten/bhtsne) by L. Van der Maaten with associated python modules. 
+This repo is an optimized CUDA version of [Barnes-Hut t-SNE](https://github.com/lvdmaaten/bhtsne) by L. Van der Maaten with associated python modules. We find that our implementation of t-SNE can be up to 1200x faster than Sklearn, or up to 50x faster than Multicore-TSNE when used with the right GPU.
 
-# Benchmark
+# Benchmarks
 
 TODO :)
 
-# How to use
+# Installation
 
-Todo :)
-
-## Python
-### Install
-
-#### Requirements
-
-- CUDA: You will need a working version of the CUDA toolkit which can be obtained from [here](https://developer.nvidia.com/cuda-toolkit).
-- CMAKE: Version >= 3.5.1 which can be obtained by running `sudo apt install cmake` on ubuntu/debian systems.
-- MKL/OpenBLAS: If you're using MKL, install it using the intel provided installation scripts. If you're using OpenBLAS install it using `sudo apt install libopenblas-dev` on ubuntu/debian systems. 
-- GCC/llvm-clang: This is likely already installed on your system. If not, on ubuntu you can run `sudo apt install build-essential` to get a version.
-- OpenMP: On ubuntu this is likely already installed with your version of GCC. For other distributions, be sure your compiler has OpenMP support.
-- Python (for Python bindings): Python is not required, however to build the python bindings you must install Python. This library was tested with Python 3, however it is possible that Python 2 will work as well (though it is untested). 
-- Doxygen: To build the documentation, a working version of doxygen is required (which can be obtained using `sudo apt install doxygen` on debian/ubuntu systems).
-- ZMQ: Necessary for building the interactive visualization. TODO: Add CMake flags to turn this off. On ubuntu you can obtain ZMQ by using `sudo apt install libzmq-dev`.
-
-This package contains no distribution specific code - thus it should compile and run on other Linux distros (and possibly even OSX) however do so at your own peril, as it has not been tested.
-
-#### Building
-
-To build the C++ portion of the library:
-```
-git clone https://github.com/rmrao/tsne-cuda.git
-cd tsne-cuda/build/
-cmake ..
-make
-```
-
-If you are using OpenBLAS instead of MKL, you need to run the following instead (otherwise it will complain that MKL is missing):
-```
-git clone https://github.com/rmrao/tsne-cuda.git
-cd tsne-cuda/build/
-cmake .. -DWITH_MKL=OFF
-make
-```
-
-For faster builds, you can utilize parallel versions of make by running `make -j<num cores>`, so to build with 5 cores, you would run `make -j5`. This can significantly speed up the build, however sometimes the build will fail because of parallel dependencies. To fix a failed build, just run `make` again, and it should work.
-
-
-To install the python package, do the above steps, then run:
-```
-cd python/
-python setup.py install
-```
-
-To build the documentation, run from the root directory:
-```
-cd tsne-cuda/build/
-cmake .. -DBUILD_DOC=ON
-make doc_doxygen
-```
-This command will put the documentation in the `tsne-cuda/build/doc_doxygen/html` folder. 
-
-#### Known good build configurations
-
-- Ubuntu 16.04, Python 3.5.2, GCC 5.4.0, CUDA 8.0.61, Intel MKL 18.0.1
+To install our library, follow the instructions in the [installation section](https://github.com/rmrao/tsne-cuda/wiki/Installation) of the wiki.
 
 ### Run
 
@@ -73,26 +18,12 @@ You can run it as follows:
 
 ```
 from pyctsne import TSNE
-
-Embedded_Data = TSNE(n_components=2, perplexity=15, learning_rate=10).fit_transform(X)
+X_embedded = TSNE(n_components=2, perplexity=15, learning_rate=10).fit_transform(X)
 ```
 
-It's worth noting that if n_components is > 3, then the program uses the naive O(n^2) method by default. To try to run the experimental FMM based method, you can use TSNE(method='experimental').
+It's worth noting that if n_components is >= 3, then the program uses the naive O(n^2) method by default. If the number of components is 2, then you can use the heavily optimized Barnes-Hut implementation.
 
-### Test
-
-The library can be tested using ctest (bundled with CMAKE) by running the following
-
-```
-cd ${ROOT}/build/
-ctest
-```
-
-# License
-
-TODO: Update this portion of the code
-
-Inherited from [original repo's license](https://github.com/lvdmaaten/bhtsne).
+For more information on running the library, or using it as a C++ library, see the [Python usage](https://github.com/rmrao/tsne-cuda/wiki/Basic-Usage:-Python) or [C++ Usage](https://github.com/rmrao/tsne-cuda/wiki/Basic-Usage:-Cxx) sections of the wiki.
 
 # Future work
 
@@ -129,8 +60,15 @@ This library is built on top of the following technology, without this tech, non
 
 [CUDA Utilities/Pairwise Distance](https://github.com/OrangeOwlSolutions)
 
+[LONESTAR-GPU](http://iss.ices.utexas.edu/?p=projects/galois/lonestargpu)
+
 [FAISS](https://github.com/facebookresearch/faiss)
 
 [GTest](https://github.com/google/googletest)
 
 [CXXopts](https://github.com/jarro2783/cxxopts)
+
+
+# License
+
+Our code is built using components from FAISS, the Lonestar GPU library, GTest, CXXopts, and OrangeOwl's CUDA utilities. Each portion of the code is governed by their respective licenses - however our code is governed by the MIT license found in LICENSE.txt
