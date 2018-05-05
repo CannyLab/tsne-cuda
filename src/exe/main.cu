@@ -157,11 +157,11 @@ int main(int argc, char** argv) {
         // Construct the options
         BHTSNE::Options opt(nullptr, data, num_images, num_columns*num_rows*num_channels);
         opt.perplexity = FOPT(perplexity);
-        opt.learning_rate = FOPT(learning_rate);
+        opt.learning_rate = FOPT(learning-rate);
         opt.early_exaggeration = FOPT(early-ex);
         opt.iterations = IOPT(num-steps);
         opt.iterations_no_progress = IOPT(num-steps);
-        opt.magnitude_factor = FOPT(magnitude_factor);
+        opt.magnitude_factor = FOPT(magnitude-factor);
         opt.initialization = init_type;
         opt.n_neighbors = IOPT(nearest-neighbors);
 
@@ -200,11 +200,11 @@ int main(int argc, char** argv) {
         // Construct the options
         BHTSNE::Options opt(nullptr, thrust::raw_pointer_cast(h_X.data()), IOPT(num-points),  IOPT(dim));
         opt.perplexity = FOPT(perplexity);
-        opt.learning_rate = FOPT(learning_rate);
+        opt.learning_rate = FOPT(learning-rate);
         opt.early_exaggeration = FOPT(early-ex);
         opt.iterations = IOPT(num-steps);
         opt.iterations_no_progress = IOPT(num-steps);
-        opt.magnitude_factor = FOPT(magnitude_factor);
+        opt.magnitude_factor = FOPT(magnitude-factor);
         opt.initialization = init_type;
         opt.n_neighbors = IOPT(nearest-neighbors);
 

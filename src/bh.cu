@@ -696,8 +696,8 @@ void IntegrationKernel(int N,
         uy = old_forces[N + i];
         gx = gains[i];
         gy = gains[N + i];
-        dx = 4.0f * (exaggeration*attr_forces[i] - (rep_forces[i] / norm));
-        dy = 4.0f * (exaggeration*attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm));
+        dx = exaggeration*attr_forces[i] - (rep_forces[i] / norm);
+        dy = exaggeration*attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm);
 
         gx = (signbit(dx) != signbit(ux)) ? gx + 0.2 : gx * 0.8;
         gy = (signbit(dy) != signbit(uy)) ? gy + 0.2 : gy * 0.8;
@@ -707,8 +707,8 @@ void IntegrationKernel(int N,
         ux = momentum * ux - eta * gx * dx;
         uy = momentum * uy - eta * gy * dy;
 
-        pts[i] += -eta * dx;
-        pts[i + nnodes + 1] += -eta * dy;
+        pts[i] += ux;
+        pts[i + nnodes + 1] += uy;
 
         old_forces[i] = ux;
         old_forces[N + i] = uy;
@@ -1335,6 +1335,8 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
             norm = thrust::reduce(norml.begin(), norml.begin() + opt.n_points, 0.0f, thrust::plus<float>());
             if (opt.verbosity >= 1 && step % opt.print_interval == 0)
                 std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
+            // std::cout << "pos_f: " << attr_forces[0] << " " << attr_forces[opt.n_points] << std::endl;
+            // std::cout << "neg_f: " << rep_forces[0] / norm << " " << rep_forces[nnodes + 1] / norm << std::endl;
             
             IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(opt.n_points, nnodes, eta, norm, momentum, attr_exaggeration,
                                                                         thrust::raw_pointer_cast(pts.data()),
