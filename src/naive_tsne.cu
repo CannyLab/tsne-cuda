@@ -43,6 +43,7 @@ __global__ void upper_lower_assign(float * __restrict__ sigmas,
     sigmas[TID] = (upper_bound[TID] + lower_bound[TID])/2.0f;
 }
 
+// TODO: replace this with the bhtsne version
 void NaiveTSNE::thrust_search_perplexity(cublasHandle_t &handle,
                         thrust::device_vector<float> &sigmas,
                         thrust::device_vector<float> &lower_bound,
@@ -120,6 +121,7 @@ thrust::device_vector<float> NaiveTSNE::search_perplexity(cublasHandle_t &handle
     return best_sigmas;
 }
 
+// TODO: put this in the same file as bhtsne compute_pij
 void NaiveTSNE::compute_pij(
                         cublasHandle_t &handle, 
                         thrust::device_vector<float> &pij,
@@ -239,8 +241,8 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
 
     // forces_ = y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1
     thrust::transform(forces.begin(), forces.end(), ys.begin(), forces.begin(), thrust::multiplies<float>());
-    alpha = 4.0f * eta;
-    beta = -4.0f * eta;
+    alpha = eta;
+    beta = -eta;
     // forces_ = 4 * y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1 - 4 * \sum_j y_j(pij - qij)(1 + ||y_i - y_j||^2)^-1
     cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, PROJDIM, N, &alpha, 
                                 thrust::raw_pointer_cast(qij.data()), N, thrust::raw_pointer_cast(ys.data()), N, &beta, 

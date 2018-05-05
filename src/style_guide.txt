@@ -1,0 +1,33 @@
+High level namespace: tsnecuda
+
+Sub-namespaces: bh, naive, util
+
+Put unrelated kernels in different files. Add c++ calls to those kernels at the bottom of the file. Expose only the c++ call in the related .h file.
+
+C++ calls should take in thrust vectors when at all possible.
+
+Timing: How do we do timing in a reasonable manner? TIMETHIS macro?
+	Calls would be TIMETHIS(gpuErrChk(function(args)))
+
+extern the vars
+
+Method call ordering:
+	Mutable scalars: 4 (avoid if possible)
+	Scalars: 5 (define as constant)
+	Handles: 1
+	Mutable vectors: 2 
+	Const Vectors: 3 
+
+N, N_POINTS should be num_points
+K should be num_near_neighbors
+nnodes should be num_nodes
+nnz should be num_nonzero (but really try to use sparsePij.size())
+These should all be defined as const uint32 when possible and generally define scalars as uint32 when possible.
+
+Loop boundaries should be size_t.
+
+Large arrays should be allocated on the heap.
+
+Clean up GPU vectors when done with? Make sure calls are errchecked and synchronized.
+
+Comments!

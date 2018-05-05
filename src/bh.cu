@@ -879,7 +879,8 @@ void computeAttrForce(int N,
 
 }
 
-// TODO: Add -1 notification here...
+// TODO: Add -1 notification here... and how to deal with it if it happens
+// TODO: Maybe think about getting FAISS to return integers (long-term todo)
 __global__ void postprocess_matrix(float* matrix, 
                                     long* long_indices,
                                     int* indices,
@@ -948,6 +949,7 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
         all_found = thrust::reduce(found.begin(), found.end(), 1, thrust::minimum<int>());
         iters++;
     } while (!all_found && iters < 200);
+    // TODO: Warn if iters == 200 because perplexity not found?
 
     Broadcast::broadcast_matrix_vector(pij, row_sum, K, N, thrust::divides<float>(), 1, 1.0f);
     return pij;
