@@ -125,14 +125,14 @@ set(SOURCES
 # Shared Library for Python Binding
 #-------------------------------------------------------------------------------
 if(BUILD_PYTHON)
-    cuda_add_library(pyctsne SHARED
+    cuda_add_library(tsnecuda SHARED
         ${faiss_gpu_headers} ${faiss_gpu_cpp} ${faiss_gpu_cuh} ${faiss_gpu_cu}
         ${SOURCES}
     )
-    set_target_properties(pyctsne PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(tsnecuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
     if(WITH_ZMQ)
-        target_link_libraries(pyctsne
+        target_link_libraries(tsnecuda
             faiss
             gtest
             ${CUDA_LIBRARIES}
@@ -147,7 +147,7 @@ if(BUILD_PYTHON)
             -Wl,--allow-multiple-definition
         )
     else()
-        target_link_libraries(pyctsne
+        target_link_libraries(tsnecuda
             faiss
             gtest
             ${CUDA_LIBRARIES}
@@ -161,11 +161,11 @@ if(BUILD_PYTHON)
             -Wl,--allow-multiple-definition
         )
     endif()
-    add_custom_command(TARGET pyctsne POST_BUILD
+    add_custom_command(TARGET tsnecuda POST_BUILD
                     COMMAND ${CMAKE_COMMAND} -E copy_directory
-                        ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:pyctsne>/python)
-    add_custom_command(TARGET pyctsne POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:pyctsne> $<TARGET_FILE_DIR:pyctsne>/python/pyctsne)
+                        ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:tsnecuda>/python)
+    add_custom_command(TARGET tsnecuda POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:tsnecuda> $<TARGET_FILE_DIR:tsnecuda>/python/tsnecuda)
 else()
     message("-- Not building python libraries. To build python libraries use -DBUILD_PYTHON=ON")
 endif()
