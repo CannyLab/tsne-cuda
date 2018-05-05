@@ -326,9 +326,7 @@ void TreeBuildingKernel(int nnodesd,
             y += dy;
             ch = childd[n*4+j];
             // repeat until the two bodies are different children
-            // if (depth >= 100)
-            //     printf("parent: %d, child: %d, depth: %d, pos_parent: (%0.5f, %0.5f), pos_child: (%0.5f, %0.5f), dir: %d\n", n, ch, cell, depth, x, y, px, py, j);
-          } while (ch >= 0 && r > 1e-10);
+          } while (ch >= 0 && r > 1e-10); // add radius check because bodies that are very close together can cause this to fail... there is some error condition here that I'm not entirely sure of (not just when two bodies are equal)
           childd[n*4+j] = i;
 
           localmaxdepth = max(depth, localmaxdepth);
@@ -576,13 +574,9 @@ void ForceCalculationKernel(int nnodesd,
   __shared__ float dq[MAXDEPTH * THREADS5/WARPSIZE];
 
   if (0 == threadIdx.x) {
-    // tmp = radiusd * 2;
-    // precompute values that depend only on tree level
     dq[0] = (radiusd * radiusd) / (theta * theta); 
-    // dq[0] = tmp * tmp * itolsqd;
     for (i = 1; i < maxdepthd; i++) {
-      // dq[i] = dq[i - 1] * 0.5f; // radius is halved with every level of the tree
-        dq[i] = dq[i - 1] * 0.25f;
+        dq[i] = dq[i - 1] * 0.25f; // radius is halved every level of tree so squared radius is quartered
         dq[i - 1] += epssqd;
     }
     dq[i - 1] += epssqd;
@@ -637,18 +631,11 @@ void ForceCalculationKernel(int nnodesd,
           if (n >= 0) {
             dx = px - posxd[n];
             dy = py - posyd[n];
-            // tmp = dx*dx + dy*dy; // distance squared
             tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
-              // if ((n >= nbodiesd) && (tmp < dq[depth])) {
-                    // printf("(%0.2f, %0.2f), (%0.2f, %0.2f), radius: %0.2f, tmp: %0.2f, dq: %0.2f\n, allzero: %d\n, mass: %0.2f\n", px, py, posxd[n], posyd[n], radiusd, tmp, dq[depth], __all(tmp < dq[depth]), massd[n]);
-                // }
-            if ((n < nbodiesd) || __all(tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
-            //   tmp = rsqrtf(tmp);  // compute distance
-              // from sptree.cpp
+            if ((n < nbodiesd) || __all_sync(__activemask(), tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+              // from bhtsne - sptree.cpp
               tmp = 1 / (1 + tmp);
               mult = massd[n] * tmp;
-              // if (n >= nbodiesd)
-                // printf("%0.2f\n", massd[n]);
               normsum += mult;
               mult *= tmp;
               vx += dx * mult;
@@ -672,7 +659,6 @@ void ForceCalculationKernel(int nnodesd,
 
       if (stepd >= 0) {
         // update velocity
-        // TODO: This is probably wrongish and depends on what I do in the attractive force calculation
         velxd[i] += vx;
         velyd[i] += vy;
         normd[i] = normsum - 1.0f; // subtract one for self computation (qii)
@@ -704,7 +690,6 @@ void IntegrationKernel(int N,
   register float dx, dy, ux, uy, gx, gy;
 
   // iterate over all bodies assigned to thread
-  // TODO: fix momentum at step 0
   inc = blockDim.x * gridDim.x;
   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
         ux = old_forces[i];
@@ -729,22 +714,6 @@ void IntegrationKernel(int N,
         old_forces[N + i] = uy;
         gains[i] = gx;
         gains[N + i] = gy;
-
-        
-
-        // tmpx = momentum * tmpx + (1 - momentum) * old_forces[i];
-        // tmpy = momentum * tmpy + (1 - momentum) * old_forces[i + N];
-
-        // // If the point is screwed up, just put it in the middle of the screen
-        // if (pts[i] != pts[i] || isinf(pts[i])) 
-        // pts[i] = 0;
-        // if (pts[i + nnodes + 1] != pts[i + nnodes + 1] || isinf(pts[i + nnodes + 1])) 
-        // pts[i + nnodes + 1] = 0;
-
-        // pts[i] -= eta * tmpx;
-        // pts[i + nnodes + 1] -= eta * tmpy;
-        // old_forces[i] = tmpx;
-        // old_forces[i + N] = tmpy;
    }
 }
 
@@ -753,64 +722,7 @@ void IntegrationKernel(int N,
 /*** compute attractive force *************************************************/
 /******************************************************************************/
 __global__
-void computePijxQij(int N, 
-                    int nnz, 
-                    int nnodes,
-                    volatile float * __restrict pij,
-                    volatile int   * __restrict pijRowPtr,
-                    volatile int   * __restrict pijColInd,
-                    volatile float * __restrict forceProd,
-                    volatile float * __restrict pts)
-{
-    register int TID, i, j, start, end;
-    register float ix, iy, jx, jy, dx, dy;
-    TID = threadIdx.x + blockIdx.x * blockDim.x;
-    if (TID >= nnz) return;
-    start = 0; end = N + 1;
-    i = (N + 1) >> 1;
-    while (end - start > 1) {
-      j = pijRowPtr[i];
-      end = (j <= TID) ? end : i;
-      start = (j > TID) ? start : i;
-      i = (start + end) >> 1;
-    }
-    
-    j = pijColInd[TID];
-    
-    ix = pts[i]; iy = pts[nnodes + 1 + i];
-    jx = pts[j]; jy = pts[nnodes + 1 + j];
-    dx = ix - jx;
-    dy = iy - jy;
-    forceProd[TID] = pij[TID] * 1 / (1 + dx*dx + dy*dy);
-}
-
-__global__
-void computePijxQij_alt(int N, int nnz, int nnodes, float *pij, int *pijRowPtr,int *pijColInd, float *forceProd, float *pts) {
-
-
-    register int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= N) return;
-    register int* end_val = pijColInd + pijRowPtr[i+1];
-    register int* j = pijColInd + pijRowPtr[i];
-    register int np1 = nnodes + 1;
-    register float* current_val = pij + pijRowPtr[i];
-    register float* current_force_prod = forceProd + pijRowPtr[i];
-    register float ix = pts[i]; register float iy = pts[np1 + i]; // This is the position of point i    
-    while (j != end_val) {
-        // Compute the pij (i) is sorted. (j) needs work
-        int jpt = *j;
-        float dx = ix - pts[jpt];
-        float dy = iy - pts[np1 + jpt];
-        (*current_force_prod) = (*current_val) * (1 / (1 + dx*dx + dy*dy));
-
-        current_val++;
-        current_force_prod++;
-        j++;
-    }
-}
-
-__global__
-void cpsq3(int N, int nnz, 
+void csr2coo(int N, int nnz, 
                     volatile int   * __restrict pijRowPtr,
                     volatile int   * __restrict pijColInd,
                     volatile int   * __restrict indices)
@@ -832,7 +744,27 @@ void cpsq3(int N, int nnz,
 }
 
 __global__
-void cpsq4(int N, int nnz, int nnodes,
+void ComputePijKernel(const unsigned int N,
+                      const unsigned int K,
+                      float * __restrict pij,
+                      const float * __restrict sqdist,
+                      const float * __restrict betas)
+{
+    register int TID, i, j;
+    register float dist, beta;
+
+    TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID >= N * K) return;
+    i = TID / K;
+    j = TID % K;
+
+    beta = betas[i];
+    dist = sqdist[TID];
+    pij[TID] = (j == 0 && dist == 0.0f) ? 0.0f : __expf(-beta * dist); // condition deals with evaluation of pii
+}
+
+__global__
+void ComputePijxQijKernel(int N, int nnz, int nnodes,
                     volatile int   * indices,
                     volatile float * __restrict pij,
                     volatile float * __restrict forceProd,
@@ -851,6 +783,46 @@ void cpsq4(int N, int nnz, int nnodes,
     forceProd[TID] = pij[TID] * 1 / (1 + dx*dx + dy*dy);
 }
 
+__global__
+void PerplexitySearchKernel(const unsigned int N,
+                            const float perplexity_target,
+                            const float eps,
+                            float * __restrict betas,
+                            float * __restrict lower_bound,
+                            float * __restrict upper_bound,
+                            int   * __restrict found,
+                            const float * __restrict neg_entropy,
+                            const float * __restrict row_sum) 
+{
+    register int i, is_found;
+    register float perplexity, neg_ent, sum_P, pdiff, beta, min_beta, max_beta;
+    i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= N) return;
+
+    neg_ent = neg_entropy[i];
+    sum_P = row_sum[i];
+    beta = betas[i];
+
+    min_beta = lower_bound[i];
+    max_beta = upper_bound[i];
+
+    perplexity = (neg_ent / sum_P) + __logf(sum_P);
+    pdiff = perplexity - __logf(perplexity_target);
+    is_found = (pdiff < eps && - pdiff < eps);
+    if (!is_found) {
+        if (pdiff > 0) {
+            min_beta = beta;
+            beta = (max_beta == FLT_MAX || max_beta == -FLT_MAX) ? beta * 2.0f : (beta + max_beta) / 2.0f;
+        } else {
+            max_beta = beta;
+            beta = (min_beta == -FLT_MAX || min_beta == FLT_MAX) ? beta / 2.0f : (beta + min_beta) / 2.0f;
+        }
+        lower_bound[i] = min_beta;
+        upper_bound[i] = max_beta;
+        betas[i] = beta;
+    }
+    found[i] = is_found;
+}
 // computes unnormalized attractive forces
 void computeAttrForce(int N,
                         int nnz,
@@ -866,34 +838,10 @@ void computeAttrForce(int N,
                         thrust::device_vector<float> &ones,
                         thrust::device_vector<int> &indices)      // N x 2 matrix of ones
 {
-    // Version 1
-    // const int BLOCKSIZE = 128;
-    // const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
-    // computePijxQij<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
-    //                                         thrust::raw_pointer_cast(sparsePij.data()),
-    //                                         thrust::raw_pointer_cast(pijRowPtr.data()),
-    //                                         thrust::raw_pointer_cast(pijColInd.data()),
-    //                                         thrust::raw_pointer_cast(forceProd.data()),
-    //                                         thrust::raw_pointer_cast(pts.data()));
-    // gpuErrchk(cudaDeviceSynchronize());
-
-    // Version 2
-    // std::cout << "Computing pijxqij" << std::endl;
-    // const int BLOCKSIZE = 128;
-    // const int NBLOCKS = iDivUp(N, BLOCKSIZE);
-    // computePijxQij_alt<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
-    //                                         thrust::raw_pointer_cast(sparsePij.data()),
-    //                                         thrust::raw_pointer_cast(pijRowPtr.data()),
-    //                                         thrust::raw_pointer_cast(pijColInd.data()),
-    //                                         thrust::raw_pointer_cast(forceProd.data()),
-    //                                         thrust::raw_pointer_cast(pts.data()));
-    // gpuErrchk(cudaDeviceSynchronize());
-    // std::cout << "Done Computing pijxqij" << std::endl;
-
-    // Version 3
+    // Computes pij*qij for each i,j
     const int BLOCKSIZE = 128;
     const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
-    cpsq4<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
+    ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
                                         thrust::raw_pointer_cast(indices.data()),
                                         thrust::raw_pointer_cast(sparsePij.data()),
                                         thrust::raw_pointer_cast(forceProd.data()),
@@ -931,39 +879,6 @@ void computeAttrForce(int N,
 
 }
 
-//TODO: Remove NDIMS argument
-void compute_pij(cublasHandle_t &handle, 
-                    thrust::device_vector<float> &pij,  
-                    const thrust::device_vector<float> &knn_distances, 
-                    const thrust::device_vector<float> &sigma,
-                    const unsigned int N, 
-                    const unsigned int K,
-                    const unsigned int NDIMS) 
-{
-    // Square the distances
-    Math::square(knn_distances, pij);
-
-    // Square the sigmas
-    // TODO: This allocates memory (we may want to fix it....)
-    thrust::device_vector<float> sigma_squared(sigma.size());
-    Math::square(sigma, sigma_squared);
-
-    // PIJ is KxN. :)
-    Broadcast::broadcast_matrix_vector(pij, sigma_squared, K, N, thrust::divides<float>(), 1, -2.0f); // Divide by -2sigma
-    thrust::transform(pij.begin(), pij.end(), pij.begin(), func_exp()); //Exponentiate
-}
-
-void normalize_pij(cublasHandle_t &handle, 
-                    thrust::device_vector<float> &pij,
-                    const unsigned int N,
-                    const unsigned int K) 
-{
-    // Reduce::reduce_sum over cols
-    auto sums = Reduce::reduce_sum(handle, pij, K, N, 0);
-    // divide column by resulting vector
-    Broadcast::broadcast_matrix_vector(pij, sums, K, N, thrust::divides<float>(), 1, 1.0f);
-}
-
 // TODO: Add -1 notification here...
 __global__ void postprocess_matrix(float* matrix, 
                                     long* long_indices,
@@ -974,99 +889,15 @@ __global__ void postprocess_matrix(float* matrix,
     register int TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= N_POINTS*K) return;
 
-    // Set pij to 0 for each of the broken values
-    if (matrix[TID] == 1.0f) matrix[TID] = 0.0f;
+    // Set pij to 0 for each of the broken values - Note: this should be handled in the ComputePijKernel now
+    // if (matrix[TID] == 1.0f) matrix[TID] = 0.0f;
     indices[TID] = (int) long_indices[TID];
     return;
 }
 
-struct saxpy_functor : public thrust::binary_function<float,float,float>
-{
-    const float a;
-
-    saxpy_functor(float _a) : a(_a) {}
-    __host__ __device__
-        float operator()(const float& x, const float& y) const { 
-            return a * x + y;
-        }
-};
-
-struct func_kl {
-  __host__ __device__ float operator()(const float &x, const float &y) const { 
-      return x == 0.0f ? 0.0f : x * (log(x) - log(y));
-  }
-};
-
 struct func_entropy_kernel {
   __host__ __device__ float operator()(const float &x) const { float val = x*log(x); return (val != val || isinf(val)) ? 0 : val; }
 };
-
-struct func_pow2 {
-  __host__ __device__ float operator()(const float &x) const { return pow(2,x); }
-};
-
-__global__ void upper_lower_assign_bh(float * __restrict__ sigmas,
-                                      float * __restrict__ lower_bound,
-                                      float * __restrict__ upper_bound,
-                                      const float * __restrict__ perplexity,
-                                      const float target_perplexity,
-                                      const unsigned int N)
-{
-  int TID = threadIdx.x + blockIdx.x * blockDim.x;
-  if (TID > N) return;
-
-  if (perplexity[TID] > target_perplexity)
-    upper_bound[TID] = sigmas[TID];
-  else
-    lower_bound[TID] = sigmas[TID];
-  sigmas[TID] = (upper_bound[TID] + lower_bound[TID])/2.0f;
-}
-
-void thrust_search_perplexity(cublasHandle_t &handle,
-                                thrust::device_vector<float> &sigmas,
-                                thrust::device_vector<float> &lower_bound,
-                                thrust::device_vector<float> &upper_bound,
-                                thrust::device_vector<float> &perplexity,
-                                const thrust::device_vector<float> &pij,
-                                const float target_perplexity,
-                                const unsigned int N,
-                                const unsigned int K)
-{
-//   std::cout << "pij:" << std::endl;
-//   printarray(pij, N, K);
-//   std::cout << std::endl;
-  thrust::device_vector<float> entropy_(pij.size());
-  thrust::transform(pij.begin(), pij.end(), entropy_.begin(), func_entropy_kernel());
-
-//   std::cout << "entropy:" << std::endl;
-//   printarray(entropy_, N, K);
-//   std::cout << std::endl;
-
-  auto neg_entropy = Reduce::reduce_alpha(handle, entropy_, K, N, -1.0f, 0);
-
-//   std::cout << "neg_entropy:" << std::endl;
-//   printarray(neg_entropy, 1, N);
-//   std::cout << std::endl;
-  
-  thrust::transform(neg_entropy.begin(), neg_entropy.end(), perplexity.begin(), func_exp());
- 
-//   std::cout << "perplexity:" << std::endl;
-//   printarray(perplexity, 1, N);
-//   std::cout << std::endl;
-
-  const unsigned int BLOCKSIZE = 128;
-  const unsigned int NBLOCKS = iDivUp(N, BLOCKSIZE);
-  upper_lower_assign_bh<<<NBLOCKS,BLOCKSIZE>>>(thrust::raw_pointer_cast(sigmas.data()),
-                thrust::raw_pointer_cast(lower_bound.data()),
-                thrust::raw_pointer_cast(upper_bound.data()),
-                thrust::raw_pointer_cast(perplexity.data()),
-                target_perplexity,
-                N);
-//   std::cout << "sigmas" << std::endl;
-//   printarray(sigmas, 1, N);
-//   std::cout << std::endl;
-
-}
 
 thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
                                                   thrust::device_vector<float> &knn_distances,
@@ -1075,31 +906,50 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
                                                   const unsigned int N,
                                                   const unsigned int K) 
 {
-    thrust::device_vector<float> sigmas(N, 500.0f);
-    thrust::device_vector<float> best_sigmas(N);
-    thrust::device_vector<float> perplexity(N);
+    // use beta instead of sigma (this matches the bhtsne code but not the paper)
+    // beta is just multiplicative instead of divisive (changes the way binary search works)
+    thrust::device_vector<float> betas(N, 1.0f);
     thrust::device_vector<float> lbs(N, 0.0f);
     thrust::device_vector<float> ubs(N, 1000.0f);
     thrust::device_vector<float> pij(N*K);
+    thrust::device_vector<float> entropy(N*K);
+    thrust::device_vector<int> found(N);
 
-    compute_pij(handle, pij, knn_distances, sigmas, N, K, 0);
-    normalize_pij(handle, pij, N, K);
-    float best_perplexity = 1000.0f;
-    float perplexity_diff = 50.0f;
+    const unsigned int BLOCKSIZE1 = 1024;
+    const unsigned int NBLOCKS1 = iDivUp(N * K, BLOCKSIZE1);
+
+    const unsigned int BLOCKSIZE2 = 128;
+    const unsigned int NBLOCKS2 = iDivUp(N, BLOCKSIZE2);
+
     int iters = 0;
-    while (perplexity_diff > eps) {
-        thrust_search_perplexity(handle, sigmas, lbs, ubs, perplexity, pij, perplexity_target, N, K);
-        perplexity_diff = abs(thrust::reduce(perplexity.begin(), perplexity.end())/((float) N) - perplexity_target);
-        if (perplexity_diff < best_perplexity){
-            best_perplexity = perplexity_diff;
-            printf("!! Best perplexity found in %d iterations: %0.5f\n", iters, perplexity_diff);
-            thrust::copy(sigmas.begin(), sigmas.end(), best_sigmas.begin());
-        }
-        compute_pij(handle, pij, knn_distances, sigmas, N, K, 0);
-        normalize_pij(handle, pij, N, K);
-        iters++;
-    } // Close perplexity search
+    int all_found = 0;
+    thrust::device_vector<float> row_sum;
+    do {
+        // compute Gaussian Kernel row
+        ComputePijKernel<<<NBLOCKS1, BLOCKSIZE1>>>(N, K, thrust::raw_pointer_cast(pij.data()),
+                                                            thrust::raw_pointer_cast(knn_distances.data()),
+                                                            thrust::raw_pointer_cast(betas.data()));
+        gpuErrchk(cudaDeviceSynchronize());
+        
+        // compute entropy of current row
+        row_sum = Reduce::reduce_sum(handle, pij, K, N, 0);
+        thrust::transform(pij.begin(), pij.end(), entropy.begin(), func_entropy_kernel());
+        auto neg_entropy = Reduce::reduce_alpha(handle, entropy, K, N, -1.0f, 0);
 
+        // binary search for beta
+        PerplexitySearchKernel<<<NBLOCKS2, BLOCKSIZE2>>>(N, perplexity_target, eps,
+                                                            thrust::raw_pointer_cast(betas.data()),
+                                                            thrust::raw_pointer_cast(lbs.data()),
+                                                            thrust::raw_pointer_cast(ubs.data()),
+                                                            thrust::raw_pointer_cast(found.data()),
+                                                            thrust::raw_pointer_cast(neg_entropy.data()),
+                                                            thrust::raw_pointer_cast(row_sum.data()));
+        gpuErrchk(cudaDeviceSynchronize());
+        all_found = thrust::reduce(found.begin(), found.end(), 1, thrust::minimum<int>());
+        iters++;
+    } while (!all_found && iters < 200);
+
+    Broadcast::broadcast_matrix_vector(pij, row_sum, K, N, thrust::divides<float>(), 1, 1.0f);
     return pij;
 }
 
@@ -1139,7 +989,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
         #endif
         cudaFuncSetCacheConfig(IntegrationKernel, cudaFuncCachePreferL1);
-        cudaFuncSetCacheConfig(computePijxQij, cudaFuncCachePreferShared);
+        cudaFuncSetCacheConfig(ComputePijxQijKernel, cudaFuncCachePreferShared);
     
         // Allocate some memory
         const unsigned int K = opt.n_neighbors < opt.n_points ? opt.n_neighbors : opt.n_points - 1; 
@@ -1163,8 +1013,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
     start_time = std::chrono::high_resolution_clock::now();
 
         // Allocate device distance memory
-        thrust::device_vector<float> d_knn_distances(opt.n_points*K);
-        thrust::copy(knn_distances, knn_distances + (opt.n_points*K), d_knn_distances.begin());
+        thrust::device_vector<float> d_knn_distances(knn_distances, knn_distances + (opt.n_points * K));
         Math::max_norm(d_knn_distances); // Here, the extra 0s floating around won't matter
         thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, opt.perplexity, opt.perplexity_search_epsilon, opt.n_points, K);
 
@@ -1175,7 +1024,6 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         // Copy the distances back to the GPU
         thrust::device_vector<long> d_knn_indices_long(opt.n_points*K);
         thrust::device_vector<int> d_knn_indices(opt.n_points*K);
-        thrust::copy(knn_indices, knn_indices + opt.n_points*K, d_knn_indices_long.begin());
 
         // Post-process the floating point matrix
         const int NBLOCKS_PP = iDivUp(opt.n_points*K, 128);
@@ -1262,7 +1110,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         // Compute the indices setup
         const int SBS = 1024;
         const int NBS = iDivUp(sparsePij.size(), SBS);
-        cpsq3<<<NBS, SBS>>>(opt.n_points, sparsePij.size(), 
+        csr2coo<<<NBS, SBS>>>(opt.n_points, sparsePij.size(), 
                                         thrust::raw_pointer_cast(pijRowPtr.data()),
                                         thrust::raw_pointer_cast(pijColInd.data()),
                                         thrust::raw_pointer_cast(indices.data()));
@@ -1372,13 +1220,12 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 	#endif
 
     // Support for infinite iteration
-  float attr_exaggeration = opt.early_exaggeration;
+    float attr_exaggeration = opt.early_exaggeration;
   
     for (int step = 0; step != opt.iterations; step++) {
 
         // Setup learning rate schedule
         if (step == opt.force_magnify_iters) {
-            // eta /= early_ex; 
             momentum = opt.post_exaggeration_momentum;
             attr_exaggeration = 1.0f;
         }
@@ -1587,348 +1434,3 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
     return;
 }
 
-/******************************************************************************/
-
-// static void CudaTest(const char *msg)
-// {
-//   cudaError_t e;
-
-//   cudaThreadSynchronize();
-//   if (cudaSuccess != (e = cudaGetLastError())) {
-//     fprintf(stderr, "%s: %d\n", msg, e);
-//     fprintf(stderr, "%s\n", cudaGetErrorString(e));
-//     exit(-1);
-//   }
-// }
-
-
-/******************************************************************************/
-
-// random number generator
-
-#define MULT 1103515245
-#define ADD 12345
-#define MASK 0x7FFFFFFF
-#define TWOTO31 2147483648.0
-
-// static int A = 1;
-// static int B = 0;
-// static int randx = 1;
-// static int lastrand;
-
-
-// static void drndset(int seed)
-// {
-//    A = 1;
-//    B = 0;
-//    randx = (A * seed + B) & MASK;
-//    A = (MULT * A) & MASK;
-//    B = (MULT * B + ADD) & MASK;
-// }
-
-
-// static double drnd()
-// {
-//    lastrand = randx;
-//    randx = (A * randx + B) & MASK;
-//    return (double)lastrand / TWOTO31;
-// }
-
-
-/******************************************************************************/
-
-// int main(int argc, char *argv[])
-// {
-//   register int i, run, blocks;
-//   int nnodes, nbodies, step, timesteps;
-//   register double runtime;
-//   int error;
-//   register float dtime, dthf, epssq, itolsq;
-//   float time, timing[7];
-//   cudaEvent_t start, stop;
-//   float *mass, *posx, *posy, *velx, *vely;
-
-//   int *errl, *sortl, *childl, *countl, *startl;
-//   float *massl;
-//   float *posxl, *posyl;
-//   float *velxl, *velyl;
-//   float *maxxl, *maxyl;
-//   float *minxl, *minyl;
-//   float *norml;
-//   register double rsc, vsc, r, v, x, y, sq, scale;
-
-//   // perform some checks
-
-//   printf("CUDA BarnesHut v3.1 ");
-// #ifdef __KEPLER__
-//   printf("[Kepler]\n");
-// #else
-//   printf("[Fermi]\n");
-// #endif
-//   printf("Copyright (c) 2013, Texas State University-San Marcos. All rights reserved.\n");
-//   fflush(stdout);
-//   if (argc != 4) {
-//     fprintf(stderr, "\n");
-//     fprintf(stderr, "arguments: number_of_bodies number_of_timesteps device\n");
-//     exit(-1);
-//   }
-
-//   int deviceCount;
-//   cudaGetDeviceCount(&deviceCount);
-//   if (deviceCount == 0) {
-//     fprintf(stderr, "There is no device supporting CUDA\n");
-//     exit(-1);
-//   }
-
-//   const int dev = atoi(argv[3]);
-//   if ((dev < 0) || (deviceCount <= dev)) {
-//     fprintf(stderr, "There is no device %d\n", dev);
-//     exit(-1);
-//   }
-//   cudaSetDevice(dev);
-
-//   cudaDeviceProp deviceProp;
-//   cudaGetDeviceProperties(&deviceProp, dev);
-//   if ((deviceProp.major == 9999) && (deviceProp.minor == 9999)) {
-//     fprintf(stderr, "There is no CUDA capable device\n");
-//     exit(-1);
-//   }
-//   if (deviceProp.major < 2) {
-//     fprintf(stderr, "Need at least compute capability 2.0\n");
-//     exit(-1);
-//   }
-//   if (deviceProp.warpSize != WARPSIZE) {
-//     fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
-//     exit(-1);
-//   }
-
-//   blocks = deviceProp.multiProcessorCount;
-// //  fprintf(stderr, "blocks = %d\n", blocks);
-
-//   if ((WARPSIZE <= 0) || (WARPSIZE & (WARPSIZE-1) != 0)) {
-//     fprintf(stderr, "Warp size must be greater than zero and a power of two\n");
-//     exit(-1);
-//   }
-//   if (MAXDEPTH > WARPSIZE) {
-//     fprintf(stderr, "MAXDEPTH must be less than or equal to WARPSIZE\n");
-//     exit(-1);
-//   }
-//   if ((THREADS1 <= 0) || (THREADS1 & (THREADS1-1) != 0)) {
-//     fprintf(stderr, "THREADS1 must be greater than zero and a power of two\n");
-//     exit(-1);
-//   }
-
-//   // set L1/shared memory configuration
-//   cudaFuncSetCacheConfig(BoundingBoxKernel, cudaFuncCachePreferShared);
-//   cudaFuncSetCacheConfig(TreeBuildingKernel, cudaFuncCachePreferL1);
-//   cudaFuncSetCacheConfig(ClearKernel1, cudaFuncCachePreferL1);
-//   cudaFuncSetCacheConfig(ClearKernel2, cudaFuncCachePreferL1);
-//   cudaFuncSetCacheConfig(SummarizationKernel, cudaFuncCachePreferShared);
-//   cudaFuncSetCacheConfig(SortKernel, cudaFuncCachePreferL1);
-// #ifdef __KEPLER__
-//   cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferEqual);
-// #else
-//   cudaFuncSetCacheConfig(ForceCalculationKernel, cudaFuncCachePreferL1);
-// #endif
-//   cudaFuncSetCacheConfig(IntegrationKernel, cudaFuncCachePreferL1);
-
-//   cudaGetLastError();  // reset error value
-//   for (run = 0; run < 3; run++) {
-//     for (i = 0; i < 7; i++) timing[i] = 0.0f;
-
-//     nbodies = atoi(argv[1]);
-//     if (nbodies < 1) {
-//       fprintf(stderr, "nbodies is too small: %d\n", nbodies);
-//       exit(-1);
-//     }
-//     if (nbodies > (1 << 30)) {
-//       fprintf(stderr, "nbodies is too large: %d\n", nbodies);
-//       exit(-1);
-//     }
-//     nnodes = nbodies * 2;
-//     if (nnodes < 1024*blocks) nnodes = 1024*blocks;
-//     while ((nnodes & (WARPSIZE-1)) != 0) nnodes++;
-//     nnodes--;
-
-//     timesteps = atoi(argv[2]);
-//     dtime = 0.025;  dthf = dtime * 0.5f;
-//     epssq = 0.05 * 0.05;
-//     itolsq = 1.0f / (0.5 * 0.5);
-
-//     // allocate memory
-
-//     if (run == 0) {
-//       printf("configuration: %d bodies, %d time steps\n", nbodies, timesteps);
-
-//       mass = (float *)malloc(sizeof(float) * nbodies);
-//       if (mass == NULL) {fprintf(stderr, "cannot allocate mass\n");  exit(-1);}
-//       posx = (float *)malloc(sizeof(float) * nbodies);
-//       if (posx == NULL) {fprintf(stderr, "cannot allocate posx\n");  exit(-1);}
-//       posy = (float *)malloc(sizeof(float) * nbodies);
-//       if (posy == NULL) {fprintf(stderr, "cannot allocate posy\n");  exit(-1);}
-//       velx = (float *)malloc(sizeof(float) * nbodies);
-//       if (velx == NULL) {fprintf(stderr, "cannot allocate velx\n");  exit(-1);}
-//       vely = (float *)malloc(sizeof(float) * nbodies);
-//       if (vely == NULL) {fprintf(stderr, "cannot allocate vely\n");  exit(-1);}
-
-//       if (cudaSuccess != cudaMalloc((void **)&errl, sizeof(int))) fprintf(stderr, "could not allocate errd\n");  CudaTest("couldn't allocate errd");
-//       if (cudaSuccess != cudaMalloc((void **)&childl, sizeof(int) * (nnodes+1) * 4)) fprintf(stderr, "could not allocate childd\n");  CudaTest("couldn't allocate childd");
-//       if (cudaSuccess != cudaMalloc((void **)&massl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate massd\n");  CudaTest("couldn't allocate massd");
-//       if (cudaSuccess != cudaMalloc((void **)&posxl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate posxd\n");  CudaTest("couldn't allocate posxd");
-//       if (cudaSuccess != cudaMalloc((void **)&posyl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate posyd\n");  CudaTest("couldn't allocate posyd");
-//       if (cudaSuccess != cudaMalloc((void **)&velxl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate velxd\n");  CudaTest("couldn't allocate velxd");
-//       if (cudaSuccess != cudaMalloc((void **)&velyl, sizeof(float) * (nnodes+1))) fprintf(stderr, "could not allocate velyd\n");  CudaTest("couldn't allocate velyd");
-//       if (cudaSuccess != cudaMalloc((void **)&countl, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate countd\n");  CudaTest("couldn't allocate countd");
-//       if (cudaSuccess != cudaMalloc((void **)&startl, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate startd\n");  CudaTest("couldn't allocate startd");
-//       if (cudaSuccess != cudaMalloc((void **)&sortl, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate sortd\n");  CudaTest("couldn't allocate sortd");
-//       if (cudaSuccess != cudaMalloc((void **)&norml, sizeof(int) * (nnodes+1))) fprintf(stderr, "could not allocate normd\n");  CudaTest("couldn't allocate normd");
-
-//       if (cudaSuccess != cudaMalloc((void **)&maxxl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate maxxd\n");  CudaTest("couldn't allocate maxxd");
-//       if (cudaSuccess != cudaMalloc((void **)&maxyl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate maxyd\n");  CudaTest("couldn't allocate maxyd");
-//       if (cudaSuccess != cudaMalloc((void **)&minxl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate minxd\n");  CudaTest("couldn't allocate minxd");
-//       if (cudaSuccess != cudaMalloc((void **)&minyl, sizeof(float) * blocks * FACTOR1)) fprintf(stderr, "could not allocate minyd\n");  CudaTest("couldn't allocate minyd");
-//     }
-
-//     // generate input
-
-//     drndset(7);
-//     rsc = (3 * 3.1415926535897932384626433832795) / 16;
-//     vsc = sqrt(1.0 / rsc);
-//     for (i = 0; i < nbodies; i++) {
-//       mass[i] = 1.0 / nbodies;
-//       r = 1.0 / sqrt(pow(drnd()*0.999, -2.0/3.0) - 1);
-//       do {
-//         x = drnd()*2.0 - 1.0;
-//         y = drnd()*2.0 - 1.0;
-//         sq = x*x + y*y;
-//       } while (sq > 1.0);
-//       scale = rsc * r / sqrt(sq);
-//       posx[i] = x * scale;
-//       posy[i] = y * scale;
-
-//       do {
-//         x = drnd();
-//         y = drnd() * 0.1;
-//       } while (y > x*x * pow(1 - x*x, 3.5));
-//       v = x * sqrt(2.0 / sqrt(1 + r*r));
-//       do {
-//         x = drnd()*2.0 - 1.0;
-//         y = drnd()*2.0 - 1.0;
-//         sq = x*x + y*y;
-//       } while (sq > 1.0);
-//       scale = vsc * v / sqrt(sq);
-//       velx[i] = x * scale;
-//       vely[i] = y * scale;
-//     }
-
-//     if (cudaSuccess != cudaMemcpy(massl, mass, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of mass to device failed\n");  CudaTest("mass copy to device failed");
-//     if (cudaSuccess != cudaMemcpy(posxl, posx, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of posx to device failed\n");  CudaTest("posx copy to device failed");
-//     if (cudaSuccess != cudaMemcpy(posyl, posy, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of posy to device failed\n");  CudaTest("posy copy to device failed");
-//     if (cudaSuccess != cudaMemcpy(velxl, velx, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of velx to device failed\n");  CudaTest("velx copy to device failed");
-//     if (cudaSuccess != cudaMemcpy(velyl, vely, sizeof(float) * nbodies, cudaMemcpyHostToDevice)) fprintf(stderr, "copying of vely to device failed\n");  CudaTest("vely copy to device failed");
-
-//     // run timesteps (launch GPU kernels)
-
-//     cudaEventCreate(&start);  cudaEventCreate(&stop);  
-//     struct timeval starttime, endtime;
-//     gettimeofday(&starttime, NULL);
-
-//     cudaEventRecord(start, 0);
-//     InitializationKernel<<<1, 1>>>(errl);
-//     cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-//     timing[0] += time;
-//     CudaTest("kernel 0 launch failed");
-
-//     for (step = 0; step < timesteps; step++) {
-//       cudaEventRecord(start, 0);
-//       BoundingBoxKernel<<<blocks * FACTOR1, THREADS1>>>(nnodes, nbodies, startl, childl, massl, posxl, posyl, maxxl, maxyl, minxl, minyl);
-//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-//       timing[1] += time;
-//       CudaTest("kernel 1 launch failed");
-
-//       cudaEventRecord(start, 0);
-//       ClearKernel1<<<blocks * 1, 1024>>>(nnodes, nbodies, childl);
-//       TreeBuildingKernel<<<blocks * FACTOR2, THREADS2>>>(nnodes, nbodies, errl, childl, posxl, posyl);
-//       ClearKernel2<<<blocks * 1, 1024>>>(nnodes, startl, massl);
-//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-//       timing[2] += time;
-//       CudaTest("kernel 2 launch failed");
-
-//       cudaEventRecord(start, 0);
-//       SummarizationKernel<<<blocks * FACTOR3, THREADS3>>>(nnodes, nbodies, countl, childl, massl, posxl, posyl);
-//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-//       timing[3] += time;
-//       CudaTest("kernel 3 launch failed");
-
-//       cudaEventRecord(start, 0);
-//       SortKernel<<<blocks * FACTOR4, THREADS4>>>(nnodes, nbodies, sortl, countl, startl, childl);
-//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-//       timing[4] += time;
-//       CudaTest("kernel 4 launch failed");
-
-//       cudaEventRecord(start, 0);
-//       ForceCalculationKernel<<<blocks * FACTOR5, THREADS5>>>(nnodes, nbodies, errl, itolsq, epssq, sortl, childl, massl, posxl, posyl, velxl, velyl, norml);
-//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-//       timing[5] += time;
-//       CudaTest("kernel 5 launch failed");
-
-//       cudaEventRecord(start, 0);
-//       IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(nbodies, dtime, posxl, posyl, velxl, velyl);
-//       cudaEventRecord(stop, 0);  cudaEventSynchronize(stop);  cudaEventElapsedTime(&time, start, stop);
-//       timing[6] += time;
-//       CudaTest("kernel 6 launch failed");
-//     }
-//     CudaTest("kernel launch failed");
-//     cudaEventDestroy(start);  cudaEventDestroy(stop);
-
-//     // transfer result back to CPU
-//     if (cudaSuccess != cudaMemcpy(&error, errl, sizeof(int), cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of err from device failed\n");  CudaTest("err copy from device failed");
-//     if (cudaSuccess != cudaMemcpy(posx, posxl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of posx from device failed\n");  CudaTest("posx copy from device failed");
-//     if (cudaSuccess != cudaMemcpy(posy, posyl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of posy from device failed\n");  CudaTest("posy copy from device failed");
-//     if (cudaSuccess != cudaMemcpy(velx, velxl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of velx from device failed\n");  CudaTest("velx copy from device failed");
-//     if (cudaSuccess != cudaMemcpy(vely, velyl, sizeof(float) * nbodies, cudaMemcpyDeviceToHost)) fprintf(stderr, "copying of vely from device failed\n");  CudaTest("vely copy from device failed");
-
-//     gettimeofday(&endtime, NULL);
-//     runtime = endtime.tv_sec + endtime.tv_usec/1000000.0 - starttime.tv_sec - starttime.tv_usec/1000000.0;
-
-//     printf("runtime: %.4lf s  (", runtime);
-//     time = 0;
-//     for (i = 1; i < 7; i++) {
-//       printf(" %.1f ", timing[i]);
-//       time += timing[i];
-//     }
-//     if (error == 0) {
-//       printf(") = %.1f ms\n", time);
-//     } else {
-//       printf(") = %.1f ms FAILED %d\n", time, error);
-//     }
-//   }
-
-//   // print output
-//   i = 0;
-// //  for (i = 0; i < nbodies; i++) {
-//     printf("%.2e %.2e\n", posx[i], posy[i]);
-// //  }
-
-//   free(mass);
-//   free(posx);
-//   free(posy);
-//   free(velx);
-//   free(vely);
-
-//   cudaFree(errl);
-//   cudaFree(childl);
-//   cudaFree(massl);
-//   cudaFree(posxl);
-//   cudaFree(posyl);
-//   cudaFree(countl);
-//   cudaFree(startl);
-//   cudaFree(norml);
-
-//   cudaFree(maxxl);
-//   cudaFree(maxyl);
-//   cudaFree(minxl);
-//   cudaFree(minyl);
-
-//   return 0;
-// }
