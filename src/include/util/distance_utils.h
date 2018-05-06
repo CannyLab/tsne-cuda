@@ -29,7 +29,7 @@
 #include "include/util/thrust_utils.h"
 
 namespace tsne {
-namespace utils {
+namespace util {
 
 /**
  * @brief Assemble the final distances from the squared norms and the dot produces

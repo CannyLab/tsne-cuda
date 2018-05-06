@@ -176,7 +176,7 @@ void tsne::util::Save(thrust::device_vector<float> d_points,
         const uint32_t num_dims) {
     float *data = new float[num_points * num_dims];
     thrust::copy(d_points.begin(), d_points.end(), data);
-    tsne::util::Save(file_name, data, num_points, num_dims);
+    tsne::util::Save(data, file_name, num_points, num_dims);
     delete[] data;
 }
 

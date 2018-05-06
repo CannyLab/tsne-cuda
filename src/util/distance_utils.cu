@@ -26,8 +26,8 @@ __global__ void tsne::util::AssembleDistances(
     const uint32_t j = threadIdx.y + blockIdx.y * blockDim.y;
 
     if ((i < num_points) && (j < num_points))
-        d_dots[i * N + j] = fabs(d_squared_norms[j] + d_squared_norms[i] -
-                                 2 * d_dot_products[i * num_points + j]);
+        d_dot_products[i * num_points + j] = fabs(d_squared_norms[j] +
+            d_squared_norms[i] - 2 * d_dot_products[i * num_points + j]);
     }
 
 // Code from https://github.com/OrangeOwlSolutions/cuBLAS/blob/master/All_pairs_distances.cu
@@ -48,7 +48,8 @@ void tsne::util::SquaredPairwiseDistance(cublasHandle_t &handle,
     cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, num_points,
         num_points, num_dims, &kAlpha,
         thrust::raw_pointer_cast(d_points.data()),
-        num_points, thrust::raw_pointer_cast(d_points.data()), N, &kBeta,
+        num_points, thrust::raw_pointer_cast(d_points.data()),
+        num_points, &kBeta,
         thrust::raw_pointer_cast(d_distances.data()), num_points));
 
     typedef thrust::device_vector<float>::iterator Iterator;
@@ -59,10 +60,11 @@ void tsne::util::SquaredPairwiseDistance(cublasHandle_t &handle,
                 squared_norms.begin());
 
     dim3 kBlockDimensions(kBlockSize, kBlockSize);
-    dim3 kGridDimensions(iDivUp(N, kBlockSize), iDivUp(num_points, kBlockSize));
+    dim3 kGridDimensions(iDivUp(num_points, kBlockSize),
+            iDivUp(num_points, kBlockSize));
     tsne::util::AssembleDistances<<<kGridDimensions, kBlockDimensions>>>(
         thrust::raw_pointer_cast(squared_norms.data()),
-        thrust::raw_pointer_cast(distances.data()), num_points);
+        thrust::raw_pointer_cast(d_distances.data()), num_points);
 }
 
 void tsne::util::PairwiseDistance(cublasHandle_t &handle,
@@ -79,7 +81,7 @@ void tsne::util::KNearestNeighbors(int64_t* indices, float* distances,
         const float* const points, const uint32_t num_dims,
         const uint32_t num_points, const uint32_t num_near_neighbors) {
     const int32_t kNumCells = static_cast<int32_t>(
-            std::sqrt(static_cast<float>(num_points));
+            std::sqrt(static_cast<float>(num_points)));
     const int32_t kNumCellsToProbe = 20;
 
     if (num_near_neighbors < 1024) {

@@ -33,7 +33,7 @@ void tsne::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
         thrust::device_vector<float> &d_points, const uint32_t num_points,
         const uint32_t num_dims) {
     // Compute the means
-    auto d_means = tsne::util::reduce_mean(handle, d_points, num_points,
+    auto d_means = Reduce::reduce_mean(handle, d_points, num_points,
                                          num_dims, 0);
 
     // Zero-Center
@@ -171,7 +171,7 @@ void tsne::util::SymmetrizeMatrix(cusparseHandle_t &handle,
     cusparseScsr2csc(handle, num_points, num_points,
                      num_near_neighbors*num_points, csr_values_a, csr_row_ptr_a,
                      csr_column_ptr_a, csc_values_at, csc_row_ptr_at,
-                     csc_column_ptr_at, CUSPARSE_aCTION_NUMERIC,
+                     csc_column_ptr_at, CUSPARSE_ACTION_NUMERIC,
                      CUSPARSE_INDEX_BASE_ZERO);
     cudaDeviceSynchronize();
 
@@ -180,7 +180,6 @@ void tsne::util::SymmetrizeMatrix(cusparseHandle_t &handle,
     int32_t symmetrized_num_nonzeros = -1;
     cusparseSetPointerMode(handle, CUSPARSE_POINTER_MODE_HOST);
     d_symmetrized_rowptr.resize(num_points+1);
-    // cudaMalloc((void**) d_symmetrized_rowptr, sizeof(int)*(num_points+1));
     cusparseXcsrgeamNnz(handle, num_points, num_points,
             matrix_descriptor, num_points*num_near_neighbors, csr_row_ptr_a,
                 csr_column_ptr_a,
@@ -188,11 +187,12 @@ void tsne::util::SymmetrizeMatrix(cusparseHandle_t &handle,
                 csc_row_ptr_at,
             matrix_descriptor,
             thrust::raw_pointer_cast(d_symmetrized_rowptr.data()),
-            symmetrized_num_nonzeros);
+            &symmetrized_num_nonzeros);
     cudaDeviceSynchronize();
 
-    if (-1 != *symmetrized_num_nonzeros) {
-        num_nonzeros_C = *symmetrized_num_nonzeros;
+    // Do some useful checking...
+    if (-1 != symmetrized_num_nonzeros) {
+        num_nonzeros_C = symmetrized_num_nonzeros;
     } else {
         cudaMemcpy(&num_nonzeros_C,
                 thrust::raw_pointer_cast(d_symmetrized_rowptr.data()) +

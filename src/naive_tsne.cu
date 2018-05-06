@@ -182,7 +182,7 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
                         float eta) 
 {
     // dist_ = ||y_i - y_j||^2
-    Distance::squared_pairwise_dist(handle, dist, ys, N, PROJDIM);
+    tsne::util::SquaredPairwiseDistance(handle, dist, ys, N, PROJDIM);
 
     // std::cout << std::endl << std::endl << "Dist" << std::endl;
     // printarray(dist, N, N);

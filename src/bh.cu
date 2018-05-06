@@ -1056,8 +1056,8 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         thrust::device_vector<float> sparsePij; // Device
         thrust::device_vector<int> pijRowPtr; // Device
         thrust::device_vector<int> pijColInd; // Device
-        int sym_nnz;
-        Sparse::sym_mat_gpu(d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, opt.n_points, K, opt.magnitude_factor);
+        tsne::util::SymmetrizeMatrix(sparse_handle, 
+          d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, opt.n_points, K, opt.magnitude_factor);
 
         // Clear some old memory
         d_knn_indices.clear();
