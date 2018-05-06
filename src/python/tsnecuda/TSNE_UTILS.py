@@ -74,7 +74,7 @@ _lib.pymodule_bhsnapshot.argtypes = [ N.ctypeslib.ndpointer(N.float32, ndim=2, f
 
 def tsne_snapshots(points, n_components=2, perplexity=32.0, early_exaggeration=12, learning_rate=500, iterations=1000, y=None, num_snapshots=5):
         if y is None:
-            Y = N.random.normal(shape=(points.shape[0],2))
+            Y = N.random.normal(size=(points.shape[0],2))
         points = N.require(points, N.float32, ['CONTIGUOUS', 'ALIGNED'])
         embedding_ = N.zeros(shape=(points.shape[0],2,num_snapshots))
         embedding_ = N.require(embedding_ , N.float32, ['F_CONTIGUOUS', 'ALIGNED', 'WRITEABLE'])
