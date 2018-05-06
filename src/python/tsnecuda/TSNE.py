@@ -80,10 +80,10 @@ class TSNE(object):
         #     self.random_seed = float(os.urandom(4))
 
         # Build the hooks for the BH T-SNE library
-        self._path = pkg_resources.resource_filename('pyctsne','') # Load from current location
+        self._path = pkg_resources.resource_filename('tsnecuda','') # Load from current location
         # self._faiss_lib = N.ctypeslib.load_library('libfaiss', self._path) # Load the ctypes library
         # self._gpufaiss_lib = N.ctypeslib.load_library('libgpufaiss', self._path) # Load the ctypes library
-        self._lib = N.ctypeslib.load_library('libpyctsne', self._path) # Load the ctypes library
+        self._lib = N.ctypeslib.load_library('libtsnecuda', self._path) # Load the ctypes library
 
         # Hook the BH T-SNE function
         self._lib.pymodule_bh_tsne.restype = None

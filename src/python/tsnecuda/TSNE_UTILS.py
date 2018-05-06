@@ -7,8 +7,8 @@ import ctypes
 import os
 import pkg_resources
 
-_path = pkg_resources.resource_filename('pyctsne','') # Load from current locationn
-_lib = N.ctypeslib.load_library('libpyctsne', _path) # Load the ctypes library
+_path = pkg_resources.resource_filename('tsnecuda','') # Load from current locationn
+_lib = N.ctypeslib.load_library('libtsnecuda', _path) # Load the ctypes library
 
 
 # Distance function hook
