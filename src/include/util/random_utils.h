@@ -13,7 +13,7 @@
 #include "include/common.h"
 #include "include/util/cuda_utils.h"
 
-namespace tsne {
+namespace tsnecuda {
 namespace util {
 
 /**

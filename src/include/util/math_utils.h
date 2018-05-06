@@ -16,7 +16,7 @@
 #include "include/util/reduce_utils.h"
 #include "include/util/thrust_transform_functions.h"
 
-namespace tsne {
+namespace tsnecuda {
 namespace util {
 
 /**
@@ -97,6 +97,6 @@ void SymmetrizeMatrix(cusparseHandle_t &handle,
         float magnitude_factor);
 
 }  // namespace util
-}  // namespace tsne
+}  // namespace tsnecuda
 
 #endif  // SRC_INCLUDE_UTIL_MATH_UTILS_H_

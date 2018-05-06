@@ -10,7 +10,7 @@
 #include "include/util/reduce_utils.h"
 
 // expects matrix of size N x M
-thrust::device_vector<float> tsne::util::ReduceAlpha(cublasHandle_t &handle,
+thrust::device_vector<float> tsnecuda::util::ReduceAlpha(cublasHandle_t &handle,
         const thrust::device_vector<float> &d_matrix,
         const uint32_t N,
         const uint32_t M,
@@ -41,21 +41,21 @@ thrust::device_vector<float> tsne::util::ReduceAlpha(cublasHandle_t &handle,
     }
 }
 
-thrust::device_vector<float> tsne::util::ReduceMean(cublasHandle_t &handle,
+thrust::device_vector<float> tsnecuda::util::ReduceMean(cublasHandle_t &handle,
         const thrust::device_vector<float> &d_matrix,
         const uint32_t N,
         const uint32_t M,
         const uint32_t axis) {
     float alpha = 1.f / N;
-    return tsne::util::ReduceAlpha(handle, d_matrix, N, M, alpha, axis);
+    return tsnecuda::util::ReduceAlpha(handle, d_matrix, N, M, alpha, axis);
 }
 
 
-thrust::device_vector<float> tsne::util::ReduceSum(cublasHandle_t &handle,
+thrust::device_vector<float> tsnecuda::util::ReduceSum(cublasHandle_t &handle,
         const thrust::device_vector<float> &d_matrix,
         const uint32_t N,
         const uint32_t M,
         const uint32_t axis) {
     float alpha = 1.f;
-    return tsne::util::ReduceAlpha(handle, d_matrix, N, M, alpha, axis);
+    return tsnecuda::util::ReduceAlpha(handle, d_matrix, N, M, alpha, axis);
 }

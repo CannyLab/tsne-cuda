@@ -28,7 +28,7 @@
 #include "include/util/math_utils.h"
 #include "include/util/thrust_utils.h"
 
-namespace tsne {
+namespace tsnecuda {
 namespace util {
 
 /**

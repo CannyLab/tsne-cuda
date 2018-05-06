@@ -19,7 +19,7 @@ void pymodule_e_dist(float *points, float *dist, ssize_t *dims) {
     // Create the handle, and construct the points
     cublasHandle_t handle;
     cublasSafeCall(cublasCreate(&handle));
-    tsne::util::PairwiseDistance(handle, d_distances, d_points, N_POINTS, N_DIMS);
+    tsnecuda::util::PairwiseDistance(handle, d_distances, d_points, N_POINTS, N_DIMS);
 
     // Copy the data back to the CPU
     thrust::copy(d_distances.begin(), d_distances.end(), dist);

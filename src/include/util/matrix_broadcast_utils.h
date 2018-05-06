@@ -13,7 +13,7 @@
 #include "include/common.h"
 #include "include/util/cuda_utils.h"
 
-namespace tsne {
+namespace tsnecuda {
 namespace util {
 
 /// @private
@@ -59,6 +59,6 @@ void BroadcastMatrixVector(thrust::device_vector<T> &d_matrix,
                             const uint32_t axis,
                             const T alpha);
 }  // namespace util
-}  // namespace tsne
+}  // namespace tsnecuda
 
 #endif  // SRC_INCLUDE_UTIL_MATRIX_BROADCAST_UTILS_H_

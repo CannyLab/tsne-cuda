@@ -15,7 +15,7 @@
 
 #include "include/common.h"
 
-namespace tsne {
+namespace tsnecuda {
 namespace util {
 
 // Strided iterator from
@@ -69,7 +69,7 @@ void ZeroDeviceMatrixDiagonal(thrust::device_vector<float> &d_vector,
                               const uint32_t N);
 
 }  // namespace util
-}  // namespace tsne
+}  // namespace tsnecuda
 
 
 #endif  // SRC_INCLUDE_UTIL_THRUST_UTILS_H_

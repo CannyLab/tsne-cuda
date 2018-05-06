@@ -13,7 +13,7 @@
 #include "include/common.h"
 #include "include/util/cuda_utils.h"
 
-namespace tsne {
+namespace tsnecuda {
 namespace util {
 
 /**
@@ -67,6 +67,6 @@ thrust::device_vector<float> ReduceSum(cublasHandle_t &handle,
                                 const uint32_t axis);
 
 }  // namespace util
-}  // namespace tsne
+}  // namespace tsnecuda
 
 #endif  // SRC_INCLUDE_UTIL_REDUCE_UTILS_H_

@@ -12,7 +12,7 @@
 // Performs the operation matrix[i, :] = binary_op(matrix[i, :],
 // alpha * vector) for each row i in the matrix
 template<typename BinaryFunction, typename T>
-__global__ void tsne::util::BroadcastRowVector(
+__global__ void tsnecuda::util::BroadcastRowVector(
         T * __restrict__ d_matrix,
         const T * __restrict__ d_vector,
         const uint32_t N,
@@ -29,7 +29,7 @@ __global__ void tsne::util::BroadcastRowVector(
 // Performs the operation matrix[:, j] = binary_op(matrix[:, j],
 // alpha * vector) for each col i in the matrix
 template<typename BinaryFunction, typename T>
-__global__ void tsne::util::BroadcastColumnVector(
+__global__ void tsnecuda::util::BroadcastColumnVector(
         T * __restrict__ d_matrix,
         const T * __restrict__ d_vector,
         const uint32_t N,
@@ -45,7 +45,7 @@ __global__ void tsne::util::BroadcastColumnVector(
 }
 
 template<typename BinaryFunction, typename T>
-void tsne::util::BroadcastMatrixVector(
+void tsnecuda::util::BroadcastMatrixVector(
         thrust::device_vector<T> &d_matrix,
         const thrust::device_vector<T> &d_vector,
         const uint32_t N,
@@ -61,12 +61,12 @@ void tsne::util::BroadcastMatrixVector(
     const uint32_t kBlockSize = 32;
     const uint32_t kNumBlocks = iDivUp(N * M, kBlockSize);
     if (axis == 0) {
-    tsne::util::BroadcastColumnVector<<<kNumBlocks, kBlockSize>>>(
+    tsnecuda::util::BroadcastColumnVector<<<kNumBlocks, kBlockSize>>>(
             thrust::raw_pointer_cast(d_matrix.data()),
             thrust::raw_pointer_cast(d_vector.data()),
             N, M, binary_operation, alpha);
     } else {
-    tsne::util::BroadcastRowVector<<<kNumBlocks, kBlockSize>>>(
+    tsnecuda::util::BroadcastRowVector<<<kNumBlocks, kBlockSize>>>(
             thrust::raw_pointer_cast(d_matrix.data()),
             thrust::raw_pointer_cast(d_vector.data()),
             N, M, binary_operation, alpha);
@@ -75,7 +75,7 @@ void tsne::util::BroadcastMatrixVector(
 
 
 // Explicit instantiations of the method
-template void tsne::util::BroadcastMatrixVector<thrust::divides<float>, float>(
+template void tsnecuda::util::BroadcastMatrixVector<thrust::divides<float>, float>(
         thrust::device_vector<float> &d_matrix,
         const thrust::device_vector<float> &d_vector,
         const uint32_t N,
@@ -83,7 +83,7 @@ template void tsne::util::BroadcastMatrixVector<thrust::divides<float>, float>(
         thrust::divides<float> binary_operation,
         const uint32_t axis,
         const float alpha);
-template void tsne::util::BroadcastMatrixVector<thrust::minus<float>, float>(
+template void tsnecuda::util::BroadcastMatrixVector<thrust::minus<float>, float>(
         thrust::device_vector<float> &d_matrix,
         const thrust::device_vector<float> &d_vector,
         const uint32_t N,

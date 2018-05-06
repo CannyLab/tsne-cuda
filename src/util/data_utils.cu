@@ -9,7 +9,7 @@
 
 #include "include/util/data_utils.h"
 
-float* tsne::util::LoadMnist(std::string file_name, int32_t& num_images,
+float* tsnecuda::util::LoadMnist(std::string file_name, int32_t& num_images,
         int32_t& num_rows, int32_t& num_columns) {
     // Construct the file stream
     std::ifstream mnist_file(file_name, std::ios::in | std::ios::binary);
@@ -78,7 +78,7 @@ float* tsne::util::LoadMnist(std::string file_name, int32_t& num_images,
     return data;
 }
 
-float* tsne::util::LoadCifar10(std::string file_path) {
+float* tsnecuda::util::LoadCifar10(std::string file_path) {
     int32_t kNumImages = 50000;
 
     int32_t kNumChannels = 3;
@@ -126,7 +126,7 @@ float* tsne::util::LoadCifar10(std::string file_path) {
     return data;
 }
 
-float* tsne::util::LoadCifar100(std::string file_name) {
+float* tsnecuda::util::LoadCifar100(std::string file_name) {
     int32_t kNumImages = 50000;
 
     int32_t kNumChannels = 3;
@@ -158,7 +158,7 @@ float* tsne::util::LoadCifar100(std::string file_name) {
     return data;
 }
 
-void tsne::util::Save(const float * const points,
+void tsnecuda::util::Save(const float * const points,
         std::string file_name,  const uint32_t num_points,
         const uint32_t num_dims) {
     std::ofstream save_file(file_name, std::ios::out | std::ios::binary);
@@ -171,16 +171,16 @@ void tsne::util::Save(const float * const points,
     save_file.close();
 }
 
-void tsne::util::Save(thrust::device_vector<float> d_points,
+void tsnecuda::util::Save(thrust::device_vector<float> d_points,
         std::string file_name,  const uint32_t num_points,
         const uint32_t num_dims) {
     float *data = new float[num_points * num_dims];
     thrust::copy(d_points.begin(), d_points.end(), data);
-    tsne::util::Save(data, file_name, num_points, num_dims);
+    tsnecuda::util::Save(data, file_name, num_points, num_dims);
     delete[] data;
 }
 
-float* tsne::util::Load(std::string file_name) {
+float* tsnecuda::util::Load(std::string file_name) {
     std::ifstream load_file(file_name, std::ios::in | std::ios::binary);
     uint32_t num_points;
     uint32_t num_dims;

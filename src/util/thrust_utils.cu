@@ -10,7 +10,7 @@
 #include "include/util/thrust_utils.h"
 
 // Assumes that vec is an N x N matrix
-void tsne::util::ZeroDeviceMatrixDiagonal(
+void tsnecuda::util::ZeroDeviceMatrixDiagonal(
         thrust::device_vector<float> &d_vector, const uint32_t N) {
     typedef thrust::device_vector<float>::iterator Iterator;
     StridedRange<Iterator> return_vector(d_vector.begin(),

@@ -929,9 +929,9 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
         gpuErrchk(cudaDeviceSynchronize());
         
         // compute entropy of current row
-        row_sum = tsne::util::ReduceSum(handle, pij, K, N, 0);
-        thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsne::util::FunctionalEntropy());
-        auto neg_entropy = tsne::util::ReduceAlpha(handle, entropy, K, N, -1.0f, 0);
+        row_sum = tsnecuda::util::ReduceSum(handle, pij, K, N, 0);
+        thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsnecuda::util::FunctionalEntropy());
+        auto neg_entropy = tsnecuda::util::ReduceAlpha(handle, entropy, K, N, -1.0f, 0);
 
         // binary search for beta
         PerplexitySearchKernel<<<NBLOCKS2, BLOCKSIZE2>>>(N, perplexity_target, eps,
@@ -947,7 +947,7 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
     } while (!all_found && iters < 200);
     // TODO: Warn if iters == 200 because perplexity not found?
 
-    tsne::util::BroadcastMatrixVector(pij, row_sum, K, N, thrust::divides<float>(), 1, 1.0f);
+    tsnecuda::util::BroadcastMatrixVector(pij, row_sum, K, N, thrust::divides<float>(), 1, 1.0f);
     return pij;
 }
 
@@ -1002,7 +1002,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
     start_time = std::chrono::high_resolution_clock::now();
 
         // Do KNN Call
-        tsne::util::KNearestNeighbors(knn_indices, knn_distances, opt.points, opt.n_dims, opt.n_points, K);
+        tsnecuda::util::KNearestNeighbors(knn_indices, knn_distances, opt.points, opt.n_dims, opt.n_points, K);
         
     end_time = std::chrono::high_resolution_clock::now();
     times[1] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1012,7 +1012,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 
         // Allocate device distance memory
         thrust::device_vector<float> d_knn_distances(knn_distances, knn_distances + (opt.n_points * K));
-        tsne::util::MaxNormalizeDeviceVector(d_knn_distances); // Here, the extra 0s floating around won't matter
+        tsnecuda::util::MaxNormalizeDeviceVector(d_knn_distances); // Here, the extra 0s floating around won't matter
         thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, opt.perplexity, opt.perplexity_search_epsilon, opt.n_points, K);
 
         // Clean up distance memory
@@ -1052,7 +1052,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         thrust::device_vector<float> sparsePij; // Device
         thrust::device_vector<int> pijRowPtr; // Device
         thrust::device_vector<int> pijColInd; // Device
-        tsne::util::SymmetrizeMatrix(sparse_handle, 
+        tsnecuda::util::SymmetrizeMatrix(sparse_handle, 
           d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, opt.n_points, K, opt.magnitude_factor);
 
         // Clear some old memory
@@ -1119,7 +1119,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         thrust::device_vector<float> random_vec(pts.size());
         
         if (opt.initialization == BHTSNE::TSNE_INIT::UNIFORM) { // Random uniform initialization
-            pts = tsne::util::RandomDeviceVectorInRange((nnodes+1)*2, -100, 100);
+            pts = tsnecuda::util::RandomDeviceVectorInRange((nnodes+1)*2, -100, 100);
         } else if (opt.initialization == BHTSNE::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
             std::default_random_engine generator;
             std::normal_distribution<double> distribution1(0.0, 1.0);
@@ -1138,7 +1138,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
             }
         } else if (opt.initialization == BHTSNE::TSNE_INIT::VECTOR) { // Preinit from vector points only
             // Load only the poitns into the pre-init vector
-            pts = tsne::util::RandomDeviceVectorInRange((nnodes+1)*2, -100, 100);
+            pts = tsnecuda::util::RandomDeviceVectorInRange((nnodes+1)*2, -100, 100);
             // Copy the pre-init data
             if(opt.preinit_data != nullptr) {
               thrust::copy(opt.preinit_data, opt.preinit_data+opt.n_points, pts.begin());

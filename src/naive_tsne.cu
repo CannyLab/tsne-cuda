@@ -39,19 +39,19 @@ void NaiveTSNE::thrust_search_perplexity(cublasHandle_t &handle,
     // printarray(pij, N, N);
     // std::cout << std::endl;
     thrust::device_vector<float> entropy_(pij.size());
-    thrust::transform(pij.begin(), pij.end(), entropy_.begin(), tsne::util::FunctionalEntropy());
-    tsne::util::ZeroDeviceMatrixDiagonal(entropy_, N);
+    thrust::transform(pij.begin(), pij.end(), entropy_.begin(), tsnecuda::util::FunctionalEntropy());
+    tsnecuda::util::ZeroDeviceMatrixDiagonal(entropy_, N);
 
     // std::cout << "entropy:" << std::endl;
     // printarray(entropy_, N, N);
     // std::cout << std::endl;
 
-    auto neg_entropy = tsne::util::ReduceAlpha(handle, entropy_, N, N, -1.0f, 1);
+    auto neg_entropy = tsnecuda::util::ReduceAlpha(handle, entropy_, N, N, -1.0f, 1);
 
     // std::cout << "neg_entropy:" << std::endl;
     // printarray(neg_entropy, 1, N);
     // std::cout << std::endl;
-    thrust::transform(neg_entropy.begin(), neg_entropy.end(), perplexity.begin(), tsne::util::FunctionalPower2());
+    thrust::transform(neg_entropy.begin(), neg_entropy.end(), perplexity.begin(), tsnecuda::util::FunctionalPower2());
     // std::cout << "perplexity:" << std::endl;
     // printarray(perplexity, 1, N);
     // std::cout << std::endl;
@@ -112,23 +112,23 @@ void NaiveTSNE::compute_pij(
                         const unsigned int N, 
                         const unsigned int NDIMS) 
 {
-    tsne::util::SquaredPairwiseDistance(handle, pij, points, N, NDIMS);
+    tsnecuda::util::SquaredPairwiseDistance(handle, pij, points, N, NDIMS);
 
     // std::cout << "Sigma:" << std::endl;
     // printarray(sigma, N, 1);
     thrust::device_vector<float> sigma_squared(sigma.size());
-    tsne::util::SquareDeviceVector(sigma_squared, sigma);
+    tsnecuda::util::SquareDeviceVector(sigma_squared, sigma);
     
     // divide column by sigmas (matrix[i,:] gets divided by sigma_i^2)
-    tsne::util::BroadcastMatrixVector(pij, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
-    thrust::transform(pij.begin(), pij.end(), pij.begin(), tsne::util::FunctionalExp());
-    tsne::util::ZeroDeviceMatrixDiagonal(pij, N);
+    tsnecuda::util::BroadcastMatrixVector(pij, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
+    thrust::transform(pij.begin(), pij.end(), pij.begin(), tsnecuda::util::FunctionalExp());
+    tsnecuda::util::ZeroDeviceMatrixDiagonal(pij, N);
     
-    // tsne::util::ReduceSum over cols? rows? Fuck if I know. 
-    auto sums = tsne::util::ReduceSum(handle, pij, N, N, 1);
+    // tsnecuda::util::ReduceSum over cols? rows? Fuck if I know. 
+    auto sums = tsnecuda::util::ReduceSum(handle, pij, N, N, 1);
 
     // divide column by resulting vector
-    tsne::util::BroadcastMatrixVector(pij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
+    tsnecuda::util::BroadcastMatrixVector(pij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
 }
 
 void NaiveTSNE::symmetrize_pij(cublasHandle_t &handle, 
@@ -164,14 +164,14 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
                         float eta) 
 {
     // dist_ = ||y_i - y_j||^2
-    tsne::util::SquaredPairwiseDistance(handle, dist, ys, N, PROJDIM);
+    tsnecuda::util::SquaredPairwiseDistance(handle, dist, ys, N, PROJDIM);
 
     // std::cout << std::endl << std::endl << "Dist" << std::endl;
     // printarray(dist, N, N);
 
     // dist_ = (1 + ||y_i - y_j||^2)^-1
-    thrust::transform(dist.begin(), dist.end(), dist.begin(), tsne::util::FunctionalIncrementInverse());
-    tsne::util::ZeroDeviceMatrixDiagonal(dist, N);
+    thrust::transform(dist.begin(), dist.end(), dist.begin(), tsnecuda::util::FunctionalIncrementInverse());
+    tsnecuda::util::ZeroDeviceMatrixDiagonal(dist, N);
 
     // std::cout << std::endl << std::endl << "Inc-Inv Dist" << std::endl;
     // printarray(dist, N, N);
@@ -180,20 +180,20 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
     float sum = thrust::reduce(dist.begin(), dist.end(), 0.0f, thrust::plus<float>());
     thrust::transform(dist.begin(), dist.end(), thrust::make_constant_iterator<float>(sum), qij.begin(), thrust::divides<float>());
 
-    // auto sums = tsne::util::ReduceSum(handle, qij, N, N, 1);
+    // auto sums = tsnecuda::util::ReduceSum(handle, qij, N, N, 1);
 
     // std::cout << std::endl << std::endl << "Sum-Dist" << std::endl;
     // printarray(sums, 1, N);
 
-    // tsne::util::BroadcastMatrixVector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
+    // tsnecuda::util::BroadcastMatrixVector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
 
     // std::cout << std::endl << std::endl << "Qij" << std::endl;
     // printarray(qij, N, N);
 
     // Compute loss = \sum_ij pij * log(pij / qij)
     thrust::device_vector<float> loss_(N * N);
-    thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), tsne::util::FunctionalKlDivergence());
-    tsne::util::ZeroDeviceMatrixDiagonal(loss_, N);
+    thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), tsnecuda::util::FunctionalKlDivergence());
+    tsnecuda::util::ZeroDeviceMatrixDiagonal(loss_, N);
 
     // printarray(loss_, N, N);
     float loss = thrust::reduce(loss_.begin(), loss_.end(), 0.0f, thrust::plus<float>());
@@ -241,7 +241,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
                                         const unsigned int N, 
                                         const unsigned int NDIMS,
                                         const unsigned int PROJDIM) {
-    tsne::util::MaxNormalizeDeviceVector(points);
+    tsnecuda::util::MaxNormalizeDeviceVector(points);
 
     // Choose the right sigmas
     std::cout << "Selecting sigmas to match perplexity..." << std::endl;
@@ -260,7 +260,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
     //printarray(pij, N, N);
     
     thrust::device_vector<float> forces(N * PROJDIM);
-    thrust::device_vector<float> ys = tsne::util::RandomDeviceUniformZeroOneVector(N * PROJDIM);
+    thrust::device_vector<float> ys = tsnecuda::util::RandomDeviceUniformZeroOneVector(N * PROJDIM);
     
     // Momentum variables
     thrust::device_vector<float> yt_1(N * PROJDIM);
@@ -313,7 +313,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
         //TODO: Add early termination for loss deltas
         
         if (i % 100 == 0)
-            std::cout << "Iteration: " << i << ", Loss: " << loss << ", ForceMag: " << tsne::util::L2NormDeviceVector(forces) << std::endl;
+            std::cout << "Iteration: " << i << ", Loss: " << loss << ", ForceMag: " << tsnecuda::util::L2NormDeviceVector(forces) << std::endl;
 
         #ifdef DEBUG
             // Dump the points
@@ -345,7 +345,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
                                                 float min_g_norm){
     
     // Compute a max-norm on the points
-    tsne::util::MaxNormalizeDeviceVector(d_points);
+    tsnecuda::util::MaxNormalizeDeviceVector(d_points);
 
     // Choose the right sigmas
     std::cout << "Selecting sigmas to match perplexity..." << std::endl;
@@ -357,7 +357,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
 
     // Allocate some memory for the foces and such
     thrust::device_vector<float> forces(N_POINTS * PROJDIM);
-    thrust::device_vector<float> ys = tsne::util::RandomDeviceUniformZeroOneVector(N_POINTS * PROJDIM);
+    thrust::device_vector<float> ys = tsnecuda::util::RandomDeviceUniformZeroOneVector(N_POINTS * PROJDIM);
     
     // Momentum variables
     thrust::device_vector<float> yt_1(N_POINTS * PROJDIM);
@@ -405,7 +405,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
         } else {if (i - best_iter > n_iter_np) break;}
 
         // Terminate if we're less than the minimum gradient norm
-        if (tsne::util::L2NormDeviceVector(forces) < min_g_norm) break;
+        if (tsnecuda::util::L2NormDeviceVector(forces) < min_g_norm) break;
     }
     return ys;
 }

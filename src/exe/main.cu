@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
 
         // Load the data
         int num_images, num_columns, num_rows;
-        float* data = tsne::util::LoadMnist(SOPT(fname), num_images, num_columns, num_rows);
+        float* data = tsnecuda::util::LoadMnist(SOPT(fname), num_images, num_columns, num_rows);
 
         // Do the T-SNE
         printf("Starting TSNE calculation with %u points.\n", num_images);
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
         int num_columns = 32;
         int num_rows = 32;
         int num_channels = 3;
-        float * data = tsne::util::LoadCifar10(SOPT(fname));
+        float * data = tsnecuda::util::LoadCifar10(SOPT(fname));
 
         // Do the T-SNE
         printf("Starting TSNE calculation with %u points.\n", num_images);
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
         int num_columns = 32;
         int num_rows = 32;
         int num_channels = 3;
-        float * data = tsne::util::LoadCifar100(SOPT(fname));
+        float * data = tsnecuda::util::LoadCifar100(SOPT(fname));
 
         // DO the T-SNE
         printf("Starting TSNE calculation with %u points.\n", num_images);

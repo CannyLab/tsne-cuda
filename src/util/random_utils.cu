@@ -9,12 +9,12 @@
 
 #include "include/util/random_utils.h"
 
-thrust::device_vector<float> tsne::util::RandomDeviceUniformZeroOneVector(
+thrust::device_vector<float> tsnecuda::util::RandomDeviceUniformZeroOneVector(
         const uint32_t vector_size) {
-    return tsne::util::RandomDeviceVectorInRange(vector_size, 0.0, 1.0);
+    return tsnecuda::util::RandomDeviceVectorInRange(vector_size, 0.0, 1.0);
 }
 
-thrust::device_vector<float> tsne::util::RandomDeviceVectorInRange(
+thrust::device_vector<float> tsnecuda::util::RandomDeviceVectorInRange(
     const uint32_t vector_size, float lower_bound, float upper_bound) {
     // Construct and seed the random engine
     std::mt19937 random_engine;

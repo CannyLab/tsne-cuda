@@ -378,7 +378,7 @@ void test_bhtsne_ref(int N, int NDIMS) {
 void test_bhtsne_full_mnist(std::string fname) {
     srand (time(NULL));
     int num_images, num_columns, num_rows;
-    float * data = tsne::util::LoadMnist(fname, num_images, num_rows, num_columns);
+    float * data = tsnecuda::util::LoadMnist(fname, num_images, num_rows, num_columns);
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;
@@ -420,7 +420,7 @@ void test_bhtsne_full_cifar10(std::string fname) {
     int num_columns = 32;
     int num_rows = 32;
     int num_channels = 3;
-    float * data = tsne::util::LoadCifar10(fname);
+    float * data = tsnecuda::util::LoadCifar10(fname);
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;
@@ -462,7 +462,7 @@ void test_bhtsne_full_cifar100(std::string fname) {
     int num_columns = 32;
     int num_rows = 32;
     int num_channels = 3;
-    float * data = tsne::util::LoadCifar100(fname);
+    float * data = tsnecuda::util::LoadCifar100(fname);
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;

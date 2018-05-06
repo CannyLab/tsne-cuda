@@ -13,7 +13,7 @@
 // to compute ||x^2|| + ||y^2|| - 2 x^Ty.
 // Added fabs to deal with numerical instabilities. I think this is a
 // reasonable solution
-__global__ void tsne::util::AssembleDistances(
+__global__ void tsnecuda::util::AssembleDistances(
         const float * __restrict__ d_squared_norms,
         float * __restrict__ d_dot_products,
         const uint32_t num_points) {
@@ -30,7 +30,7 @@ __global__ void tsne::util::AssembleDistances(
 // Squared norms taken from diagnoal of dot product which should be faster
 // and result in actually zeroing out the diagonal in assemble_final_result
 
-void tsne::util::SquaredPairwiseDistance(cublasHandle_t &handle,
+void tsnecuda::util::SquaredPairwiseDistance(cublasHandle_t &handle,
         thrust::device_vector<float> &d_distances,
         const thrust::device_vector<float> &d_points,
         const uint32_t num_points,
@@ -48,7 +48,7 @@ void tsne::util::SquaredPairwiseDistance(cublasHandle_t &handle,
         thrust::raw_pointer_cast(d_distances.data()), num_points));
 
     typedef thrust::device_vector<float>::iterator Iterator;
-    tsne::util::StridedRange<Iterator> diagonalized(d_distances.begin(),
+    tsnecuda::util::StridedRange<Iterator> diagonalized(d_distances.begin(),
             d_distances.end(), num_points + 1);
     thrust::device_vector<float> squared_norms(num_points);
     thrust::copy(diagonalized.begin(), diagonalized.end(),
@@ -57,22 +57,22 @@ void tsne::util::SquaredPairwiseDistance(cublasHandle_t &handle,
     dim3 kBlockDimensions(kBlockSize, kBlockSize);
     dim3 kGridDimensions(iDivUp(num_points, kBlockSize),
             iDivUp(num_points, kBlockSize));
-    tsne::util::AssembleDistances<<<kGridDimensions, kBlockDimensions>>>(
+    tsnecuda::util::AssembleDistances<<<kGridDimensions, kBlockDimensions>>>(
         thrust::raw_pointer_cast(squared_norms.data()),
         thrust::raw_pointer_cast(d_distances.data()), num_points);
 }
 
-void tsne::util::PairwiseDistance(cublasHandle_t &handle,
+void tsnecuda::util::PairwiseDistance(cublasHandle_t &handle,
         thrust::device_vector<float> &d_distances,
         const thrust::device_vector<float> &d_points,
         const uint32_t num_points,
         const uint32_t num_dims) {
-    tsne::util::SquaredPairwiseDistance(handle, d_distances, d_points,
+    tsnecuda::util::SquaredPairwiseDistance(handle, d_distances, d_points,
                                           num_points, num_dims);
-    tsne::util::SqrtDeviceVector(d_distances, d_distances);
+    tsnecuda::util::SqrtDeviceVector(d_distances, d_distances);
 }
 
-void tsne::util::KNearestNeighbors(int64_t* indices, float* distances,
+void tsnecuda::util::KNearestNeighbors(int64_t* indices, float* distances,
         const float* const points, const uint32_t num_dims,
         const uint32_t num_points, const uint32_t num_near_neighbors) {
     const int32_t kNumCells = static_cast<int32_t>(

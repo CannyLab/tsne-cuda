@@ -97,7 +97,7 @@
 //         // pts[N - i - 1] = mypts[2 * i];
 //         // pts[2 * N - i - 1] = mypts[2 * i + 1];
 //     // }
-//     auto pts = tsne::util::RandomDeviceUniformZeroOneVector(N * 2);
+//     auto pts = tsnecuda::util::RandomDeviceUniformZeroOneVector(N * 2);
 
 //     // std::cout << "initial points" << std::endl;
 //     // printarray(pts, N, 2);

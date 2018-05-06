@@ -9,65 +9,65 @@
 
 #include "util/math_utils.h"
 
-void tsne::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
+void tsnecuda::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
         thrust::device_vector<float> &d_points, const uint32_t num_points,
         const uint32_t num_dims) {
     // Compute the means
-    auto d_means = tsne::util::ReduceMean(handle, d_points, num_points,
+    auto d_means = tsnecuda::util::ReduceMean(handle, d_points, num_points,
                                          num_dims, 0);
 
     // Zero-Center
-    tsne::util::BroadcastMatrixVector(d_points, d_means, num_points, num_dims,
+    tsnecuda::util::BroadcastMatrixVector(d_points, d_means, num_points, num_dims,
                                        thrust::minus<float>(), 1, 1.f);
 
     // Compute the standard deviation
     thrust::device_vector<float> squared_vals(d_points.size());
-    tsne::util::SquareDeviceVector(squared_vals, d_points);
-    auto norm_sum_of_squares = tsne::util::ReduceAlpha(handle, squared_vals,
+    tsnecuda::util::SquareDeviceVector(squared_vals, d_points);
+    auto norm_sum_of_squares = tsnecuda::util::ReduceAlpha(handle, squared_vals,
             num_points, num_dims, 1.f / (num_points - 1), 0);
     thrust::device_vector<float> standard_deviation(norm_sum_of_squares.size());
-    tsne::util::SqrtDeviceVector(standard_deviation, norm_sum_of_squares);
+    tsnecuda::util::SqrtDeviceVector(standard_deviation, norm_sum_of_squares);
 
     // Normalize the values
-    tsne::util::BroadcastMatrixVector(d_points, standard_deviation, num_points,
+    tsnecuda::util::BroadcastMatrixVector(d_points, standard_deviation, num_points,
             num_dims, thrust::divides<float>(), 1, 1.f);
 }
 
-void tsne::util::SquareDeviceVector(thrust::device_vector<float> &d_out,
+void tsnecuda::util::SquareDeviceVector(thrust::device_vector<float> &d_out,
         const thrust::device_vector<float> &d_input) {
     thrust::transform(d_input.begin(), d_input.end(),
-                      d_out.begin(), tsne::util::FunctionalSquare());
+                      d_out.begin(), tsnecuda::util::FunctionalSquare());
 }
 
-void tsne::util::SqrtDeviceVector(thrust::device_vector<float> &d_out,
+void tsnecuda::util::SqrtDeviceVector(thrust::device_vector<float> &d_out,
         const thrust::device_vector<float> &d_input) {
     thrust::transform(d_input.begin(), d_input.end(),
-                      d_out.begin(), tsne::util::FunctionalSqrt());
+                      d_out.begin(), tsnecuda::util::FunctionalSqrt());
 }
 
-float tsne::util::L2NormDeviceVector(
+float tsnecuda::util::L2NormDeviceVector(
         const thrust::device_vector<float> &d_vector) {
     return std::sqrt(thrust::transform_reduce(d_vector.begin(),
-                     d_vector.end(), tsne::util::FunctionalSquare(), 0.0f,
+                     d_vector.end(), tsnecuda::util::FunctionalSquare(), 0.0f,
                      thrust::plus<float>()));
 }
 
-bool tsne::util::AnyNanOrInfDeviceVector(
+bool tsnecuda::util::AnyNanOrInfDeviceVector(
         const thrust::device_vector<float> &d_vector) {
     return thrust::transform_reduce(d_vector.begin(), d_vector.end(),
-                tsne::util::FunctionalNanOrInf(), 0, thrust::plus<bool>());
+                tsnecuda::util::FunctionalNanOrInf(), 0, thrust::plus<bool>());
 }
 
-void tsne::util::MaxNormalizeDeviceVector(
+void tsnecuda::util::MaxNormalizeDeviceVector(
         thrust::device_vector<float> &d_vector) {
     float max_val = thrust::transform_reduce(d_vector.begin(), d_vector.end(),
-            tsne::util::FunctionalAbs(), 0.0f, thrust::maximum<float>());
+            tsnecuda::util::FunctionalAbs(), 0.0f, thrust::maximum<float>());
     thrust::constant_iterator<float> division_iterator(max_val);
     thrust::transform(d_vector.begin(), d_vector.end(), division_iterator,
                       d_vector.begin(), thrust::divides<float>());
 }
 
-void tsne::util::SymmetrizeMatrix(cusparseHandle_t &handle,
+void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
         thrust::device_vector<float> &d_values,
         thrust::device_vector<int32_t> &d_indices,
         thrust::device_vector<float> &d_symmetrized_values,

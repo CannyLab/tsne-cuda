@@ -10,7 +10,7 @@
 #ifndef SRC_INCLUDE_UTIL_THRUST_TRANSFORM_FUNCTIONS_H_
 #define SRC_INCLUDE_UTIL_THRUST_TRANSFORM_FUNCTIONS_H_
 
-namespace tsne {
+namespace tsnecuda {
 namespace util {
 
 struct FunctionalExp {
@@ -62,6 +62,6 @@ struct FunctionalNanOrInf {
 };
 
 }  // namespace util
-}  // namespace tsne
+}  // namespace tsnecuda
 
 #endif  // SRC_INCLUDE_UTIL_THRUST_TRANSFORM_FUNCTIONS_H_

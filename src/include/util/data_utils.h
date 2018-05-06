@@ -18,7 +18,7 @@
 #include "include/common.h"
 
 
-namespace tsne {
+namespace tsnecuda {
 namespace util {
 
 // TODO(David): Bad Practice to return float* of allocated memory. Make the
@@ -76,7 +76,7 @@ void Save(thrust::device_vector<float> d_points, std::string file_name,
 float* Load(std::string file_name);
 
 }  // namespace util
-}  // namespace tsne
+}  // namespace tsnecuda
 
 
 #endif  // SRC_INCLUDE_UTIL_DATA_UTILS_H_
