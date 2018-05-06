@@ -13,8 +13,6 @@
 namespace tsne {
 namespace util {
 
-#include "include/common.h"
-
 struct FunctionalExp {
     __host__ __device__ float operator()(const float &x) const {
         return exp(x);

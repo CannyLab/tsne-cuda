@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
         ("e,early-ex", "Early Exaggeration Factor", cxxopts::value<float>()->default_value("2.0"))
         ("s,data", "Which program to run on <cifar10,cifar100,mnist,sim>", cxxopts::value<std::string>()->default_value("sim"))
         ("k,num-points", "How many simulated points to use", cxxopts::value<int>()->default_value("5000"))
-        ("u,nearest-neighbors", "How many nearest neighbors should we use", cxxopts::value<int>()->default_value("1023"))
+        ("u,nearest-neighbors", "How many nearest neighbors should we use", cxxopts::value<int>()->default_value("32"))
         ("n,num-steps", "How many steps to take", cxxopts::value<int>()->default_value("1000"))
         ("i,viz", "Use interactive visualization", cxxopts::value<bool>()->default_value("false"))
         ("d,dump", "Dump the output points", cxxopts::value<bool>()->default_value("false"))

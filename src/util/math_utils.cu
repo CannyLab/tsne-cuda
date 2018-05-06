@@ -55,7 +55,7 @@ float tsne::util::L2NormDeviceVector(
 bool tsne::util::AnyNanOrInfDeviceVector(
         const thrust::device_vector<float> &d_vector) {
     return thrust::transform_reduce(d_vector.begin(), d_vector.end(),
-                                    tsne::util::FunctionalNanOrInf(), 0, thrust::plus<bool>());
+                tsne::util::FunctionalNanOrInf(), 0, thrust::plus<bool>());
 }
 
 void tsne::util::MaxNormalizeDeviceVector(

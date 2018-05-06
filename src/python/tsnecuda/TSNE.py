@@ -15,8 +15,8 @@ import os
 import pkg_resources
 
 class TSNE(object):
-    def __init__(self, n_components=2, perplexity=30.0, early_exaggeration=12.0, 
-                    learning_rate=1.0, n_iter=1000, n_iter_without_progress=300,
+    def __init__(self, n_components=2, perplexity=50.0, early_exaggeration=2.0, 
+                    learning_rate=200.0, n_iter=1000, n_iter_without_progress=1000,
                     min_grad_norm=1e-7, metric='euclidean',init='random',verbose=0,
                     random_seed=None):
         """Initialization method for barnes hut T-SNE class.
