@@ -138,7 +138,7 @@ void NaiveTSNE::compute_pij(
     tsne::util::SquareDeviceVector(sigma_squared, sigma);
     
     // divide column by sigmas (matrix[i,:] gets divided by sigma_i^2)
-    Broadcast::broadcast_matrix_vector(pij, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
+    tsne::util::BroadcastMatrixVector(pij, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
     thrust::transform(pij.begin(), pij.end(), pij.begin(), func_exp());
     zero_diagonal(pij, N);
     
@@ -146,7 +146,7 @@ void NaiveTSNE::compute_pij(
     auto sums = Reduce::reduce_sum(handle, pij, N, N, 1);
 
     // divide column by resulting vector
-    Broadcast::broadcast_matrix_vector(pij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
+    tsne::util::BroadcastMatrixVector(pij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
 }
 
 void NaiveTSNE::symmetrize_pij(cublasHandle_t &handle, 
@@ -203,7 +203,7 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
     // std::cout << std::endl << std::endl << "Sum-Dist" << std::endl;
     // printarray(sums, 1, N);
 
-    // Broadcast::broadcast_matrix_vector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
+    // tsne::util::BroadcastMatrixVector(qij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
 
     // std::cout << std::endl << std::endl << "Qij" << std::endl;
     // printarray(qij, N, N);
@@ -278,7 +278,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
     //printarray(pij, N, N);
     
     thrust::device_vector<float> forces(N * PROJDIM);
-    thrust::device_vector<float> ys = Random::random_vector(N * PROJDIM);
+    thrust::device_vector<float> ys = tsne::util::RandomDeviceUniformZeroOneVector(N * PROJDIM);
     
     // Momentum variables
     thrust::device_vector<float> yt_1(N * PROJDIM);
@@ -375,7 +375,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
 
     // Allocate some memory for the foces and such
     thrust::device_vector<float> forces(N_POINTS * PROJDIM);
-    thrust::device_vector<float> ys = Random::random_vector(N_POINTS * PROJDIM);
+    thrust::device_vector<float> ys = tsne::util::RandomDeviceUniformZeroOneVector(N_POINTS * PROJDIM);
     
     // Momentum variables
     thrust::device_vector<float> yt_1(N_POINTS * PROJDIM);

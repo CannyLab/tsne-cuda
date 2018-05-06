@@ -4,86 +4,90 @@
  * @file matrix_broadcast.cu
  * @author David Chan
  * @date 2018-04-04
+ * Copyright (c) 2018, Regents of the University of California
  */
 
- #include "util/matrix_broadcast_utils.h"
+#include "include/util/matrix_broadcast_utils.h"
 
- // Performs the operation matrix[i, :] = binary_op(matrix[i, :], alpha * vector) for each row i in the matrix
+// Performs the operation matrix[i, :] = binary_op(matrix[i, :],
+// alpha * vector) for each row i in the matrix
 template<typename BinaryFunction, typename T>
-__global__ void Broadcast::_broadcast_row_vec(
-                                    T * __restrict__ matrix, 
-                                    const T * __restrict__ vector, 
-                                    const unsigned int N, 
-                                    const unsigned int M, 
-                                    BinaryFunction binary_op, 
-                                    const T alpha) 
-{
-    const unsigned int TID = threadIdx.x + blockIdx.x * blockDim.x;
-    const unsigned int i = TID % N;
-    const unsigned int j = TID / N;
-
-    if (j < M) matrix[j * N + i] = binary_op(matrix[j * N + i], alpha * vector[j]);
+__global__ void tsne::util::BroadcastRowVector(
+        T * __restrict__ d_matrix,
+        const T * __restrict__ d_vector,
+        const uint32_t N,
+        const uint32_t M,
+        BinaryFunction binary_operation,
+        const T alpha) {
+    const uint32_t TID = threadIdx.x + blockIdx.x * blockDim.x;
+    const uint32_t i = TID % N;
+    const uint32_t j = TID / N;
+    if (j < M) d_matrix[j * N + i] = binary_operation(d_matrix[j * N + i],
+                                            alpha * d_vector[j]);
 }
 
-// Performs the operation matrix[:, j] = binary_op(matrix[:, j], alpha * vector) for each col i in the matrix
+// Performs the operation matrix[:, j] = binary_op(matrix[:, j],
+// alpha * vector) for each col i in the matrix
 template<typename BinaryFunction, typename T>
-__global__ void Broadcast::_broadcast_col_vec(
-                                    T * __restrict__ matrix, 
-                                    const T * __restrict__ vector, 
-                                    const unsigned int N, 
-                                    const unsigned int M,
-                                    BinaryFunction binary_op,
-                                    const T alpha)
-{
-     const unsigned int TID = threadIdx.x + blockIdx.x * blockDim.x;
-     const unsigned int i = TID % N;
-     const unsigned int j = TID / N;
+__global__ void tsne::util::BroadcastColumnVector(
+        T * __restrict__ d_matrix,
+        const T * __restrict__ d_vector,
+        const uint32_t N,
+        const uint32_t M,
+        BinaryFunction binary_operation,
+        const T alpha) {
+     const uint32_t TID = threadIdx.x + blockIdx.x * blockDim.x;
+     const uint32_t i = TID % N;
+     const uint32_t j = TID / N;
 
-     if (j < M) matrix[j * N + i] = binary_op(matrix[j * N + i], alpha * vector[i]);
+     if (j < M) d_matrix[j * N + i] = binary_operation(d_matrix[j * N + i],
+                                            alpha * d_vector[i]);
 }
 
- template<typename BinaryFunction, typename T>
- void Broadcast::broadcast_matrix_vector(
-                             thrust::device_vector<T> &matrix, 
-                             const thrust::device_vector<T> &vector, 
-                             const unsigned int N, 
-                             const unsigned int M, 
-                             BinaryFunction binary_op,
-                             const unsigned int axis,
-                             const T alpha) 
- { 
-     // Checks to make sure dimensions are correct
-     assert(matrix.size() >= N * M);
-     assert((axis == 0 && vector.size() >= N) || (axis == 1 && vector.size() >= M));
-     
-     const unsigned int BLOCKSIZE = 32;
-     const unsigned int NBLOCKS = iDivUp(N * M, BLOCKSIZE);
-     if (axis == 0) {
-        Broadcast::_broadcast_col_vec<<<NBLOCKS,BLOCKSIZE>>>(thrust::raw_pointer_cast(matrix.data()),
-                                                     thrust::raw_pointer_cast(vector.data()), 
-                                                     N, M, binary_op, alpha);
-     } else {
-        Broadcast::_broadcast_row_vec<<<NBLOCKS,BLOCKSIZE>>>(thrust::raw_pointer_cast(matrix.data()),
-                                                     thrust::raw_pointer_cast(vector.data()), 
-                                                     N, M, binary_op, alpha);
-     }
- }
+template<typename BinaryFunction, typename T>
+void tsne::util::BroadcastMatrixVector(
+        thrust::device_vector<T> &d_matrix,
+        const thrust::device_vector<T> &d_vector,
+        const uint32_t N,
+        const uint32_t M,
+        BinaryFunction binary_operation,
+        const uint32_t axis,
+        const T alpha) {
+    // Checks to make sure dimensions are correct
+    assert(d_matrix.size() >= N * M);
+    assert((axis == 0 && d_vector.size() >= N) ||
+            (axis == 1 && d_vector.size() >= M));
+
+    const uint32_t kBlockSize = 32;
+    const uint32_t kNumBlocks = iDivUp(N * M, kBlockSize);
+    if (axis == 0) {
+    tsne::util::BroadcastColumnVector<<<kNumBlocks, kBlockSize>>>(
+            thrust::raw_pointer_cast(d_matrix.data()),
+            thrust::raw_pointer_cast(d_vector.data()),
+            N, M, binary_operation, alpha);
+    } else {
+    tsne::util::BroadcastRowVector<<<kNumBlocks, kBlockSize>>>(
+            thrust::raw_pointer_cast(d_matrix.data()),
+            thrust::raw_pointer_cast(d_vector.data()),
+            N, M, binary_operation, alpha);
+    }
+}
 
 
- // Explicit instantiations of the method
- template void Broadcast::broadcast_matrix_vector<thrust::divides<float>, float>(
-    thrust::device_vector<float> &matrix, 
-    const thrust::device_vector<float> &vector, 
-    const unsigned int N, 
-    const unsigned int M, 
-    thrust::divides<float> binary_op,
-    const unsigned int axis,
-    const float alpha);
- template void Broadcast::broadcast_matrix_vector<thrust::minus<float>, float>(
-    thrust::device_vector<float> &matrix, 
-    const thrust::device_vector<float> &vector, 
-    const unsigned int N, 
-    const unsigned int M, 
-    thrust::minus<float> binary_op,
-    const unsigned int axis,
-    const float alpha);
+// Explicit instantiations of the method
+template void tsne::util::BroadcastMatrixVector<thrust::divides<float>, float>(
+        thrust::device_vector<float> &d_matrix,
+        const thrust::device_vector<float> &d_vector,
+        const uint32_t N,
+        const uint32_t M,
+        thrust::divides<float> binary_operation,
+        const uint32_t axis,
+        const float alpha);
+template void tsne::util::BroadcastMatrixVector<thrust::minus<float>, float>(
+        thrust::device_vector<float> &d_matrix,
+        const thrust::device_vector<float> &d_vector,
+        const uint32_t N,
+        const uint32_t M,
+        thrust::minus<float> binary_operation,
+        const uint32_t axis,
+        const float alpha);

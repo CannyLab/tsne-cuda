@@ -951,7 +951,7 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
     } while (!all_found && iters < 200);
     // TODO: Warn if iters == 200 because perplexity not found?
 
-    Broadcast::broadcast_matrix_vector(pij, row_sum, K, N, thrust::divides<float>(), 1, 1.0f);
+    tsne::util::BroadcastMatrixVector(pij, row_sum, K, N, thrust::divides<float>(), 1, 1.0f);
     return pij;
 }
 
@@ -1123,7 +1123,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         thrust::device_vector<float> random_vec(pts.size());
         
         if (opt.initialization == BHTSNE::TSNE_INIT::UNIFORM) { // Random uniform initialization
-            pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
+            pts = tsne::util::RandomDeviceVectorInRange((nnodes+1)*2, -100, 100);
         } else if (opt.initialization == BHTSNE::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
             std::default_random_engine generator;
             std::normal_distribution<double> distribution1(0.0, 1.0);
@@ -1142,7 +1142,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
             }
         } else if (opt.initialization == BHTSNE::TSNE_INIT::VECTOR) { // Preinit from vector points only
             // Load only the poitns into the pre-init vector
-            pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
+            pts = tsne::util::RandomDeviceVectorInRange((nnodes+1)*2, -100, 100);
             // Copy the pre-init data
             if(opt.preinit_data != nullptr) {
               thrust::copy(opt.preinit_data, opt.preinit_data+opt.n_points, pts.begin());

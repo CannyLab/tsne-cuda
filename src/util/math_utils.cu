@@ -37,7 +37,7 @@ void tsne::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
                                          num_dims, 0);
 
     // Zero-Center
-    Broadcast::broadcast_matrix_vector(d_points, d_means, num_points, num_dims,
+    tsne::util::BroadcastMatrixVector(d_points, d_means, num_points, num_dims,
                                        thrust::minus<float>(), 1, 1.f);
 
     // Compute the standard deviation
@@ -49,7 +49,7 @@ void tsne::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
     tsne::util::SqrtDeviceVector(standard_deviation, norm_sum_of_squares);
 
     // Normalize the values
-    Broadcast::broadcast_matrix_vector(d_points, standard_deviation, num_points,
+    tsne::util::BroadcastMatrixVector(d_points, standard_deviation, num_points,
             num_dims, thrust::divides<float>(), 1, 1.f);
 }
 

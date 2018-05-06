@@ -5,7 +5,7 @@
  * @date 2018-04-04
  */
 
-#include "util/cuda_utils.h"
+#include "include/util/cuda_utils.h"
 #define PI_R         3.14159265358979323846f
 
 /*******************/

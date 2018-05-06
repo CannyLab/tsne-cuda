@@ -7,7 +7,7 @@
  * Copyright (c) 2018, Regents of the University of California
  */
 
-#include "util/distance_utils.h"
+#include "include/util/distance_utils.h"
 
 struct func_sqrt {
     __host__ __device__ float operator()(const float &x) const {
