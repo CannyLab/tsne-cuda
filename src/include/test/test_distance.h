@@ -24,8 +24,8 @@ void test_pairwise_distance(int N, int NDIM) {
 
     // Construct the CUBLAS handle
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
-    Distance::pairwise_dist(handle, d_distances, d_points, N, NDIM);
+    CublasSafeCall(cublasCreate(&handle));
+    tsnecuda::util::PairwiseDistance(handle, d_distances, d_points, N, NDIM);
 
     thrust::host_vector<float> h_distances(N*N);
     thrust::copy(d_distances.begin(), d_distances.end(), h_distances.begin());
@@ -68,6 +68,6 @@ void test_pairwise_distance_speed(int N, int NDIM) {
 
     // Construct the CUBLAS handle
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
-    Distance::pairwise_dist(handle, d_distances, d_points, N, NDIM);
+    CublasSafeCall(cublasCreate(&handle));
+    tsnecuda::util::PairwiseDistance(handle, d_distances, d_points, N, NDIM);
 }

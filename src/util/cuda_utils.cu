@@ -1,12 +1,37 @@
 /**
- * @brief Utility code, Credit to https://github.com/OrangeOwlSolutions
+ * @brief Utility/Error Checking code.
  * 
  * @file cuda_utils.cu
  * @date 2018-04-04
+ * Copyright (C) 2012-2017 Orange Owl Solutions.  
  */
 
-#include "util/cuda_utils.h"
-#define PI_R         3.14159265358979323846f
+
+ /*
+ CUDA Utilities - Utilities for high performance CPUs/C/C++ and GPUs/CUDA computing library.
+    
+    Copyright (C) 2012-2017 Orange Owl Solutions.  
+
+    
+    CUDA Utilities is free software: you can redistribute it and/or modify
+    it under the terms of the Lesser GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    CUDA Utilities is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    Lesser GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Bluebird Library.  If not, see <http://www.gnu.org/licenses/>.
+
+
+    For any request, question or bug reporting please visit http://www.orangeowlsolutions.com/
+    or send an e-mail to: info@orangeowlsolutions.com
+*/
+
+#include "include/util/cuda_utils.h"
 
 /*******************/
 /* iDivUp FUNCTION */
@@ -27,54 +52,7 @@ void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
 	}
 }
 
-extern "C" void gpuErrchk(cudaError_t ans) { gpuAssert((ans), __FILE__, __LINE__); }
-
-/**************************/
-/* CUSOLVE ERROR CHECKING */
-/**************************/
-static const char *_cusolverGetErrorEnum(cusolverStatus_t error)
-{
-	switch (error)
-	{
-	case CUSOLVER_STATUS_SUCCESS:
-		return "CUSOLVER_SUCCESS";
-
-	case CUSOLVER_STATUS_NOT_INITIALIZED:
-		return "CUSOLVER_STATUS_NOT_INITIALIZED";
-
-	case CUSOLVER_STATUS_ALLOC_FAILED:
-		return "CUSOLVER_STATUS_ALLOC_FAILED";
-
-	case CUSOLVER_STATUS_INVALID_VALUE:
-		return "CUSOLVER_STATUS_INVALID_VALUE";
-
-	case CUSOLVER_STATUS_ARCH_MISMATCH:
-		return "CUSOLVER_STATUS_ARCH_MISMATCH";
-
-	case CUSOLVER_STATUS_EXECUTION_FAILED:
-		return "CUSOLVER_STATUS_EXECUTION_FAILED";
-
-	case CUSOLVER_STATUS_INTERNAL_ERROR:
-		return "CUSOLVER_STATUS_INTERNAL_ERROR";
-
-	case CUSOLVER_STATUS_MATRIX_TYPE_NOT_SUPPORTED:
-		return "CUSOLVER_STATUS_MATRIX_TYPE_NOT_SUPPORTED";
-
-	}
-
-	return "<unknown>";
-}
-
-inline void __cusolveSafeCall(cusolverStatus_t err, const char *file, const int line)
-{
-	if (CUSOLVER_STATUS_SUCCESS != err) {
-		fprintf(stderr, "CUSOLVE error in file '%s', line %d, error: %s \nterminating!\n", __FILE__, __LINE__, \
-			_cusolverGetErrorEnum(err)); \
-			assert(0); \
-	}
-}
-
-extern "C" void cusolveSafeCall(cusolverStatus_t err) { __cusolveSafeCall(err, __FILE__, __LINE__); }
+extern "C" void GpuErrorCheck(cudaError_t ans) { gpuAssert((ans), __FILE__, __LINE__); }
 
 /*************************/
 /* CUBLAS ERROR CHECKING */
@@ -117,7 +95,7 @@ static const char *_cublasGetErrorEnum(cublasStatus_t error)
 	return "<unknown>";
 }
 
-inline void __cublasSafeCall(cublasStatus_t err, const char *file, const int line)
+inline void __CublasSafeCall(cublasStatus_t err, const char *file, const int line)
 {
 	if (CUBLAS_STATUS_SUCCESS != err) {
 		fprintf(stderr, "CUBLAS error in file '%s', line %d, error: %s\nterminating!\n", __FILE__, __LINE__, \
@@ -126,81 +104,7 @@ inline void __cublasSafeCall(cublasStatus_t err, const char *file, const int lin
 	}
 }
 
-extern "C" void cublasSafeCall(cublasStatus_t err) { __cublasSafeCall(err, __FILE__, __LINE__); }
-
-/************************/
-/* CUFFT ERROR CHECKING */
-/************************/
-// See http://stackoverflow.com/questions/16267149/cufft-error-handling
-static const char *_cudaGetErrorEnum(cufftResult error)
-{
-	switch (error)
-	{
-	case CUFFT_SUCCESS:
-		return "CUFFT_SUCCESS - The cuFFT operation was successful";
-
-	case CUFFT_INVALID_PLAN:
-		return "CUFFT_INVALID_PLAN - cuFFT was passed an invalid plan handle";
-
-	case CUFFT_ALLOC_FAILED:
-		return "CUFFT_ALLOC_FAILED - cuFFT failed to allocate GPU or CPU memory";
-
-	case CUFFT_INVALID_TYPE:
-		return "CUFFT_INVALID_TYPE - No longer used";
-
-	case CUFFT_INVALID_VALUE:
-		return "CUFFT_INVALID_VALUE - User specified an invalid pointer or parameter";
-
-	case CUFFT_INTERNAL_ERROR:
-		return "CUFFT_INTERNAL_ERROR - Driver or internal cuFFT library error";
-
-	case CUFFT_EXEC_FAILED:
-		return "CUFFT_EXEC_FAILED - Failed to execute an FFT on the GPU";
-
-	case CUFFT_SETUP_FAILED:
-		return "CUFFT_SETUP_FAILED - The cuFFT library failed to initialize";
-
-	case CUFFT_INVALID_SIZE:
-		return "CUFFT_INVALID_SIZE - User specified an invalid transform size";
-
-	case CUFFT_UNALIGNED_DATA:
-		return "CUFFT_UNALIGNED_DATA - No longer used";
-
-	case CUFFT_INCOMPLETE_PARAMETER_LIST:
-		return "CUFFT_INCOMPLETE_PARAMETER_LIST - Missing parameters in call";
-
-	case CUFFT_INVALID_DEVICE:
-		return "CUFFT_INVALID_DEVICE - Execution of a plan was on different GPU than plan creation";
-
-	case CUFFT_PARSE_ERROR:
-		return "CUFFT_PARSE_ERROR - Internal plan database error";
-
-	case CUFFT_NO_WORKSPACE:
-		return "CUFFT_NO_WORKSPACE - No workspace has been provided prior to plan execution";
-
-	case CUFFT_NOT_IMPLEMENTED:
-		return "CUFFT_NOT_IMPLEMENTED - Function does not implement functionality for parameters given";
-
-	case CUFFT_LICENSE_ERROR:
-		return "CUFFT_LICENSE_ERROR - Used in previous versions";
-
-	case CUFFT_NOT_SUPPORTED:
-		return "CUFFT_NOT_SUPPORTED - Operation is not supported for parameters given";
-	}
-
-	return "<unknown>";
-}
-
-// --- CUFFTSAFECALL
-inline void cufftAssert(cufftResult err, const char *file, const int line, bool abort = true)
-{
-	if (CUFFT_SUCCESS != err) {
-		fprintf(stderr, "CUFFTassert: Error nr. %d - %s %s %d\n", err, _cudaGetErrorEnum(err), __FILE__, __LINE__);
-		if (abort) exit(err);
-	}
-}
-
-extern "C" void cufftSafeCall(cufftResult err) { cufftAssert(err, __FILE__, __LINE__); }
+extern "C" void CublasSafeCall(cublasStatus_t err) { __CublasSafeCall(err, __FILE__, __LINE__); }
 
 /***************************/
 /* CUSPARSE ERROR CHECKING */
@@ -244,7 +148,7 @@ static const char *_cusparseGetErrorEnum(cusparseStatus_t error)
 	return "<unknown>";
 }
 
-inline void __cusparseSafeCall(cusparseStatus_t err, const char *file, const int line)
+inline void __CusparseSafeCall(cusparseStatus_t err, const char *file, const int line)
 {
 	if (CUSPARSE_STATUS_SUCCESS != err) {
 		fprintf(stderr, "CUSPARSE error in file '%s', line %d, error %s\nterminating!\n", __FILE__, __LINE__, \
@@ -253,313 +157,7 @@ inline void __cusparseSafeCall(cusparseStatus_t err, const char *file, const int
 	}
 }
 
-extern "C" void cusparseSafeCall(cusparseStatus_t err) { __cusparseSafeCall(err, __FILE__, __LINE__); }
+extern "C" void CusparseSafeCall(cusparseStatus_t err) { __CusparseSafeCall(err, __FILE__, __LINE__); }
 
-/************************/
-/* REVERSE ARRAY KERNEL */
-/************************/
-#define BLOCKSIZE_REVERSE	256
 
-// --- Credit to http://www.drdobbs.com/parallel/cuda-supercomputing-for-the-masses-part/208801731?pgno=2
-template <class T>
-__global__ void reverseArrayKernel(const T * __restrict__ d_in, T * __restrict__ d_out, const int N, const T a)
-{
-	// --- Credit to the simpleTemplates CUDA sample
-	SharedMemory<T> smem;
-	T* s_data = smem.getPointer();
-
-	const int tid = blockDim.x * blockIdx.x + threadIdx.x;
-	const int id = threadIdx.x;
-	const int offset = blockDim.x * (blockIdx.x + 1);
-
-	// --- Load one element per thread from device memory and store it *in reversed order* into shared memory
-	if (tid < N) s_data[BLOCKSIZE_REVERSE - (id + 1)] = a * d_in[tid];
-
-	// --- Block until all threads in the block have written their data to shared memory
-	__syncthreads();
-
-	// --- Write the data from shared memory in forward order
-	if ((N - offset + id) >= 0) d_out[N - offset + id] = s_data[threadIdx.x];
-}
-
-/************************/
-/* REVERSE ARRAY KERNEL */
-/************************/
-template <class T>
-void reverseArray(const T * __restrict__ d_in, T * __restrict__ d_out, const int N, const T a) {
-
-	reverseArrayKernel << <iDivUp(N, BLOCKSIZE_REVERSE), BLOCKSIZE_REVERSE, BLOCKSIZE_REVERSE * sizeof(T) >> >(d_in, d_out, N, a);
-#ifdef DEBUG
-	gpuErrchk(cudaPeekAtLastError());
-	gpuErrchk(cudaDeviceSynchronize());
-#endif
-
-}
-
-template void reverseArray<float>(const float  * __restrict__, float  * __restrict__, const int, const float);
-template void reverseArray<double>(const double * __restrict__, double * __restrict__, const int, const double);
-
-/********************************************************/
-/* CARTESIAN TO POLAR COORDINATES TRANSFORMATION KERNEL */
-/********************************************************/
-#define BLOCKSIZE_CART2POL	256
-
-template <class T>
-__global__ void Cartesian2PolarKernel(const T * __restrict__ d_x, const T * __restrict__ d_y, T * __restrict__ d_rho, T * __restrict__ d_theta,
-	const int N, const T a) {
-
-	const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (tid < N) {
-		d_rho[tid] = a * hypot(d_x[tid], d_y[tid]);
-		d_theta[tid] = atan2(d_y[tid], d_x[tid]);
-	}
-
-}
-
-/*******************************/
-/* COMPUTE L2 NORM OF A VECTOR */
-/*******************************/
-template<class T>
-T h_l2_norm(T *v1, T *v2, const int N) {
-
-	T norm = (T)0;
-
-	for (int i = 0; i < N; ++i)
-	{
-		T d = v1[i] - v2[i];
-		norm = norm + d * d;
-	}
-
-	return sqrt(norm);
-}
-
-template float  h_l2_norm<float>(float  *, float  *, const int);
-template double h_l2_norm<double>(double *, double *, const int);
-
-/*******************************/
-/* LINEAR COMBINATION FUNCTION */
-/*******************************/
-void linearCombination(const float * __restrict__ d_coeff, const float * __restrict__ d_basis_functions_real, float * __restrict__ d_linear_combination,
-	const int N_basis_functions, const int N_sampling_points, const cublasHandle_t handle) {
-
-	float alpha = 1.f;
-	float beta = 0.f;
-	cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N_sampling_points, N_basis_functions, &alpha, d_basis_functions_real, N_sampling_points,
-		d_coeff, 1, &beta, d_linear_combination, 1));
-
-}
-
-void linearCombination(const double * __restrict__ d_coeff, const double * __restrict__ d_basis_functions_real, double * __restrict__ d_linear_combination,
-	const int N_basis_functions, const int N_sampling_points, const cublasHandle_t handle) {
-
-	double alpha = 1.;
-	double beta = 0.;
-	cublasSafeCall(cublasDgemv(handle, CUBLAS_OP_N, N_sampling_points, N_basis_functions, &alpha, d_basis_functions_real, N_sampling_points,
-		d_coeff, 1, &beta, d_linear_combination, 1));
-
-}
-
-/******************************/
-/* ADD A CONSTANT TO A VECTOR */
-/******************************/
-#define BLOCKSIZE_VECTORADDCONSTANT	256
-
-template<class T>
-__global__ void vectorAddConstantKernel(T * __restrict__ d_in, const T scalar, const int N) {
-
-	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-
-	if (tid < N) d_in[tid] += scalar;
-
-}
-
-template<class T>
-void vectorAddConstant(T * __restrict__ d_in, const T scalar, const int N) {
-
-	vectorAddConstantKernel << <iDivUp(N, BLOCKSIZE_VECTORADDCONSTANT), BLOCKSIZE_VECTORADDCONSTANT >> >(d_in, scalar, N);
-
-}
-
-template void  vectorAddConstant<float>(float  * __restrict__, const float, const int);
-template void  vectorAddConstant<double>(double * __restrict__, const double, const int);
-
-/*****************************************/
-/* MULTIPLY A VECTOR BY A CONSTANT - GPU */
-/*****************************************/
-#define BLOCKSIZE_VECTORMULCONSTANT	256
-
-template<class T>
-__global__ void vectorMulConstantKernel(T * __restrict__ d_in, const T scalar, const int N) {
-
-	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-
-	if (tid < N) d_in[tid] *= scalar;
-
-}
-
-template<class T>
-void vectorMulConstant(T * __restrict__ d_in, const T scalar, const int N) {
-
-	vectorMulConstantKernel << <iDivUp(N, BLOCKSIZE_VECTORMULCONSTANT), BLOCKSIZE_VECTORMULCONSTANT >> >(d_in, scalar, N);
-
-}
-
-template void  vectorMulConstant<float>(float  * __restrict__, const float, const int);
-template void  vectorMulConstant<double>(double * __restrict__, const double, const int);
-
-/*****************************************/
-/* MULTIPLY A VECTOR BY A CONSTANT - CPU */
-/*****************************************/
-template<class T>
-void h_vectorMulConstant(T * __restrict__ h_in, const T scalar, const int N) {
-
-	for (int i = 0; i < N; i++) h_in[i] *= scalar;
-
-}
-
-template void  h_vectorMulConstant<float>(float  * __restrict__, const float, const int);
-template void  h_vectorMulConstant<double>(double * __restrict__, const double, const int);
-
-/*****************************************************/
-/* FUSED MULTIPLY ADD OPERATIONS FOR HOST AND DEVICE */
-/*****************************************************/
-template<class T>
-__host__ __device__ T fma2(T x, T y, T z) { return x * y + z; }
-
-template float  fma2<float >(float, float, float);
-template double fma2<double>(double, double, double);
-
-/*******************/
-/* MODULO FUNCTION */
-/*******************/
-__device__ int modulo(int val, int _mod)
-{
-	int P;
-	if (val > 0) { (!(_mod & (_mod - 1)) ? P = val&(_mod - 1) : P = val % (_mod)); return P; }
-	else
-	{
-		(!(_mod & (_mod - 1)) ? P = (-val)&(_mod - 1) : P = (-val) % (_mod));
-		if (P > 0) return _mod - P;
-		else return 0;
-	}
-}
-
-/***************************************/
-/* ATOMIC ADDITION FUNCTION ON DOUBLES */
-/***************************************/
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600
-#else
-__device__ double atomicAdd(double* address, double val)
-{
-	unsigned long long int* address_as_ull =
-		(unsigned long long int*)address;
-	register unsigned long long int old = *address_as_ull, assumed;
-	do {
-		assumed = old;
-		old = atomicCAS(address_as_ull, assumed,
-			__double_as_longlong(val +
-			__longlong_as_double(assumed)));
-	} while (assumed != old);
-	return __longlong_as_double(old);
-}
-#endif
-
-/*********************************/
-/* ATOMIC MIN FUNCTION ON FLOATS */
-/*********************************/
-__device__ float atomicMin(float* address, float val)
-{
-	int* address_as_i = (int*)address;
-	int old = *address_as_i, assumed;
-	do {
-		assumed = old;
-		old = ::atomicCAS(address_as_i, assumed,
-			__float_as_int(::fminf(val, __int_as_float(assumed))));
-	} while (assumed != old);
-	return __int_as_float(old);
-}
-
-/*********************/
-/* DEGREE TO RADIANS */
-/*********************/
-double deg2rad(double deg) { return deg*PI_R / 180; }
-
-/*********************/
-/* CUDA MEMORY USAGE */
-/*********************/
-void cudaMemoryUsage() {
-
-	size_t free_byte;
-	size_t total_byte;
-
-	gpuErrchk(cudaMemGetInfo(&free_byte, &total_byte));
-
-	double free_db = (double)free_byte;
-	double total_db = (double)total_byte;
-	double used_db = total_db - free_db;
-
-	printf("GPU memory: used = %f, free = %f MB, total available = %f MB\n", used_db / 1024.0 / 1024.0, free_db / 1024.0 / 1024.0, total_db / 1024.0 / 1024.0);
-
-}
-
-template <typename T>
-void printarray(thrust::device_vector<T> vec, const unsigned int N, const unsigned int M) {
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < M; j++) {
-        	std::cout << vec[i + j * N] << " ";
-            // printf("%0.2f ", vec[i + j * N]);
-        }
-        std::cout << std::endl;
-    }
-}
-
-template void printarray<float>(thrust::device_vector<float> vec, const unsigned int N, const unsigned int M); 
-template void printarray<long>(thrust::device_vector<long> vec, const unsigned int N, const unsigned int M); 
-template void printarray<int>(thrust::device_vector<int> vec, const unsigned int N, const unsigned int M); 
-
-// convert a linear index to a linear index in the transpose 
-struct transpose_index : public thrust::unary_function<size_t,size_t>
-{
-    size_t m, n;
-
-    __host__ __device__
-    transpose_index(size_t _m, size_t _n) : m(_m), n(_n) {}
-
-    __host__ __device__
-    size_t operator()(size_t linear_index)
-    {
-        size_t i = linear_index / n;
-        size_t j = linear_index % n;
-
-        return m * j + i;
-    }
-};
-
-// convert a linear index to a row index
-struct row_index : public thrust::unary_function<size_t,size_t>
-{
-    size_t n;
-
-    __host__ __device__
-    row_index(size_t _n) : n(_n) {}
-
-    __host__ __device__
-
-    size_t operator()(size_t i)
-    {
-        return i / n;
-    }
-};
-
-// transpose an M-by-N array
-template <typename T>
-void transpose(size_t m, size_t n, thrust::device_vector<T>& src, thrust::device_vector<T>& dst)
-{
-    thrust::counting_iterator<size_t> indices(0);
-
-    thrust::gather
-    (thrust::make_transform_iterator(indices, transpose_index(n, m)),
-    thrust::make_transform_iterator(indices, transpose_index(n, m)) + dst.size(),
-    src.begin(),dst.begin());
-}
+/// END OF CUDA UTILITIES

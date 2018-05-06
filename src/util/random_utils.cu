@@ -4,45 +4,33 @@
  * @file random_utils.cu
  * @author David Chan
  * @date 2018-04-04
+ * Copyright (c) 2018, Regents of the University of California
  */
 
- #include "util/random_utils.h"
+#include "include/util/random_utils.h"
 
- struct prg
-{
-    float a, b;
-
-    __host__ __device__
-    prg(float _a=-1.f, float _b=1.f) : a(_a), b(_b) {};
-
-    __host__ __device__
-        float operator()(const int &n) const
-        {
-            thrust::default_random_engine rng;
-            thrust::uniform_real_distribution<float> dist(a, b);
-            rng.discard(n);
-            return dist(rng);
-        }
-};
-
-
-thrust::device_vector<float> Random::random_vector(const unsigned int N) {
-    thrust::device_vector<float> vec(N);
-    thrust::counting_iterator<int> first(0);
-    thrust::counting_iterator<int> last = first + N;
-    thrust::transform(first, last, vec.begin(), prg(-10.0f, 10.0f));
-    return vec;
+thrust::device_vector<float> tsnecuda::util::RandomDeviceUniformZeroOneVector(
+        const uint32_t vector_size) {
+    return tsnecuda::util::RandomDeviceVectorInRange(vector_size, 0.0, 1.0);
 }
 
-thrust::device_vector<float> Random::rand_in_range(const unsigned int N, float lb, float ub) {
-    std::mt19937 eng; 
-    eng.seed(time(NULL));
-    std::uniform_real_distribution<float> dist(lb, ub);  
-    float points[N];
-    for (int i = 0; i < N; i++) points[i] = dist(eng);
+thrust::device_vector<float> tsnecuda::util::RandomDeviceVectorInRange(
+    const uint32_t vector_size, float lower_bound, float upper_bound) {
+    // Construct and seed the random engine
+    std::mt19937 random_engine;
+    random_engine.seed(time(NULL));
+
+    // Construct a uniform real vector distribution
+    std::uniform_real_distribution<float> distribution(lower_bound,
+                                                       upper_bound);
+    float* host_points = new float[vector_size];
+    for (size_t i = 0; i < vector_size; i++)
+        host_points[i] = distribution(random_engine);
 
     // Copy the matrix to the GPU
-    thrust::device_vector<float> vec(N);
-    thrust::copy(points, points+(N), vec.begin());
-    return vec;
+    thrust::device_vector<float> gpu_vector(vector_size);
+    thrust::copy(host_points, host_points+vector_size,
+                 gpu_vector.begin());
+    delete[] host_points;
+    return gpu_vector;
 }

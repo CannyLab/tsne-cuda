@@ -17,6 +17,8 @@
 #include "util/distance_utils.h"
 #include "util/random_utils.h"
 #include "util/thrust_utils.h"
+#include "include/util/thrust_transform_functions.h"
+#include "include/util/debug_utils.h"
 
 namespace NaiveTSNE {
     /**

@@ -24,6 +24,24 @@ if(NOT WITH_FAISS_GPU_STANDALONE)
 endif()
 #-------------------------------------------------------------------------------
 
+# Build Number Generation
+#-------------------------------------------------------------------------------
+SET(BUILD_NUMBER "0")
+SET(VERSION_STRING "${cuda-tsne_VERSION_MAJOR}.${cuda-tsne_VERSION_MINOR}")
+find_package(Git)
+if(GIT_FOUND)
+    execute_process(
+            COMMAND ${GIT_EXECUTABLE} describe --match INITIAL_BUILD
+            OUTPUT_VARIABLE DESCRIBE_BUILD
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(REGEX MATCH "[0-9]+" BUILD_NUMBER ${DESCRIBE_BUILD})
+endif()
+ADD_DEFINITIONS(-DBUILD_NUMBER="${BUILD_NUMBER}")
+ADD_DEFINITIONS(-DVERSION_STRING="${VERSION_STRING}")
+#-------------------------------------------------------------------------------
+
+
+
 # CXX Configuration
 #-------------------------------------------------------------------------------
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -94,6 +112,7 @@ file(GLOB_RECURSE faiss_gpu_cu third_party/faiss/gpu/*.cu)
 # Project Setup
 #-------------------------------------------------------------------------------
 include_directories(
+    src/
     src/include
     ${CUDA_INCLUDE_DIRECTORIES}
     third_party/gtest/googletest/include
@@ -108,6 +127,7 @@ set(SOURCES
     src/naive_tsne.cu
     src/naive_tsne_cpu.cu
     src/util/data_utils.cu
+    src/util/debug_utils.cu
     src/util/cuda_utils.cu
     src/util/thrust_utils.cu
     src/util/distance_utils.cu
@@ -117,20 +137,34 @@ set(SOURCES
     src/util/reduce_utils.cu
     src/ext/pymodule_ext.cu
     src/bh.cu
-    src/bh_tsne.cu
-    src/bh_tsne_ref.cu
 )
 #-------------------------------------------------------------------------------
 
 # Shared Library for Python Binding
 #-------------------------------------------------------------------------------
 if(BUILD_PYTHON)
+
+
+    set(PYTHON_SOURCES
+        src/python/CHANGES.txt
+        src/python/LICENSE.txt
+        src/python/MANIFEST.in
+        src/python/MANIFEST
+        src/python/README.txt
+        src/python/setup.py
+        src/python/tsnecuda/__init__.py
+        src/python/tsnecuda/NaiveTSNE.py
+        src/python/tsnecuda/TSNE_UTILS.py
+        src/python/tsnecuda/TSNE.py
+        src/python/tsnecuda/test/__init__.py
+        src/python/docs/FAQ.txt
+    )
+
     cuda_add_library(tsnecuda SHARED
         ${faiss_gpu_headers} ${faiss_gpu_cpp} ${faiss_gpu_cuh} ${faiss_gpu_cu}
         ${SOURCES}
     )
     set_target_properties(tsnecuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
     if(WITH_ZMQ)
         target_link_libraries(tsnecuda
             faiss
@@ -161,11 +195,23 @@ if(BUILD_PYTHON)
             -Wl,--allow-multiple-definition
         )
     endif()
-    add_custom_command(TARGET tsnecuda POST_BUILD
+
+    # Copy the source files across
+    add_custom_target(python_source_files ALL SOURCES ${PYTHON_SOURCES})
+    add_dependencies(python_source_files tsnecuda)
+    add_custom_command(TARGET python_source_files POST_BUILD
                     COMMAND ${CMAKE_COMMAND} -E copy_directory
-                        ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:tsnecuda>/python)
-    add_custom_command(TARGET tsnecuda POST_BUILD
+                        ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:tsnecuda>/python
+                    )
+    add_custom_command(TARGET python_source_files POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:tsnecuda> $<TARGET_FILE_DIR:tsnecuda>/python/tsnecuda)
+    add_custom_target(write_version_string_to_python ALL SOURCES ${PYTHON_SOURCES})
+
+    # Write the version string
+    add_dependencies(write_version_string_to_python python_source_files)
+    add_custom_command(TARGET write_version_string_to_python POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -DVERSION_STRING=${VERSION_STRING} -DBUILD_NUMBER=${BUILD_NUMBER} -P 
+        ${CMAKE_CURRENT_BINARY_DIR}/../cmake/write_python_version_string.cmake)
 else()
     message("-- Not building python libraries. To build python libraries use -DBUILD_PYTHON=ON")
 endif()

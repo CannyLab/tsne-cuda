@@ -2,7 +2,7 @@
 import numpy as np
 import scipy
 from sklearn.decomposition import PCA
-import pyctsne
+import tsnecuda
 
 
 print('Loading data...')
@@ -19,7 +19,7 @@ r_points = X[np.random.choice(np.arange(0,X.shape[0]), size=20000,replace=False)
 print('Computing distances...')
 # Compute the pairwise distances between the points
 # hd_distances = scipy.spatial.distance.pdist(r_points)
-hd_distances = pyctsne.TSNE.e_pw_dist(r_points)
+hd_distances = tsnecuda.TSNE.e_pw_dist(r_points)
 
 print('Projecting...')
 # Project the points using PCA
@@ -27,7 +27,7 @@ proj_points = PCA(n_components=30).fit_transform(r_points)
 
 print('Computing LD distances...')
 # Compute the pairwise distances between the points
-ld_distances = pyctsne.TSNE.e_pw_dist(proj_points) + 1e-4*np.ones(shape=(20000, 20000))
+ld_distances = tsnecuda.TSNE.e_pw_dist(proj_points) + 1e-4*np.ones(shape=(20000, 20000))
 
 print('Computing ratios...')
 # Compute for each pair of points the ratio between the point distances

@@ -18,8 +18,8 @@ void pymodule_e_dist(float *points, float *dist, ssize_t *dims) {
 
     // Create the handle, and construct the points
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
-    Distance::pairwise_dist(handle, d_distances, d_points, N_POINTS, N_DIMS);
+    CublasSafeCall(cublasCreate(&handle));
+    tsnecuda::util::PairwiseDistance(handle, d_distances, d_points, N_POINTS, N_DIMS);
 
     // Copy the data back to the CPU
     thrust::copy(d_distances.begin(), d_distances.end(), dist);
@@ -43,7 +43,7 @@ void pymodule_naive_tsne(float *points, float *result, ssize_t *dims, int proj_d
 
     // Create the CUBLAS handle
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
 
     // Do the T-SNE
     auto tsne_result = NaiveTSNE::tsne(handle, d_points, N_POINTS, N_DIMS, proj_dim, perplexity, 
@@ -71,7 +71,7 @@ void pymodule_compute_pij(float *points, float* sigmas, float *result, ssize_t *
  
      // Create the CUBLAS handle
      cublasHandle_t handle;
-     cublasSafeCall(cublasCreate(&handle));
+     CublasSafeCall(cublasCreate(&handle));
  
      // Do the T-SNE
      thrust::device_vector<float> pij(N_POINTS*N_POINTS);
@@ -91,9 +91,9 @@ void pymodule_bh_tsne(float *points, float *result, ssize_t *dims, int proj_dim,
 
     // Create the CUBLAS handles
     cublasHandle_t dense_handle;
-    cublasSafeCall(cublasCreate(&dense_handle));
+    CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
-    cusparseSafeCall(cusparseCreate(&sparse_handle));
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     // Construct the options
     BHTSNE::Options opt(result, points, N_POINTS, N_DIMS);
@@ -124,9 +124,9 @@ void pymodule_bhsnapshot(float *points, float *result, ssize_t *dims, int proj_d
 
     // Create the CUBLAS handles
     cublasHandle_t dense_handle;
-    cublasSafeCall(cublasCreate(&dense_handle));
+    CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
-    cusparseSafeCall(cusparseCreate(&sparse_handle));
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     // Construct the options
     BHTSNE::Options opt(result, points, N_POINTS, N_DIMS);
