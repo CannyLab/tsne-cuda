@@ -55,6 +55,7 @@ SET(CUDA_HOST_COMPILER ${CXX})
 SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
                     -O3 
+                    -Xptxas -dlcm=cg
                     #-gencode=arch=compute_30,code=sm_30
                     #-gencode=arch=compute_35,code=sm_35
                     -gencode=arch=compute_50,code=sm_50
