@@ -108,17 +108,17 @@ void tsnecuda::bh::BoundingBoxKernel(
     }
 }
 
-void tsnecuda::bh::BoundingBox(thrust::device_vector<int> &cell_starts,
-                               thrust::device_vector<int> &children,
-                               thrust::device_vector<float> &cell_mass,
-                               thrust::device_vector<float> &points,
-                               thrust::device_vector<float> &x_max_device,
-                               thrust::device_vector<float> &y_max_device,
-                               thrust::device_vector<float> &x_min_device,
-                               thrust::device_vector<float> &y_min_device,
-                               const uint32 num_nodes,
-                               const uint32 num_points,
-                               const uint32 num_blocks)
+void tsnecuda::bh::ComputeBoundingBox(thrust::device_vector<int> &cell_starts,
+                                      thrust::device_vector<int> &children,
+                                      thrust::device_vector<float> &cell_mass,
+                                      thrust::device_vector<float> &points,
+                                      thrust::device_vector<float> &x_max_device,
+                                      thrust::device_vector<float> &y_max_device,
+                                      thrust::device_vector<float> &x_min_device,
+                                      thrust::device_vector<float> &y_min_device,
+                                      const uint32 num_nodes,
+                                      const uint32 num_points,
+                                      const uint32 num_blocks)
 {
     tsnecuda::bh::BoundingBoxKernel<<<num_blocks * BOUNDING_BOX_BLOCKS, BOUNDING_BOX_THREADS>>>(
                                                           thrust::raw_pointer_cast(cell_starts.data()),
