@@ -39,7 +39,7 @@ void NaiveTSNE::thrust_search_perplexity(cublasHandle_t &handle,
     // printarray(pij, N, N);
     // std::cout << std::endl;
     thrust::device_vector<float> entropy_(pij.size());
-    thrust::transform(pij.begin(), pij.end(), entropy_.begin(), func_entropy_kernel());
+    thrust::transform(pij.begin(), pij.end(), entropy_.begin(), tsne::util::FunctionalEntropy());
     tsne::util::ZeroDeviceMatrixDiagonal(entropy_, N);
 
     // std::cout << "entropy:" << std::endl;
@@ -51,7 +51,7 @@ void NaiveTSNE::thrust_search_perplexity(cublasHandle_t &handle,
     // std::cout << "neg_entropy:" << std::endl;
     // printarray(neg_entropy, 1, N);
     // std::cout << std::endl;
-    thrust::transform(neg_entropy.begin(), neg_entropy.end(), perplexity.begin(), func_pow2());
+    thrust::transform(neg_entropy.begin(), neg_entropy.end(), perplexity.begin(), tsne::util::FunctionalPower2());
     // std::cout << "perplexity:" << std::endl;
     // printarray(perplexity, 1, N);
     // std::cout << std::endl;
@@ -121,7 +121,7 @@ void NaiveTSNE::compute_pij(
     
     // divide column by sigmas (matrix[i,:] gets divided by sigma_i^2)
     tsne::util::BroadcastMatrixVector(pij, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
-    thrust::transform(pij.begin(), pij.end(), pij.begin(), func_exp());
+    thrust::transform(pij.begin(), pij.end(), pij.begin(), tsne::util::FunctionalExp());
     tsne::util::ZeroDeviceMatrixDiagonal(pij, N);
     
     // tsne::util::ReduceSum over cols? rows? Fuck if I know. 
@@ -170,7 +170,7 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
     // printarray(dist, N, N);
 
     // dist_ = (1 + ||y_i - y_j||^2)^-1
-    thrust::transform(dist.begin(), dist.end(), dist.begin(), func_inc_inv());
+    thrust::transform(dist.begin(), dist.end(), dist.begin(), tsne::util::FunctionalIncrementInverse());
     tsne::util::ZeroDeviceMatrixDiagonal(dist, N);
 
     // std::cout << std::endl << std::endl << "Inc-Inv Dist" << std::endl;
@@ -192,7 +192,7 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
 
     // Compute loss = \sum_ij pij * log(pij / qij)
     thrust::device_vector<float> loss_(N * N);
-    thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), func_kl());
+    thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), tsne::util::FunctionalKlDivergence());
     tsne::util::ZeroDeviceMatrixDiagonal(loss_, N);
 
     // printarray(loss_, N, N);

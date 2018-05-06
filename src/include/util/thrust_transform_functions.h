@@ -10,41 +10,60 @@
 #ifndef SRC_INCLUDE_UTIL_THRUST_TRANSFORM_FUNCTIONS_H_
 #define SRC_INCLUDE_UTIL_THRUST_TRANSFORM_FUNCTIONS_H_
 
+namespace tsne {
+namespace util {
+
 #include "include/common.h"
 
-struct func_exp {
-    __host__ __device__ float operator()(const float &x) const { return exp(x); }
+struct FunctionalExp {
+    __host__ __device__ float operator()(const float &x) const {
+        return exp(x);
+    }
 };
-struct func_inc_inv {
-    __host__ __device__ float operator()(const float &x) const { return 1 / (x + 1); }
+struct FunctionalIncrementInverse {
+    __host__ __device__ float operator()(const float &x) const {
+        return 1 / (x + 1);
+    }
 };
-struct func_kl {
-    __host__ __device__ float operator()(const float &x, const float &y) const { 
+struct FunctionalKlDivergence {
+    __host__ __device__ float operator()(const float &x,
+            const float &y) const {
         return x == 0.0f ? 0.0f : x * (log(x) - log(y));
     }
 };
-struct func_entropy_kernel {
-  __host__ __device__ float operator()(const float &x) const { float val = x*log(x); return (val != val || isinf(val)) ? 0 : val; }
+struct FunctionalEntropy {
+  __host__ __device__ float operator()(const float &x) const {
+      float val = x*log(x);
+      return (val != val || isinf(val)) ? 0 : val;
+    }
 };
-struct func_pow2 {
-    __host__ __device__ float operator()(const float &x) const { return pow(2,x); }
-};
-struct func_sqrt {
+struct FunctionalPower2 {
     __host__ __device__ float operator()(const float &x) const {
-            return pow(x, 0.5); }
+        return pow(2, x);
+    }
 };
-struct func_square {
-    __host__ __device__ float operator()(const float &x) const { return x * x; }
+struct FunctionalSqrt {
+    __host__ __device__ float operator()(const float &x) const {
+        return pow(x, 0.5);
+    }
 };
-struct func_abs {
+struct FunctionalSquare {
+    __host__ __device__ float operator()(const float &x) const {
+        return x * x;
+    }
+};
+struct FunctionalAbs {
     __host__ __device__ float operator()(const float &x) const {
         return fabsf(x);
     }
 };
-struct func_nan_or_inf {
+struct FunctionalNanOrInf {
     __host__ __device__ bool operator()(const float &x) const {
         return isnan(x) || isinf(x);
     }
 };
+
+}  // namespace util
+}  // namespace tsne
 
 #endif  // SRC_INCLUDE_UTIL_THRUST_TRANSFORM_FUNCTIONS_H_

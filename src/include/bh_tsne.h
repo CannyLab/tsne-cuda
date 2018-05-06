@@ -51,8 +51,8 @@ namespace BHTSNE {
 
             // Algorithm options
             float perplexity = 32.0f;
-            float learning_rate = 500.0f;
-            float early_exaggeration = 12.0f;
+            float learning_rate = 200.0f;
+            float early_exaggeration = 2.0f;
             float magnitude_factor = 1.0f;
             int n_neighbors = 1023;
             int iterations = 1000;
@@ -68,7 +68,7 @@ namespace BHTSNE {
             float min_gradient_norm = 0.0;
 
             // Initialization
-            TSNE_INIT initialization = TSNE_INIT::UNIFORM;
+            TSNE_INIT initialization = TSNE_INIT::GAUSSIAN;
             float* preinit_data = nullptr;
 
             // Verbosity control

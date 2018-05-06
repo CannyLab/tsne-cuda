@@ -36,32 +36,32 @@ void tsne::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
 void tsne::util::SquareDeviceVector(thrust::device_vector<float> &d_out,
         const thrust::device_vector<float> &d_input) {
     thrust::transform(d_input.begin(), d_input.end(),
-                      d_out.begin(), func_square());
+                      d_out.begin(), tsne::util::FunctionalSquare());
 }
 
 void tsne::util::SqrtDeviceVector(thrust::device_vector<float> &d_out,
         const thrust::device_vector<float> &d_input) {
     thrust::transform(d_input.begin(), d_input.end(),
-                      d_out.begin(), func_sqrt());
+                      d_out.begin(), tsne::util::FunctionalSqrt());
 }
 
 float tsne::util::L2NormDeviceVector(
         const thrust::device_vector<float> &d_vector) {
     return std::sqrt(thrust::transform_reduce(d_vector.begin(),
-                     d_vector.end(), func_square(), 0.0f,
+                     d_vector.end(), tsne::util::FunctionalSquare(), 0.0f,
                      thrust::plus<float>()));
 }
 
 bool tsne::util::AnyNanOrInfDeviceVector(
         const thrust::device_vector<float> &d_vector) {
     return thrust::transform_reduce(d_vector.begin(), d_vector.end(),
-                                    func_nan_or_inf(), 0, thrust::plus<bool>());
+                                    tsne::util::FunctionalNanOrInf(), 0, thrust::plus<bool>());
 }
 
 void tsne::util::MaxNormalizeDeviceVector(
         thrust::device_vector<float> &d_vector) {
     float max_val = thrust::transform_reduce(d_vector.begin(), d_vector.end(),
-            func_abs(), 0.0f, thrust::maximum<float>());
+            tsne::util::FunctionalAbs(), 0.0f, thrust::maximum<float>());
     thrust::constant_iterator<float> division_iterator(max_val);
     thrust::transform(d_vector.begin(), d_vector.end(), division_iterator,
                       d_vector.begin(), thrust::divides<float>());

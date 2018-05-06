@@ -930,7 +930,7 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
         
         // compute entropy of current row
         row_sum = tsne::util::ReduceSum(handle, pij, K, N, 0);
-        thrust::transform(pij.begin(), pij.end(), entropy.begin(), func_entropy_kernel());
+        thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsne::util::FunctionalEntropy());
         auto neg_entropy = tsne::util::ReduceAlpha(handle, entropy, K, N, -1.0f, 0);
 
         // binary search for beta
