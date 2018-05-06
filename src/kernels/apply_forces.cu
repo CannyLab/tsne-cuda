@@ -4,23 +4,35 @@
     Apply forces to the points with momentum, exaggeration, etc.
 */
 
+#include "apply_forces.h"
+
+#ifdef __KEPLER__
+#define INTEGRATION_THREADS 1024
+#define INTEGRATION_BLOCKS 2
+#else
+#define INTEGRATION_THREADS 1024
+#define INTEGRATION_BLOCKS 1
+#endif
+
+
 /******************************************************************************/
 /*** advance bodies ***********************************************************/
 /******************************************************************************/
 // Edited to add momentum, repulsive, attr forces, etc.
 __global__
-__launch_bounds__(THREADS6, FACTOR6)
-void IntegrationKernel(int N,
-                        int nnodes,
-                        float eta,
-                        float norm,
-                        float momentum,
-                        float exaggeration,
-                        volatile float * __restrict pts, // (nnodes + 1) x 2
-                        volatile float * __restrict attr_forces, // (N x 2)
-                        volatile float * __restrict rep_forces, // (nnodes + 1) x 2
-                        volatile float * __restrict gains,
-                        volatile float * __restrict old_forces) // (N x 2)
+__launch_bounds__(INTEGRATION_THREADS, INTEGRATION_BLOCKS)
+void tsnecuda::bh::IntegrationKernel(
+                                 volatile float * __restrict__ points,
+                                 volatile float * __restrict__ attr_forces,
+                                 volatile float * __restrict__ rep_forces,
+                                 volatile float * __restrict__ gains,
+                                 volatile float * __restrict__ old_forces,
+                                 const float eta,
+                                 const float normalization,
+                                 const float momentum,
+                                 const float exaggeration
+                                 const uint32 num_nodes,
+                                 const uint32 num_points);
 {
   register int i, inc;
   register float dx, dy, ux, uy, gx, gy;
@@ -29,11 +41,11 @@ void IntegrationKernel(int N,
   inc = blockDim.x * gridDim.x;
   for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
         ux = old_forces[i];
-        uy = old_forces[N + i];
+        uy = old_forces[num_points + i];
         gx = gains[i];
-        gy = gains[N + i];
-        dx = exaggeration*attr_forces[i] - (rep_forces[i] / norm);
-        dy = exaggeration*attr_forces[i + N] - (rep_forces[nnodes + 1 + i] / norm);
+        gy = gains[num_points + i];
+        dx = exaggeration*attr_forces[i] - (rep_forces[i] / normalization);
+        dy = exaggeration*attr_forces[i + num_points] - (rep_forces[num_nodes + 1 + i] / normalization);
 
         gx = (signbit(dx) != signbit(ux)) ? gx + 0.2 : gx * 0.8;
         gy = (signbit(dy) != signbit(uy)) ? gy + 0.2 : gy * 0.8;
@@ -43,12 +55,96 @@ void IntegrationKernel(int N,
         ux = momentum * ux - eta * gx * dx;
         uy = momentum * uy - eta * gy * dy;
 
-        pts[i] += ux;
-        pts[i + nnodes + 1] += uy;
+        points[i] += ux;
+        points[i + num_nodes + 1] += uy;
 
         old_forces[i] = ux;
-        old_forces[N + i] = uy;
+        old_forces[num_points + i] = uy;
         gains[i] = gx;
-        gains[N + i] = gy;
+        gains[num_points + i] = gy;
    }
+}
+
+__global__
+__launch_bounds__(INTEGRATION_THREADS, INTEGRATION_BLOCKS)
+void tsnecuda::naive::IntegrationKernel(
+                                 volatile float * __restrict__ points,
+                                 volatile float * __restrict__ forces,
+                                 volatile float * __restrict__ gains,
+                                 volatile float * __restrict__ old_forces,
+                                 const float eta,
+                                 const float momentum,
+                                 const uint32 num_points);
+{
+  register int i, inc;
+  register float dx, dy, ux, uy, gx, gy;
+
+  // iterate over all bodies assigned to thread
+  inc = blockDim.x * gridDim.x;
+  for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
+        ux = old_forces[i];
+        uy = old_forces[num_points + i];
+        gx = gains[i];
+        gy = gains[num_points + i];
+        dx = forces[i];
+        dy = forces[num_points + i];
+
+        gx = (signbit(dx) != signbit(ux)) ? gx + 0.2 : gx * 0.8;
+        gy = (signbit(dy) != signbit(uy)) ? gy + 0.2 : gy * 0.8;
+        gx = (gx < 0.01) ? 0.01 : gx;
+        gy = (gy < 0.01) ? 0.01 : gy;
+
+        ux = momentum * ux - eta * gx * dx;
+        uy = momentum * uy - eta * gy * dy;
+
+        points[i] += ux;
+        points[num_points + i] += uy;
+
+        old_forces[i] = ux;
+        old_forces[num_points + i] = uy;
+        gains[i] = gx;
+        gains[num_points + i] = gy;
+   }
+}
+
+void tsnecuda::bh::ApplyForces(thrust::device_vector<float> &points,
+                               thrust::device_vector<float> &attr_forces,
+                               thrust::device_vector<float> &rep_forces,
+                               thrust::device_vector<float> &gains, 
+                               thrust::device_vector<float> &old_forces,
+                               const float eta,
+                               const float normalization,
+                               const float momentum,
+                               const float exaggeration,
+                               const uint32 num_nodes,
+                               const uint32 num_points,
+                               const uint32 num_blocks)
+{
+    tsnecuda::bh::IntegrationKernel<<<num_blocks * INTEGRATION_BLOCKS, INTEGRATION_THREADS>>>(
+                    thrust::raw_pointer_cast(points.data()),
+                    thrust::raw_pointer_cast(attr_forces.data()),
+                    thrust::raw_pointer_cast(rep_forces.data()),
+                    thrust::raw_pointer_cast(gains.data()),
+                    thrust::raw_pointer_cast(old_forces.data()),
+                    eta, normalization, momentum, exaggeration,
+                    num_nodes, num_points);
+    gpuErrchk(cudaDeviceSynchronize());
+}
+
+void tsnecuda::naive::ApplyForces(thrust::device_vector<float> &points,
+                                  thrust::device_vector<float> &forces,
+                                  thrust::device_vector<float> &gains,
+                                  thrust::device_vector<float> &old_forces,
+                                  const float eta,
+                                  const float momentum,
+                                  const uint32 num_points,
+                                  const uint32 num_blocks)
+{
+    tsnecuda::naive::IntegrationKernel<<<num_blocks * INTEGRATION_BLOCKS, INTEGRATION_THREADS>>>(
+                    thrust::raw_pointer_cast(points.data()),
+                    thrust::raw_pointer_cast(forces.data()),
+                    thrust::raw_pointer_cast(gains.data()),
+                    thrust::raw_pointer_cast(old_forces.data()),
+                    eta, momentum, num_points);
+    gpuErrchk(cudaDeviceSynchronize());
 }
