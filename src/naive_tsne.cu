@@ -8,24 +8,6 @@
 
 #include "naive_tsne.h"
 
-struct func_inc_inv {
-    __host__ __device__ float operator()(const float &x) const { return 1 / (x + 1); }
-};
-
-struct func_kl {
-    __host__ __device__ float operator()(const float &x, const float &y) const { 
-        return x == 0.0f ? 0.0f : x * (log(x) - log(y));
-    }
-};
-
-struct func_entropy_kernel {
-    __host__ __device__ float operator()(const float &x) const { float val = x*log2(x); return (val != val) ? 0 : val; }
-};
-
-struct func_pow2 {
-    __host__ __device__ float operator()(const float &x) const { return pow(2,x); }
-};
-
 __global__ void upper_lower_assign(float * __restrict__ sigmas,
                                     float * __restrict__ lower_bound,
                                     float * __restrict__ upper_bound,
@@ -58,7 +40,7 @@ void NaiveTSNE::thrust_search_perplexity(cublasHandle_t &handle,
     // std::cout << std::endl;
     thrust::device_vector<float> entropy_(pij.size());
     thrust::transform(pij.begin(), pij.end(), entropy_.begin(), func_entropy_kernel());
-    zero_diagonal(entropy_, N);
+    tsne::util::ZeroDeviceMatrixDiagonal(entropy_, N);
 
     // std::cout << "entropy:" << std::endl;
     // printarray(entropy_, N, N);
@@ -140,7 +122,7 @@ void NaiveTSNE::compute_pij(
     // divide column by sigmas (matrix[i,:] gets divided by sigma_i^2)
     tsne::util::BroadcastMatrixVector(pij, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
     thrust::transform(pij.begin(), pij.end(), pij.begin(), func_exp());
-    zero_diagonal(pij, N);
+    tsne::util::ZeroDeviceMatrixDiagonal(pij, N);
     
     // tsne::util::ReduceSum over cols? rows? Fuck if I know. 
     auto sums = tsne::util::ReduceSum(handle, pij, N, N, 1);
@@ -189,7 +171,7 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
 
     // dist_ = (1 + ||y_i - y_j||^2)^-1
     thrust::transform(dist.begin(), dist.end(), dist.begin(), func_inc_inv());
-    zero_diagonal(dist, N);
+    tsne::util::ZeroDeviceMatrixDiagonal(dist, N);
 
     // std::cout << std::endl << std::endl << "Inc-Inv Dist" << std::endl;
     // printarray(dist, N, N);
@@ -211,7 +193,7 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
     // Compute loss = \sum_ij pij * log(pij / qij)
     thrust::device_vector<float> loss_(N * N);
     thrust::transform(pij.begin(), pij.end(), qij.begin(), loss_.begin(), func_kl());
-    zero_diagonal(loss_, N);
+    tsne::util::ZeroDeviceMatrixDiagonal(loss_, N);
 
     // printarray(loss_, N, N);
     float loss = thrust::reduce(loss_.begin(), loss_.end(), 0.0f, thrust::plus<float>());

@@ -9,11 +9,6 @@
 
 #include "include/util/distance_utils.h"
 
-struct func_sqrt {
-    __host__ __device__ float operator()(const float &x) const {
-            return pow(x, 0.5); }
-};
-
 // This really does a simultaneous row/col matrix vector broadcast
 // to compute ||x^2|| + ||y^2|| - 2 x^Ty.
 // Added fabs to deal with numerical instabilities. I think this is a
@@ -53,7 +48,7 @@ void tsne::util::SquaredPairwiseDistance(cublasHandle_t &handle,
         thrust::raw_pointer_cast(d_distances.data()), num_points));
 
     typedef thrust::device_vector<float>::iterator Iterator;
-    strided_range<Iterator> diagonalized(d_distances.begin(),
+    tsne::util::StridedRange<Iterator> diagonalized(d_distances.begin(),
             d_distances.end(), num_points + 1);
     thrust::device_vector<float> squared_norms(num_points);
     thrust::copy(diagonalized.begin(), diagonalized.end(),

@@ -896,10 +896,6 @@ __global__ void postprocess_matrix(float* matrix,
     return;
 }
 
-struct func_entropy_kernel {
-  __host__ __device__ float operator()(const float &x) const { float val = x*log(x); return (val != val || isinf(val)) ? 0 : val; }
-};
-
 thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
                                                   thrust::device_vector<float> &knn_distances,
                                                   const float perplexity_target,

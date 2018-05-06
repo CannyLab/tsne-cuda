@@ -9,26 +9,6 @@
 
 #include "util/math_utils.h"
 
-struct func_square {
-    __host__ __device__ float operator()(const float &x) const { return x * x; }
-};
-
-struct func_sqrt {
-    __host__ __device__ float operator()(const float &x) const {
-        return sqrtf(x);
-    }
-};
-struct func_abs {
-    __host__ __device__ float operator()(const float &x) const {
-        return fabsf(x);
-    }
-};
-struct func_nan_or_inf {
-    __host__ __device__ bool operator()(const float &x) const {
-        return isnan(x) || isinf(x);
-    }
-};
-
 void tsne::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
         thrust::device_vector<float> &d_points, const uint32_t num_points,
         const uint32_t num_dims) {

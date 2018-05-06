@@ -1,8 +1,19 @@
-#include "util/thrust_utils.h"
+/**
+ * @brief Implementation of some thrust utility functions
+ * 
+ * @file thrust_utils.cu
+ * @author David Chan
+ * @date 2018-04-28
+ * Copyright (c) 2018, Regents of the University of California
+ */
+
+#include "include/util/thrust_utils.h"
 
 // Assumes that vec is an N x N matrix
-void zero_diagonal(thrust::device_vector<float> &vec, const unsigned int N) {
-	typedef thrust::device_vector<float>::iterator Iterator;
-	strided_range<Iterator> diag(vec.begin(), vec.end(), N + 1);
-	thrust::fill(diag.begin(), diag.end(), 0.0f);
+void tsne::util::ZeroDeviceMatrixDiagonal(
+        thrust::device_vector<float> &d_vector, const uint32_t N) {
+    typedef thrust::device_vector<float>::iterator Iterator;
+    StridedRange<Iterator> return_vector(d_vector.begin(),
+            d_vector.end(), N + 1);
+    thrust::fill(return_vector.begin(), return_vector.end(), 0.0f);
 }

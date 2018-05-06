@@ -14,6 +14,7 @@
 #include "include/common.h"
 #include "include/util/matrix_broadcast_utils.h"
 #include "include/util/reduce_utils.h"
+#include "include/util/thrust_transform_functions.h"
 
 namespace tsne {
 namespace util {
