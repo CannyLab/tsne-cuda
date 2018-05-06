@@ -5,14 +5,6 @@
 
 #include "include/kernels/apply_forces.h"
 
-#ifdef __KEPLER__
-#define INTEGRATION_THREADS 1024
-#define INTEGRATION_BLOCKS 2
-#else
-#define INTEGRATION_THREADS 1024
-#define INTEGRATION_BLOCKS 1
-#endif
-
 
 /******************************************************************************/
 /*** advance bodies ***********************************************************/

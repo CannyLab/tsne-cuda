@@ -1,18 +1,8 @@
-// TODO: add copyright
-
 /*
         Builds a quad tree for computing Barnes-Hut approximation of t-SNE repulsive forces.
 */
 
-#include "tree_builder.h"
-
-#ifdef __KEPLER__
-#define TREE_THREADS 1024
-#define TREE_BLOCKS 2
-#else
-#define TREE_THREADS 512
-#define TREE_BLOCKS 3
-#endif
+#include "include/kernels/tree_builder.h"
 
 /******************************************************************************/
 /*** build tree ***************************************************************/
@@ -20,7 +10,7 @@
 
 __global__
 __launch_bounds__(1024, 1)
-void tsnecuda::bh::ClearKernel1(volatile int * __restrict__ children, const uint32 num_nodes, const uint32 num_points)
+void tsnecuda::bh::ClearKernel1(volatile int * __restrict__ children, const uint32_t num_nodes, const uint32_t num_points)
 {
     register int k, inc, top, bottom;
 
@@ -44,8 +34,8 @@ void tsnecuda::bh::TreeBuildingKernel(volatile int * __restrict__ errd,
                                         volatile int * __restrict__ children, 
                                         volatile float * __restrict__ x_pos_device, 
                                         volatile float * __restrict__ y_pos_device,
-                                        const uint32 num_nodes,
-                                        const uint32 num_points) 
+                                        const uint32_t num_nodes,
+                                        const uint32_t num_points) 
 {
     register int i, j, depth, localmaxdepth, skip, inc;
     register float x, y, r;
@@ -159,7 +149,7 @@ void tsnecuda::bh::TreeBuildingKernel(volatile int * __restrict__ errd,
 
 __global__
 __launch_bounds__(1024, 1)
-void tsnecuda::bh::ClearKernel2(volatile int * __restrict__ cell_starts, volatile float * __restrict__ cell_mass, const uint32 num_nodes)
+void tsnecuda::bh::ClearKernel2(volatile int * __restrict__ cell_starts, volatile float * __restrict__ cell_mass, const uint32_t num_nodes)
 {
     register int k, inc, bottom;
 
@@ -180,9 +170,9 @@ void tsnecuda::bh::BuildTree(thrust::device_vector<int> &errd,
                                thrust::device_vector<int> &children,
                                thrust::device_vector<int> &cell_starts,
                                thrust::device_vector<float> &points,
-                               const uint32 num_nodes,
-                               const uint32 num_points,
-                               const uint32 num_blocks)
+                               const uint32_t num_nodes,
+                               const uint32_t num_points,
+                               const uint32_t num_blocks)
 {
     tsnecuda::bh::ClearKernel1<<<num_blocks, 1024>>>(thrust::raw_pointer_cast(children.data()),
                                                        num_nodes, num_points);

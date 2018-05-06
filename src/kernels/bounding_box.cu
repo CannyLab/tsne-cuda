@@ -1,18 +1,8 @@
-// TODO: add copyright
-
 /*
         Computes bounding box for all points for barnes hut. Also resets start, child, mass
 */
 
-#include "bounding_box.h"
-
-#ifdef __KEPLER__
-#define BOUNDING_BOX_THREADS 1024
-#define BOUNDING_BOX_BLOCKS 2
-#else
-#define BOUNDING_BOX_THREADS 512
-#define BOUNDING_BOX_BLOCKS 3
-#endif
+#include "include/kernels/bounding_box.h"
 
 /******************************************************************************/
 /*** compute center and radius ************************************************/
@@ -30,8 +20,8 @@ void tsnecuda::bh::BoundingBoxKernel(
                        volatile float * __restrict__ y_max_device, 
                        volatile float * __restrict__ x_min_device, 
                        volatile float * __restrict__ y_min_device,
-                       const uint32 num_nodes,
-                       const uint32 num_points) 
+                       const uint32_t num_nodes,
+                       const uint32_t num_points) 
 {
     register int i, j, k, inc;
     register float val, minx, maxx, miny, maxy;
@@ -116,9 +106,9 @@ void tsnecuda::bh::ComputeBoundingBox(thrust::device_vector<int> &cell_starts,
                                       thrust::device_vector<float> &y_max_device,
                                       thrust::device_vector<float> &x_min_device,
                                       thrust::device_vector<float> &y_min_device,
-                                      const uint32 num_nodes,
-                                      const uint32 num_points,
-                                      const uint32 num_blocks)
+                                      const uint32_t num_nodes,
+                                      const uint32_t num_points,
+                                      const uint32_t num_blocks)
 {
     tsnecuda::bh::BoundingBoxKernel<<<num_blocks * BOUNDING_BOX_BLOCKS, BOUNDING_BOX_THREADS>>>(
                                                           thrust::raw_pointer_cast(cell_starts.data()),

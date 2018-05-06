@@ -1,18 +1,8 @@
-// TODO: add copyright
-
 /*
         Summarize position and mass of cells in quad-tree.
 */
 
 #include "tree_summary.h"
-
-#ifdef __KEPLER__
-#define SUMMARY_THREADS 768
-#define SUMMARY_BLOCKS 1
-#else
-#define SUMMARY_THREADS 128
-#define SUMMARY_BLOCKS 6
-#endif
 
 /******************************************************************************/
 /*** compute center of mass ***************************************************/
@@ -26,8 +16,8 @@ void tsnecuda::bh::SummarizationKernel(
                                volatile float * __restrict x_pos_device, 
                                volatile float * __restrict y_pos_device,
                                const int * __restrict children,
-                               const uint32 num_nodes,
-                               const uint32 num_points) 
+                               const uint32_t num_nodes,
+                               const uint32_t num_points) 
 {
     register int i, j, k, ch, inc, cnt, bottom, flag;
     register float m, cm, px, py;
@@ -155,9 +145,9 @@ void tsnecuda::bh::SummarizeTree(thrust::device_vector<int> &cell_counts,
                                  thrust::device_vector<int> &children,
                                  thrust::device_vector<float> &cell_mass,
                                  thrust::device_vector<float> &pts_device,
-                                 const uint32 num_nodes,
-                                 const uint32 num_points,
-                                 const uint32 num_blocks)
+                                 const uint32_t num_nodes,
+                                 const uint32_t num_points,
+                                 const uint32_t num_blocks)
 {
     tsnecuda::bh::SummarizationKernel<<<num_blocks * SUMMARY_BLOCKS, SUMMARY_THREADS>>>(
                                                     thrust::raw_pointer_cast(cell_counts.data()),

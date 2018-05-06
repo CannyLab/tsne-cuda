@@ -7,10 +7,19 @@
  * Copyright (c) 2018, Regents of the University of California
  */
 
-#ifndef SRC_INCLUDE_KERNEL_APPLY_FORCES_H_
-#define SRC_INCLUDE_KERNEL_APPLY_FORCES_H_
+#ifndef SRC_INCLUDE_KERNELS_APPLY_FORCES_H_
+#define SRC_INCLUDE_KERNELS_APPLY_FORCES_H_
 
 #include "include/common.h"
+
+#ifdef __KEPLER__
+#define INTEGRATION_THREADS 1024
+#define INTEGRATION_BLOCKS 2
+#else
+#define INTEGRATION_THREADS 1024
+#define INTEGRATION_BLOCKS 1
+#endif
+ 
 namespace tsnecuda {
 namespace bh {
 __global__

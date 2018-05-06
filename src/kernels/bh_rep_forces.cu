@@ -10,14 +10,6 @@
 
 #include "bh_rep_forces.h"
 
-#ifdef __KEPLER__
-#define REPULSIVE_FORCES_THREADS 1024
-#define REPULSIVE_FORCE_BLOCKS 2
-#else
-#define REPULSIVE_FORCES_THREADS 256
-#define REPULSIVE_FORCES_BLOCKS 5
-#endif
-
 /******************************************************************************/
 /*** compute force ************************************************************/
 /******************************************************************************/
@@ -35,8 +27,8 @@ void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
                                           volatile float * __restrict__ y_pos_device,
                                           const float theta,
                                           const float epsilon,
-                                          const uint32 num_nodes,
-                                          const uint32 num_points)
+                                          const uint32_t num_nodes,
+                                          const uint32_t num_points)
 {
     register int i, j, k, n, depth, base, sbase, diff, pd, nd;
     register float px, py, vx, vy, dx, dy, normsum, tmp, mult;
@@ -146,9 +138,9 @@ void tsnecuda::bh::ComputeRepulsiveForces(thrust::device_vector<int> &errd,
                                           thrust::device_vector<float> &points,
                                           const float theta,
                                           const float epsilon,
-                                          const uint32 num_nodes,
-                                          const uint32 num_points,
-                                          const uint32 num_blocks)
+                                          const uint32_t num_nodes,
+                                          const uint32_t num_points,
+                                          const uint32_t num_blocks)
 {
     tsnecuda::bh::ForceCalculationKernel<<<num_blocks * REPULSIVE_FORCES_BLOCKS, REPULSIVE_FORCES_THREADS>>>(
                         thrust::raw_pointer_cast(errd.data()),

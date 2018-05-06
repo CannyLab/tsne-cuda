@@ -22,7 +22,7 @@ N, N_POINTS should be num_points
 K should be num_near_neighbors
 nnodes should be num_nodes
 nnz should be num_nonzero (but really try to use sparsePij.size())
-These should all be defined as const uint32 when possible and generally define scalars as uint32 when possible.
+These should all be defined as const uint32_t when possible and generally define scalars as uint32_t when possible.
 
 Loop boundaries should be size_t.
 

@@ -1,5 +1,3 @@
-// TODO: add copyright
-
 /*
     Compute t-SNE via Barnes-Hut for NlogN time.
 */

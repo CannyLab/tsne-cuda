@@ -1,10 +1,8 @@
-// TODO: Add copyright
-
 /*
 Kernel to initialize the global variables
 */
 
-#include "initialization.h"
+#include "kernels/include/initialization.h"
 
 
 /******************************************************************************/

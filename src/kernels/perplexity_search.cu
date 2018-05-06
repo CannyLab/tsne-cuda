@@ -1,11 +1,11 @@
-// TODO: add copyright
-
 /*
     Compute the unnormalized pij matrix given a squared distance matrix and a target perplexity.
     pij = exp(-beta * dist ** 2)
 
     Note that FAISS returns the first row as the same point, with distance = 0. pii is defined as zero.
 */
+
+#include "include/kernels/perplexity_search.h"
 
 __global__
 void tsnecuda::bh::ComputePijKernel(
@@ -66,7 +66,7 @@ void tsnecuda::PerplexitySearchKernel(
                             const float * __restrict__ row_sum,
                             const float perplexity_target,
                             const float epsilon,
-                            const uint32 num_points);
+                            const uint32_t num_points)
 {
     register int i, is_found;
     register float perplexity, neg_ent, sum_P, perplexity_diff, beta, min_beta, max_beta;
@@ -103,8 +103,8 @@ void tsnecuda::bh::SearchPerplexity(cublasHandle_t &handle,
                                      thrust::device_vector<float> &squared_dist,
                                      const float perplexity_target,
                                      const float epsilon,
-                                     const uint32 num_points,
-                                     const uint32 num_near_neighbors)
+                                     const uint32_t num_points,
+                                     const uint32_t num_near_neighbors)
 {
     // use beta instead of sigma (this matches the bhtsne code but not the paper)
     // beta is just multiplicative instead of divisive (changes the way binary search works)
@@ -115,11 +115,11 @@ void tsnecuda::bh::SearchPerplexity(cublasHandle_t &handle,
     thrust::device_vector<int> found(num_points);
 
     // TODO: this doesn't really fit with the style
-    const uint32 BLOCKSIZE1 = 1024;
-    const uint32 NBLOCKS1 = iDivUp(num_points * num_near_neighbors, BLOCKSIZE1);
+    const uint32_t BLOCKSIZE1 = 1024;
+    const uint32_t NBLOCKS1 = iDivUp(num_points * num_near_neighbors, BLOCKSIZE1);
 
-    const uint32 BLOCKSIZE2 = 128;
-    const uint32 NBLOCKS2 = iDivUp(num_points, BLOCKSIZE2);
+    const uint32_t BLOCKSIZE2 = 128;
+    const uint32_t NBLOCKS2 = iDivUp(num_points, BLOCKSIZE2);
 
     size_t iters = 0;
     int all_found = 0;
@@ -164,7 +164,7 @@ void tsnecuda::naive::SearchPerplexity(cublasHandle_t &handle,
                                      thrust::device_vector<float> &squared_dist,
                                      const float perplexity_target,
                                      const float epsilon,
-                                     const uint32 num_points);
+                                     const uint32_t num_points)
 {
     // use beta instead of sigma (this matches the bhtsne code but not the paper)
     // beta is just multiplicative instead of divisive (changes the way binary search works)
@@ -175,11 +175,11 @@ void tsnecuda::naive::SearchPerplexity(cublasHandle_t &handle,
     thrust::device_vector<int> found(num_points);
 
     // TODO: this doesn't really fit with the style
-    const uint32 BLOCKSIZE1 = 1024;
-    const uint32 NBLOCKS1 = iDivUp(num_points * num_points, BLOCKSIZE1);
+    const uint32_t BLOCKSIZE1 = 1024;
+    const uint32_t NBLOCKS1 = iDivUp(num_points * num_points, BLOCKSIZE1);
 
-    const uint32 BLOCKSIZE2 = 128;
-    const uint32 NBLOCKS2 = iDivUp(num_points, BLOCKSIZE2);
+    const uint32_t BLOCKSIZE2 = 128;
+    const uint32_t NBLOCKS2 = iDivUp(num_points, BLOCKSIZE2);
 
     size_t iters = 0;
     int all_found = 0;

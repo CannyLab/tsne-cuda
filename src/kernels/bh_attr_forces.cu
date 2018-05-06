@@ -6,7 +6,7 @@
     Attractive force is given by pij*qij.
 */
 
-#include "bh_attr_forces.h"
+#include "include/kernels/bh_attr_forces.h"
 
 __global__
 void tsnecuda::bh::ComputePijxQijKernel(
@@ -14,8 +14,8 @@ void tsnecuda::bh::ComputePijxQijKernel(
                             const float * __restrict__ pij,
                             const float * __restrict__ points,
                             const int * __restrict__ coo_indices,
-                            const uint32 num_nodes,
-                            const uint32 num_nonzero)
+                            const uint32_t num_nodes,
+                            const uint32_t num_nonzero)
 {
     register int TID, i, j;
     register float ix, iy, jx, jy, dx, dy;
@@ -41,9 +41,9 @@ void tsnecuda::bh::ComputeAttractiveForces(
                     thrust::device_vector<int> &coo_indices,
                     thrust::device_vector<float> &points,
                     thrust::device_vector<float> &ones,
-                    const uint32 num_nodes,
-                    const uint32 num_points,
-                    const uint32 num_nonzero)
+                    const uint32_t num_nodes,
+                    const uint32_t num_points,
+                    const uint32_t num_nonzero)
 {
     // Computes pij*qij for each i,j
     // TODO: this is bad style
