@@ -4,88 +4,98 @@
  * @file math_utils.h
  * @author David Chan
  * @date 2018-04-04
+ * Copyright (c) 2018, Regents of the University of California
  */
 
 
-#ifndef MATH_UTILS_H
-#define MATH_UTILS_H
+#ifndef SRC_INCLUDE_UTIL_MATH_UTILS_H_
+#define SRC_INCLUDE_UTIL_MATH_UTILS_H_
 
-    #include "common.h"
-    #include "util/matrix_broadcast_utils.h"
-    #include "util/reduce_utils.h"
+#include "include/common.h"
+#include "include/util/matrix_broadcast_utils.h"
+#include "include/util/reduce_utils.h"
 
-    namespace Math {
-        /**
-         * @brief Normalize a vector to have mean zero and variance one. The dimensions are normalized independently.
-         * 
-         * @param handle CUBLAS handle reference
-         * @param points The points to normalize (Column-Major NxNDIM matrix)
-         * @param N The number of points
-         * @param NDIMS The dimension of each point
-         */
-        void gauss_normalize(cublasHandle_t &handle, thrust::device_vector<float> &points, const unsigned int N, const unsigned int NDIMS);
+namespace tsne {
+namespace util {
 
-        /**
-         * @brief Square a vector element-wise
-         * 
-         * @param vec The vector to square
-         * @param out The output vector
-         */
-        void square(const thrust::device_vector<float> &vec, thrust::device_vector<float> &out);
+/**
+* @brief Normalize a vector to have mean zero and variance one. The dimensions are normalized independently.
+* 
+* @param handle CUBLAS handle reference
+* @param points The points to normalize (Column-Major NxNDIM matrix)
+* @param num_points The number of points
+* @param num_dims The dimension of each point
+*/
+void GaussianNormalizeDeviceVector(cublasHandle_t &handle,
+        thrust::device_vector<float> &d_points,
+        const uint32_t num_points, const uint32_t num_dims);
 
-        /**
-         * @brief Take the square root of a vector element-wise
-         * 
-         * @param vec The vector to square root
-         * @param out The output vector
-         */
-        void sqrt(const thrust::device_vector<float> &vec, thrust::device_vector<float> &out);
-        
-        /**
-         * @brief Compute the L2 squared norm of a vector
-         * 
-         * @param vec The vector to compute
-         * @return float The squared norm of vec
-         */
-        float norm(const thrust::device_vector<float> &vec);
+/**
+* @brief Square a vector element-wise
+* 
+* @param d_input The vector to square
+* @param d_out The output vector
+*/
+void SquareDeviceVector(thrust::device_vector<float> &d_out,
+        const thrust::device_vector<float> &d_input);
 
-        /**
-         * @brief Checks if any element of a vector is NaN or inf.
-         * 
-         * @param vec The vector to check
-         * @return bool If the vector contains NaNs of Infs 
-         */
-        bool any_nan_or_inf(const thrust::device_vector<float> &vec);
+/**
+* @brief Take the square root of a vector element-wise
+* 
+* @param d_input The vector to square root
+* @param d_out The output vector
+*/
+void SqrtDeviceVector(thrust::device_vector<float> &d_out,
+        const thrust::device_vector<float> &d_input);
 
-        /**
-         * @brief Normalizes a vector by the maximum in-place
-         * 
-         * @param vec The vector to normalize
-         */
-        void max_norm(thrust::device_vector<float> &vec);
-    }
+/**
+ * @brief Compute the L2 Norm of a device vector
+ * 
+ * @param d_vector The vector to compute the norm of
+ * @return float The L2 Norm
+ */
+float L2NormDeviceVector(const thrust::device_vector<float> &d_vector);
 
-    namespace Sparse {
+/**
+ * @brief Check if any elements in the vector are NaN or Inf
+ * 
+ * @param d_vector The device vector to check
+ * @return true Nan/Inf present
+ * @return false No Nan/Inf present
+ */
+bool AnyNanOrInfDeviceVector(const thrust::device_vector<float> &d_vector);
 
-        /**
-         * @brief Symmetrize a sparse-built pij matrix by taking the sum and dividing. Note that all of the
-         * sym_* values should be declared but not allocated with the exception of sym_nnz which shhould be the
-         * address of an integer to return into (probably allocated on the stack). 
-         * 
-         * @param values The values of the FAISS-constructed pij matrix to symmetrize (DEVICE FLOAT MATRIX)
-         * @param indices The indices of the FAISS matrix to symmetrize (DEVICE INDICES MATRIX)
-         * @param sym_values DO NOT ALLOCATE (the function does this for you) The returned sparse matrix values (CSR format, DEVICE)
-         * @param sym_colind DO NOT ALLOCATE (the function does this for you) The returned sparse matrix column indices (CSR format, DEVICE)
-         * @param sym_rowptr DO NOT ALLOCATE (the function does this for you) The returned sparse matrix row pointers (CSR format, DEVICE)
-         * @param sym_nnz The returned sparse matrix number of non-zeros (CSR format, HOST)
-         * @param N_POINTS The number of points
-         * @param K The number of nearest neighbors
-         * @param magnitude_factor Floating point attractive force magnitude
-         */
-        void sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_vector<int> &indices, thrust::device_vector<float> &sym_values,  
-                                thrust::device_vector<int> &sym_colind, thrust::device_vector<int> &sym_rowptr, int* sym_nnz, 
-                                unsigned int N_POINTS, unsigned int K, float magnitude_factor);
+/**
+ * @brief Max-normalize a device vector in place
+ * 
+ * @param d_vector The vector to normalize
+ */
+void MaxNormalizeDeviceVector(thrust::device_vector<float> &d_vector);
 
-    }
 
-#endif
+/**
+ * @brief Symmetrize the Pij matrix in CSR format
+ * 
+ * @param handle The CUSPARSE handle
+ * @param d_values The values of the sparse pij matrix
+ * @param d_indices The indices of the sparse pij matrix
+ * @param d_symmetrized_values The symmetrized values matrix
+ * @param d_symmetrized_colind The symmetrized column indicies
+ * @param d_symmetrized_rowptr The symmetrized row values
+ * @param num_points The number of points
+ * @param num_near_neighbors The number of nearest neighbors
+ * @param magnitude_factor The normalization magnitude factor
+ */
+void SymmetrizeMatrix(cusparseHandle_t &handle,
+        thrust::device_vector<float> &d_values,
+        thrust::device_vector<int32_t> &d_indices,
+        thrust::device_vector<float> &d_symmetrized_values,
+        thrust::device_vector<int32_t> &d_symmetrized_colind,
+        thrust::device_vector<int32_t> &d_symmetrized_rowptr,
+        uint32_t num_points, uint32_t num_near_neighbors,
+        float magnitude_factor);
+
+}  // namespace util
+}  // namespace tsne
+
+#endif  // SRC_INCLUDE_UTIL_MATH_UTILS_H_

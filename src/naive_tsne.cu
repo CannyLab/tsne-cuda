@@ -130,12 +130,12 @@ void NaiveTSNE::compute_pij(
                         const unsigned int N, 
                         const unsigned int NDIMS) 
 {
-    Distance::squared_pairwise_dist(handle, pij, points, N, NDIMS);
+    tsne::util::SquaredPairwiseDistance(handle, pij, points, N, NDIMS);
 
     // std::cout << "Sigma:" << std::endl;
     // printarray(sigma, N, 1);
     thrust::device_vector<float> sigma_squared(sigma.size());
-    Math::square(sigma, sigma_squared);
+    tsne::util::SquareDeviceVector(sigma_squared, sigma);
     
     // divide column by sigmas (matrix[i,:] gets divided by sigma_i^2)
     Broadcast::broadcast_matrix_vector(pij, sigma_squared, N, N, thrust::divides<float>(), 0, -2.0f);
@@ -259,7 +259,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
                                         const unsigned int N, 
                                         const unsigned int NDIMS,
                                         const unsigned int PROJDIM) {
-    Math::max_norm(points);
+    tsne::util::MaxNormalizeDeviceVector(points);
 
     // Choose the right sigmas
     std::cout << "Selecting sigmas to match perplexity..." << std::endl;
@@ -331,7 +331,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
         //TODO: Add early termination for loss deltas
         
         if (i % 100 == 0)
-            std::cout << "Iteration: " << i << ", Loss: " << loss << ", ForceMag: " << Math::norm(forces) << std::endl;
+            std::cout << "Iteration: " << i << ", Loss: " << loss << ", ForceMag: " << tsne::util::L2NormDeviceVector(forces) << std::endl;
 
         #ifdef DEBUG
             // Dump the points
@@ -363,7 +363,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
                                                 float min_g_norm){
     
     // Compute a max-norm on the points
-    Math::max_norm(d_points);
+    tsne::util::MaxNormalizeDeviceVector(d_points);
 
     // Choose the right sigmas
     std::cout << "Selecting sigmas to match perplexity..." << std::endl;
@@ -423,7 +423,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
         } else {if (i - best_iter > n_iter_np) break;}
 
         // Terminate if we're less than the minimum gradient norm
-        if (Math::norm(forces) < min_g_norm) break;
+        if (tsne::util::L2NormDeviceVector(forces) < min_g_norm) break;
     }
     return ys;
 }

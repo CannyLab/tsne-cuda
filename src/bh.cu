@@ -1006,7 +1006,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
     start_time = std::chrono::high_resolution_clock::now();
 
         // Do KNN Call
-        Distance::knn(opt.points, knn_indices, knn_distances, opt.n_dims, opt.n_points, K);
+        tsne::util::KNearestNeighbors(knn_indices, knn_distances, opt.points, opt.n_dims, opt.n_points, K);
         
     end_time = std::chrono::high_resolution_clock::now();
     times[1] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1016,7 +1016,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 
         // Allocate device distance memory
         thrust::device_vector<float> d_knn_distances(knn_distances, knn_distances + (opt.n_points * K));
-        Math::max_norm(d_knn_distances); // Here, the extra 0s floating around won't matter
+        tsne::util::MaxNormalizeDeviceVector(d_knn_distances); // Here, the extra 0s floating around won't matter
         thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, opt.perplexity, opt.perplexity_search_epsilon, opt.n_points, K);
 
         // Clean up distance memory

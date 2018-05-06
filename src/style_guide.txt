@@ -31,3 +31,5 @@ Large arrays should be allocated on the heap.
 Clean up GPU vectors when done with? Make sure calls are errchecked and synchronized.
 
 Comments!
+
+ 

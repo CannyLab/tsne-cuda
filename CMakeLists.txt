@@ -94,6 +94,7 @@ file(GLOB_RECURSE faiss_gpu_cu third_party/faiss/gpu/*.cu)
 # Project Setup
 #-------------------------------------------------------------------------------
 include_directories(
+    src/
     src/include
     ${CUDA_INCLUDE_DIRECTORIES}
     third_party/gtest/googletest/include

@@ -1,207 +1,231 @@
 /**
- * @brief 
+ * @brief Implementation of the math_utils.h file
  * 
  * @file math_utils.cu
  * @author David Chan
  * @date 2018-04-04
+ * Copyright (c) 2018, Regents of the University of California
  */
 
- #include "util/math_utils.h"
+#include "util/math_utils.h"
 
- struct func_square {
+struct func_square {
     __host__ __device__ float operator()(const float &x) const { return x * x; }
 };
+
 struct func_sqrt {
-    __host__ __device__ float operator()(const float &x) const { return pow(x, 0.5); }
+    __host__ __device__ float operator()(const float &x) const {
+        return sqrtf(x);
+    }
 };
 struct func_abs {
-    __host__ __device__ float operator()(const float &x) const { return fabs(x); }
+    __host__ __device__ float operator()(const float &x) const {
+        return fabsf(x);
+    }
 };
 struct func_nan_or_inf {
-    __host__ __device__ bool operator()(const float &x) const { return isnan(x) || isinf(x); }
+    __host__ __device__ bool operator()(const float &x) const {
+        return isnan(x) || isinf(x);
+    }
 };
-struct func_cast_to_int {
-    __host__ __device__ int operator()(const long &x) const { return (int) x; }
-};
 
-void Math::gauss_normalize(cublasHandle_t &handle, thrust::device_vector<float> &points, const unsigned int N, const unsigned int NDIMS) {
-    auto means = Reduce::reduce_mean(handle, points, N, NDIMS, 0);
+void tsne::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
+        thrust::device_vector<float> &d_points, const uint32_t num_points,
+        const uint32_t num_dims) {
+    // Compute the means
+    auto d_means = tsne::util::reduce_mean(handle, d_points, num_points,
+                                         num_dims, 0);
 
-    // zero center
-    Broadcast::broadcast_matrix_vector(points, means, N, NDIMS, thrust::minus<float>(), 1, 1.f);
-    
-    // compute standard deviation
-    thrust::device_vector<float> squared_vals(points.size());
-    Math::square(points, squared_vals);
-    auto norm_sum_of_squares = Reduce::reduce_alpha(handle, squared_vals, N, NDIMS, 1.f / (N - 1), 0);
-    thrust::device_vector<float> stddev(norm_sum_of_squares.size());
-    Math::sqrt(norm_sum_of_squares, stddev);
+    // Zero-Center
+    Broadcast::broadcast_matrix_vector(d_points, d_means, num_points, num_dims,
+                                       thrust::minus<float>(), 1, 1.f);
 
-    // normalize
-    Broadcast::broadcast_matrix_vector(points, stddev, N, NDIMS, thrust::divides<float>(), 1, 1.f);
+    // Compute the standard deviation
+    thrust::device_vector<float> squared_vals(d_points.size());
+    tsne::util::SquareDeviceVector(squared_vals, d_points);
+    auto norm_sum_of_squares = Reduce::reduce_alpha(handle, squared_vals,
+            num_points, num_dims, 1.f / (num_points - 1), 0);
+    thrust::device_vector<float> standard_deviation(norm_sum_of_squares.size());
+    tsne::util::SqrtDeviceVector(standard_deviation, norm_sum_of_squares);
+
+    // Normalize the values
+    Broadcast::broadcast_matrix_vector(d_points, standard_deviation, num_points,
+            num_dims, thrust::divides<float>(), 1, 1.f);
 }
 
-void Math::square(const thrust::device_vector<float> &vec, thrust::device_vector<float> &out) {
-    thrust::transform(vec.begin(), vec.end(), out.begin(), func_square());
+void tsne::util::SquareDeviceVector(thrust::device_vector<float> &d_out,
+        const thrust::device_vector<float> &d_input) {
+    thrust::transform(d_input.begin(), d_input.end(),
+                      d_out.begin(), func_square());
 }
 
-void Math::sqrt(const thrust::device_vector<float> &vec, thrust::device_vector<float> &out) {
-    thrust::transform(vec.begin(), vec.end(), out.begin(), func_sqrt());
+void tsne::util::SqrtDeviceVector(thrust::device_vector<float> &d_out,
+        const thrust::device_vector<float> &d_input) {
+    thrust::transform(d_input.begin(), d_input.end(),
+                      d_out.begin(), func_sqrt());
 }
 
-float Math::norm(const thrust::device_vector<float> &vec) {
-    return std::sqrt( thrust::transform_reduce(vec.begin(), vec.end(), func_square(), 0.0f, thrust::plus<float>()) );
+float tsne::util::L2NormDeviceVector(
+        const thrust::device_vector<float> &d_vector) {
+    return std::sqrt(thrust::transform_reduce(d_vector.begin(),
+                     d_vector.end(), func_square(), 0.0f,
+                     thrust::plus<float>()));
 }
 
-bool Math::any_nan_or_inf(const thrust::device_vector<float> &vec) {
-    return thrust::transform_reduce(vec.begin(), vec.end(), func_nan_or_inf(), 0, thrust::plus<bool>());
+bool tsne::util::AnyNanOrInfDeviceVector(
+        const thrust::device_vector<float> &d_vector) {
+    return thrust::transform_reduce(d_vector.begin(), d_vector.end(),
+                                    func_nan_or_inf(), 0, thrust::plus<bool>());
 }
 
-void Math::max_norm(thrust::device_vector<float> &vec) {
-    float max_val = thrust::transform_reduce(vec.begin(), vec.end(), func_abs(), 0.0f, thrust::maximum<float>());
-    thrust::constant_iterator<float> div_iter(max_val);
-    thrust::transform(vec.begin(), vec.end(), div_iter, vec.begin(), thrust::divides<float>());
+void tsne::util::MaxNormalizeDeviceVector(
+        thrust::device_vector<float> &d_vector) {
+    float max_val = thrust::transform_reduce(d_vector.begin(), d_vector.end(),
+            func_abs(), 0.0f, thrust::maximum<float>());
+    thrust::constant_iterator<float> division_iterator(max_val);
+    thrust::transform(d_vector.begin(), d_vector.end(), division_iterator,
+                      d_vector.begin(), thrust::divides<float>());
 }
 
-void Sparse::sym_mat_gpu(thrust::device_vector<float> &values, thrust::device_vector<int> &indices, thrust::device_vector<float> &sym_values,  
-                                thrust::device_vector<int> &sym_colind, thrust::device_vector<int> &sym_rowptr, int* sym_nnz, 
-                                unsigned int N_POINTS, unsigned int K, float magnitude_factor) {
+void tsne::util::SymmetrizeMatrix(cusparseHandle_t &handle,
+        thrust::device_vector<float> &d_values,
+        thrust::device_vector<int32_t> &d_indices,
+        thrust::device_vector<float> &d_symmetrized_values,
+        thrust::device_vector<int32_t> &d_symmetrized_colind,
+        thrust::device_vector<int32_t> &d_symmetrized_rowptr,
+        uint32_t num_points, uint32_t num_near_neighbors,
+        float magnitude_factor) {
+
     // Allocate memory
-    // std::cout << "Allocating initial memory on GPU..." << std::endl;
-    int* csrRowPtrA = nullptr;
-    cudaMalloc((void**)& csrRowPtrA, (N_POINTS+1)*sizeof(int));
-    int* csrColPtrA = thrust::raw_pointer_cast(indices.data());
-    // cudaMalloc((void**)& csrColPtrA, (N_POINTS*K)*sizeof(int));
-    float* csrValA = thrust::raw_pointer_cast(values.data());
-    // cudaMalloc((void**)& csrValA, (N_POINTS*K)*sizeof(float));
+    int32_t *csr_row_ptr_a = nullptr;
+    cudaMalloc(reinterpret_cast<void**>(&csr_row_ptr_a),
+               (num_points+1)*sizeof(int32_t));
+    int32_t *csr_column_ptr_a = thrust::raw_pointer_cast(d_indices.data());
+    float *csr_values_a = thrust::raw_pointer_cast(d_values.data());
 
     // Copy the data
-    // cudaMemcpy(csrColPtrA, indices, N_POINTS*K*sizeof(int), cudaMemcpyHostToDevice);
-    // cudaMemcpy(csrValA, values, N_POINTS*K*sizeof(float), cudaMemcpyHostToDevice);
-
-    thrust::device_vector<int> vx(csrRowPtrA, csrRowPtrA+N_POINTS+1);
-    thrust::sequence(vx.begin(), vx.end(), 0,(int) K);
-    thrust::copy(vx.begin(), vx.end(), csrRowPtrA);
+    thrust::device_vector<int> d_vector_memory(csr_row_ptr_a,
+            csr_row_ptr_a+num_points+1);
+    thrust::sequence(d_vector_memory.begin(), d_vector_memory.end(),
+                     0, static_cast<int32_t>(num_near_neighbors));
+    thrust::copy(d_vector_memory.begin(), d_vector_memory.end(), csr_row_ptr_a);
     cudaDeviceSynchronize();
-    *sym_nnz = -1; // Initialize the default value of the sym_nnz var
-
-    // Initialize the cusparse handle
-    cusparseHandle_t handle;
-    cusparseCreate(&handle);
 
     // Initialize the matrix descriptor
-    cusparseMatDescr_t descr;
-    cusparseCreateMatDescr(&descr);
-    cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ZERO); 
+    cusparseMatDescr_t matrix_descriptor;
+    cusparseCreateMatDescr(&matrix_descriptor);
+    cusparseSetMatType(matrix_descriptor, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(matrix_descriptor, CUSPARSE_INDEX_BASE_ZERO);
 
     // Sort the matrix properly
-    size_t pBufferSizeInBytes = 0;
-    void *pBuffer = NULL;
-    int *P = NULL;
+    size_t permutation_buffer_byte_size = 0;
+    void *permutation_buffer = NULL;
+    int32_t *permutation = NULL;
 
-    // step 1: allocate buffer
-    cusparseXcsrsort_bufferSizeExt(handle, N_POINTS, N_POINTS, N_POINTS*K, csrRowPtrA, csrColPtrA, &pBufferSizeInBytes);
+    // step 1: Allocate memory buffer
+    cusparseXcsrsort_bufferSizeExt(handle, num_points, num_points,
+            num_points*num_near_neighbors, csr_row_ptr_a,
+            csr_column_ptr_a, &permutation_buffer_byte_size);
     cudaDeviceSynchronize();
-    cudaMalloc( &pBuffer, sizeof(char)* pBufferSizeInBytes);
+    cudaMalloc(&permutation_buffer,
+               sizeof(char)*permutation_buffer_byte_size);
 
-    // step 2: setup permutation vector P to identity
-    cudaMalloc( (void**)&P, sizeof(int)*N_POINTS*K);
-    cusparseCreateIdentityPermutation(handle, N_POINTS*K, P);
+    // step 2: Setup permutation vector permutation to be the identity
+    cudaMalloc(reinterpret_cast<void**>(&permutation),
+            sizeof(int32_t)*num_points*num_near_neighbors);
+    cusparseCreateIdentityPermutation(handle, num_points*num_near_neighbors,
+                                      permutation);
     cudaDeviceSynchronize();
 
-    // step 3: sort CSR format
-    cusparseXcsrsort(handle, N_POINTS, N_POINTS, N_POINTS*K, descr, csrRowPtrA, csrColPtrA, P, pBuffer);
+    // step 3: Sort CSR format
+    cusparseXcsrsort(handle, num_points, num_points,
+            num_points*num_near_neighbors, matrix_descriptor, csr_row_ptr_a,
+            csr_column_ptr_a, permutation, permutation_buffer);
     cudaDeviceSynchronize();
 
-    // step 4: gather sorted csrVal
-    float* csrValA_sorted = nullptr;
-    cudaMalloc((void**)& csrValA_sorted, (N_POINTS*K)*sizeof(float));
-    cusparseSgthr(handle, N_POINTS*K, csrValA, csrValA_sorted, P, CUSPARSE_INDEX_BASE_ZERO);
+    // step 4: Gather sorted csr_values
+    float* csr_values_a_sorted = nullptr;
+    cudaMalloc(reinterpret_cast<void**>(&csr_values_a_sorted),
+            (num_points*num_near_neighbors)*sizeof(float));
+    cusparseSgthr(handle, num_points*num_near_neighbors, csr_values_a,
+            csr_values_a_sorted, permutation, CUSPARSE_INDEX_BASE_ZERO);
     cudaDeviceSynchronize();
 
     // Free some memory
-    cudaFree(pBuffer);
-    cudaFree(P);
-    // cudaFree(csrValA);
-    csrValA = csrValA_sorted;
+    cudaFree(permutation_buffer);
+    cudaFree(permutation);
+    csr_values_a = csr_values_a_sorted;
 
     // We need A^T, so we do a csr2csc() call
-    // std::cout << "Allocating memory for transpose..." << std::endl;
-    int* cscRowIndAT = nullptr;
-    cudaMalloc((void**)& cscRowIndAT, (N_POINTS*K)*sizeof(int));
-    int* cscColPtrAT = nullptr;
-    cudaMalloc((void**)& cscColPtrAT, (N_POINTS+1)*sizeof(int));
-    float* cscValAT = nullptr;
-    cudaMalloc((void**)& cscValAT, (N_POINTS*K)*sizeof(float));
+    int32_t* csc_row_ptr_at = nullptr;
+    cudaMalloc(reinterpret_cast<void**>(&csc_row_ptr_at),
+            (num_points*num_near_neighbors)*sizeof(int32_t));
+    int32_t* csc_column_ptr_at = nullptr;
+    cudaMalloc(reinterpret_cast<void**>(&csc_column_ptr_at),
+            (num_points+1)*sizeof(int32_t));
+    float* csc_values_at = nullptr;
+    cudaMalloc(reinterpret_cast<void**>(&csc_values_at),
+            (num_points*num_near_neighbors)*sizeof(float));
 
     // Do the transpose operation
-    cusparseScsr2csc(handle, N_POINTS , N_POINTS , K*N_POINTS , csrValA, csrRowPtrA, csrColPtrA, cscValAT, 
-                cscRowIndAT, cscColPtrAT, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO);
+    cusparseScsr2csc(handle, num_points, num_points,
+                     num_near_neighbors*num_points, csr_values_a, csr_row_ptr_a,
+                     csr_column_ptr_a, csc_values_at, csc_row_ptr_at,
+                     csc_column_ptr_at, CUSPARSE_aCTION_NUMERIC,
+                     CUSPARSE_INDEX_BASE_ZERO);
     cudaDeviceSynchronize();
 
     // Now compute the output size of the matrix
-    int baseC, nnzC;
+    int32_t base_C, num_nonzeros_C;
+    int32_t symmetrized_num_nonzeros = -1;
     cusparseSetPointerMode(handle, CUSPARSE_POINTER_MODE_HOST);
-    sym_rowptr.resize(N_POINTS+1);
-    // cudaMalloc((void**) sym_rowptr, sizeof(int)*(N_POINTS+1));
-    cusparseXcsrgeamNnz(handle, N_POINTS, N_POINTS,
-                            descr, N_POINTS*K, csrRowPtrA, csrColPtrA,
-                            descr, N_POINTS*K, cscColPtrAT, cscRowIndAT,
-                            descr, thrust::raw_pointer_cast(sym_rowptr.data()), sym_nnz
-                        );
+    d_symmetrized_rowptr.resize(num_points+1);
+    // cudaMalloc((void**) d_symmetrized_rowptr, sizeof(int)*(num_points+1));
+    cusparseXcsrgeamNnz(handle, num_points, num_points,
+            matrix_descriptor, num_points*num_near_neighbors, csr_row_ptr_a,
+                csr_column_ptr_a,
+            matrix_descriptor, num_points*num_near_neighbors, csc_column_ptr_at,
+                csc_row_ptr_at,
+            matrix_descriptor,
+            thrust::raw_pointer_cast(d_symmetrized_rowptr.data()),
+            symmetrized_num_nonzeros);
     cudaDeviceSynchronize();
 
-    if (-1 != *sym_nnz) {
-        nnzC = *sym_nnz;
+    if (-1 != *symmetrized_num_nonzeros) {
+        num_nonzeros_C = *symmetrized_num_nonzeros;
     } else {
-        cudaMemcpy(&nnzC, thrust::raw_pointer_cast(sym_rowptr.data())+N_POINTS,sizeof(int), cudaMemcpyDeviceToHost);
-        cudaMemcpy(&baseC, thrust::raw_pointer_cast(sym_rowptr.data()), sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&num_nonzeros_C,
+                thrust::raw_pointer_cast(d_symmetrized_rowptr.data()) +
+                num_points, sizeof(int32_t), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&base_C,
+                thrust::raw_pointer_cast(d_symmetrized_rowptr.data()),
+                sizeof(int), cudaMemcpyDeviceToHost);
     }
 
     // Allocate memory for the new summed array
-    sym_colind.resize(nnzC);
-    sym_values.resize(nnzC);
-    // cudaMalloc((void**) sym_colind, sizeof(int)*nnzC);
-    // cudaMalloc((void**) sym_values, sizeof(float)*nnzC);
-
-    // Basically, we want to compute the average sparsity of the indices
-    thrust::device_vector<int> sparsity(N_POINTS);
-    thrust::transform(sym_rowptr.begin()+1, sym_rowptr.end(),sym_rowptr.begin(), sparsity.begin(), thrust::minus<int>());
-    int sum = thrust::reduce(sparsity.begin(), sparsity.end(), 0, thrust::plus<int>());
-    int maxs = thrust::reduce(sparsity.begin(), sparsity.end(), 0, thrust::maximum<int>());
-    int mins = thrust::reduce(sparsity.begin(), sparsity.end(), N_POINTS, thrust::minimum<int>());
-
-    std::cout << "Average Sparsity: " << ((float)sum/N_POINTS) << std::endl;
-    std::cout << "Maximum Sparsity: " << maxs << std::endl;
-    std::cout << "Minimum Sparsity: " << mins << std::endl;
-    std::cout << "N_POINTS: " << N_POINTS << std::endl;
-    std::cout << "K: " << K << std::endl;
+    d_symmetrized_colind.resize(num_nonzeros_C);
+    d_symmetrized_values.resize(num_nonzeros_C);
 
     // Sum the arrays
-    // std::cout << "Symmetrizing..." << std::endl;
-    float alpha = 1.0f / (2.0f * N_POINTS );
-    float beta = 1.0f / (2.0f * N_POINTS );
-    cusparseScsrgeam(handle, N_POINTS, N_POINTS, 
-       &alpha, descr, N_POINTS*K, csrValA, csrRowPtrA, csrColPtrA,
-        &beta, descr, N_POINTS*K, cscValAT, cscColPtrAT, cscRowIndAT,
-        descr, thrust::raw_pointer_cast(sym_values.data()), 
-                thrust::raw_pointer_cast(sym_rowptr.data()), 
-                thrust::raw_pointer_cast(sym_colind.data())
-    );
+    float kAlpha = 1.0f / (2.0f * num_points);
+    float kBeta = 1.0f / (2.0f * num_points);
+
+    cusparseScsrgeam(handle, num_points, num_points,
+            &kAlpha, matrix_descriptor, num_points*num_near_neighbors,
+            csr_values_a, csr_row_ptr_a, csr_column_ptr_a,
+            &kBeta, matrix_descriptor, num_points*num_near_neighbors,
+            csc_values_at, csc_column_ptr_at, csc_row_ptr_at,
+            matrix_descriptor,
+            thrust::raw_pointer_cast(d_symmetrized_values.data()),
+            thrust::raw_pointer_cast(d_symmetrized_rowptr.data()),
+            thrust::raw_pointer_cast(d_symmetrized_colind.data()));
     cudaDeviceSynchronize();
 
-    // float sum_P = thrust::reduce(sym_values.begin(), sym_values.end(), 0.0f, thrust::plus<float>()); // TODO: This actually should equal N so we can just do it in the previous step
-    // thrust::constant_iterator<float> normalization(sum_P);
-    // thrust::transform(sym_values.begin(), sym_values.end(), normalization, sym_values.begin(), thrust::divides<float>());
-    // std::cout << "sum_P: " << sum_P << std::endl;
-
     // Free the memory we were using...
-    cudaFree(csrValA);
-    cudaFree(cscValAT);
-    cudaFree(csrRowPtrA);
-    cudaFree(cscColPtrAT);
-    // cudaFree(csrColPtrA);
-    cudaFree(cscRowIndAT);
+    cudaFree(csr_values_a);
+    cudaFree(csc_values_at);
+    cudaFree(csr_row_ptr_a);
+    cudaFree(csc_column_ptr_at);
+    cudaFree(csc_row_ptr_at);
 }
 
