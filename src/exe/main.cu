@@ -10,7 +10,6 @@
 #include "util/distance_utils.h"
 #include "naive_tsne.h"
 #include "naive_tsne_cpu.h"
-#include "bh_tsne_ref.h"
 #include "bh_tsne.h"
 #include <time.h>
 #include <string>
@@ -60,9 +59,9 @@ int main(int argc, char** argv) {
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;
-    cublasSafeCall(cublasCreate(&dense_handle));
+    CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
-    cusparseSafeCall(cusparseCreate(&sparse_handle));
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     BHTSNE::TSNE_INIT init_type = BHTSNE::TSNE_INIT::UNIFORM;
     if (SOPT(init).compare("unif") == 0) {

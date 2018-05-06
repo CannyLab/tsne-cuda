@@ -92,7 +92,7 @@ void test_cpu_is_gpu_perplexity(unsigned int N, unsigned int NDIMS) {
 
     // Compute the GPU Pij
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
     thrust::device_vector<float> d_gpu_pij(N*N);
     NaiveTSNE::compute_pij(handle, d_gpu_pij, d_X, d_sigmas, N, NDIMS);
     NaiveTSNE::thrust_search_perplexity(handle, d_sigmas, lbs, ubs, d_perp, d_gpu_pij, 8.0, N);
@@ -136,7 +136,7 @@ void test_cpu_is_gpu_pij(unsigned int N, unsigned int NDIMS) {
 
     // Compute the GPU Pij
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
     thrust::device_vector<float> d_gpu_pij(N*N);
     NaiveTSNE::compute_pij(handle, d_gpu_pij, d_X, d_sigmas, N, NDIMS);
     cudaDeviceSynchronize();
@@ -188,7 +188,7 @@ void test_sigmas_search(unsigned int N, unsigned int NDIMS) {
 
     // Compute the GPU Pij
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
     auto d_sigmas = NaiveTSNE::search_perplexity(handle, d_X, perplexity_target, eps, N, NDIMS);
     std::vector<float> sigmas = sigmas_search_cpu(h_X, N, NDIMS, perplexity_target);
     // for (int i = 0; i < N; i++) {
@@ -226,7 +226,7 @@ void test_tsne(unsigned int N,unsigned int NDIMS) {
 
     thrust::device_vector<float> sigmas(N, 1.0f);
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -263,9 +263,9 @@ void test_bhtsne(int N, int NDIMS) {
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;
-    cublasSafeCall(cublasCreate(&dense_handle));
+    CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
-    cusparseSafeCall(cusparseCreate(&sparse_handle));
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -316,9 +316,9 @@ void test_rings(int N) {
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;
-    cublasSafeCall(cublasCreate(&dense_handle));
+    CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
-    cusparseSafeCall(cusparseCreate(&sparse_handle));
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -344,37 +344,6 @@ void test_rings(int N) {
     EXPECT_EQ(0, 0);
 }
 
-void test_bhtsne_ref(int N, int NDIMS) {
-    std::default_random_engine generator;
-    std::normal_distribution<double> distribution1(0.0, 20.0);
-    std::normal_distribution<double> distribution2(0.0, 20.0);
-
-    std::vector<float> h_X(NDIMS * N);
-    for (int i = 0; i < N * NDIMS; i ++) {
-        if (i < (N * NDIMS / 2)) {
-            h_X[i] = distribution1(generator);
-        } else {
-            h_X[i] = distribution2(generator);
-        }
-    }
-    float * fYs = (float *) calloc(N * 2, sizeof(float));
-
-    for (int i = 0; i < N * 2; i++) {
-        fYs[i] = (float) distribution1(generator);
-    }
-
-    int K = N - 1;
-
-    double * forces = BHTSNERef::computeEdgeForces(h_X.data(), fYs, NDIMS, 2, N, K, 35.0f);
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < NDIMS; j++)
-            std::cout << forces[i * NDIMS + j] << " ";
-        printf("\n");
-    }
-
-
-}
-
 void test_bhtsne_full_mnist(std::string fname) {
     srand (time(NULL));
     int num_images, num_columns, num_rows;
@@ -382,9 +351,9 @@ void test_bhtsne_full_mnist(std::string fname) {
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;
-    cublasSafeCall(cublasCreate(&dense_handle));
+    CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
-    cusparseSafeCall(cusparseCreate(&sparse_handle));
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -424,9 +393,9 @@ void test_bhtsne_full_cifar10(std::string fname) {
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;
-    cublasSafeCall(cublasCreate(&dense_handle));
+    CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
-    cusparseSafeCall(cusparseCreate(&sparse_handle));
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -466,9 +435,9 @@ void test_bhtsne_full_cifar100(std::string fname) {
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;
-    cublasSafeCall(cublasCreate(&dense_handle));
+    CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
-    cusparseSafeCall(cusparseCreate(&sparse_handle));
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);

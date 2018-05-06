@@ -7,7 +7,7 @@ Put unrelated kernels in different files. Add c++ calls to those kernels at the 
 C++ calls should take in thrust vectors when at all possible.
 
 Timing: How do we do timing in a reasonable manner? TIMETHIS macro?
-	Calls would be TIMETHIS(gpuErrChk(function(args)))
+	Calls would be TIMETHIS(GpuErrorCheck(function(args)))
 
 extern the vars
 

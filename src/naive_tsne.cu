@@ -138,7 +138,7 @@ void NaiveTSNE::symmetrize_pij(cublasHandle_t &handle,
     float alpha = 0.5f;
     float beta = 0.5f;
     thrust::device_vector<float> pij_out(N*N);
-    cublasSafeCall(cublasSgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, N, N, &alpha, thrust::raw_pointer_cast(pij.data()), N, 
+    CublasSafeCall(cublasSgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, N, N, &alpha, thrust::raw_pointer_cast(pij.data()), N, 
                                &beta, thrust::raw_pointer_cast(pij.data()), N, thrust::raw_pointer_cast(pij_out.data()), N));
     pij = pij_out;
 }
@@ -214,7 +214,7 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
     float alpha = 1.0f;
     float beta = 0.0f;
     thrust::device_vector<float> ones(PROJDIM * N, 1.0f);
-    cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, PROJDIM, N, &alpha, 
+    CublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, PROJDIM, N, &alpha, 
                                 thrust::raw_pointer_cast(qij.data()), N, thrust::raw_pointer_cast(ones.data()), N, &beta, 
                                 thrust::raw_pointer_cast(forces.data()), N));
 
@@ -226,7 +226,7 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
     alpha = eta;
     beta = -eta;
     // forces_ = 4 * y_i * \sum_j (pij - qij)(1 + ||y_i - y_j||^2)^-1 - 4 * \sum_j y_j(pij - qij)(1 + ||y_i - y_j||^2)^-1
-    cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, PROJDIM, N, &alpha, 
+    CublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, PROJDIM, N, &alpha, 
                                 thrust::raw_pointer_cast(qij.data()), N, thrust::raw_pointer_cast(ys.data()), N, &beta, 
                                 thrust::raw_pointer_cast(forces.data()), N));
 

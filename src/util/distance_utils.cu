@@ -40,7 +40,7 @@ void tsnecuda::util::SquaredPairwiseDistance(cublasHandle_t &handle,
     float kBeta = 0.f;
 
     // TODO(Roshan): Could replace this with cublasSsyrk, might be faster?
-    cublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, num_points,
+    CublasSafeCall(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, num_points,
         num_points, num_dims, &kAlpha,
         thrust::raw_pointer_cast(d_points.data()),
         num_points, thrust::raw_pointer_cast(d_points.data()),

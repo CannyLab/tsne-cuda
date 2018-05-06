@@ -846,12 +846,12 @@ void computeAttrForce(int N,
                                         thrust::raw_pointer_cast(sparsePij.data()),
                                         thrust::raw_pointer_cast(forceProd.data()),
                                         thrust::raw_pointer_cast(pts.data()));
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 
     // compute forces_i = sum_j pij*qij*normalization*yi
     float alpha = 1.0f;
     float beta = 0.0f;
-    cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+    CusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                             N, 2, N, nnz, &alpha, descr,
                             thrust::raw_pointer_cast(forceProd.data()),
                             thrust::raw_pointer_cast(pijRowPtr.data()),
@@ -859,14 +859,14 @@ void computeAttrForce(int N,
                             thrust::raw_pointer_cast(ones.data()),
                             N, &beta, thrust::raw_pointer_cast(forces.data()),
                             N));
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
     thrust::transform(forces.begin(), forces.begin() + N, pts.begin(), forces.begin(), thrust::multiplies<float>());
     thrust::transform(forces.begin() + N, forces.end(), pts.begin() + nnodes + 1, forces.begin() + N, thrust::multiplies<float>());
 
     // compute forces_i = forces_i - sum_j pij*qij*normalization*yj
     alpha = -1.0f;
     beta = 1.0f;
-    cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+    CusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                             N, 2, N, nnz, &alpha, descr,
                             thrust::raw_pointer_cast(forceProd.data()),
                             thrust::raw_pointer_cast(pijRowPtr.data()),
@@ -874,7 +874,7 @@ void computeAttrForce(int N,
                             thrust::raw_pointer_cast(pts.data()),
                             nnodes + 1, &beta, thrust::raw_pointer_cast(forces.data()),
                             N));
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
     
 
 }
@@ -926,7 +926,7 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
         ComputePijKernel<<<NBLOCKS1, BLOCKSIZE1>>>(N, K, thrust::raw_pointer_cast(pij.data()),
                                                             thrust::raw_pointer_cast(knn_distances.data()),
                                                             thrust::raw_pointer_cast(betas.data()));
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
         
         // compute entropy of current row
         row_sum = tsnecuda::util::ReduceSum(handle, pij, K, N, 0);
@@ -941,7 +941,7 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
                                                             thrust::raw_pointer_cast(found.data()),
                                                             thrust::raw_pointer_cast(neg_entropy.data()),
                                                             thrust::raw_pointer_cast(row_sum.data()));
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
         all_found = thrust::reduce(found.begin(), found.end(), 1, thrust::minimum<int>());
         iters++;
     } while (!all_found && iters < 200);
@@ -1112,7 +1112,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                         thrust::raw_pointer_cast(pijRowPtr.data()),
                                         thrust::raw_pointer_cast(pijColInd.data()),
                                         thrust::raw_pointer_cast(indices.data()));
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
 
         // Point initialization
         thrust::device_vector<float> pts((nnodes + 1) * 2);
@@ -1163,7 +1163,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 
         // Initialize the GPU tree memory
         InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
 
     end_time = std::chrono::high_resolution_clock::now();
     times[4] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1253,7 +1253,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                             thrust::raw_pointer_cast(minxl.data()), 
                                                             thrust::raw_pointer_cast(minyl.data()));
 
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[6] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1267,7 +1267,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                                 thrust::raw_pointer_cast(pts.data()), 
                                                                                 thrust::raw_pointer_cast(pts.data() + nnodes + 1));
             ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[7] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1280,7 +1280,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                                         thrust::raw_pointer_cast(massl.data()),
                                                                                         thrust::raw_pointer_cast(pts.data()),
                                                                                         thrust::raw_pointer_cast(pts.data() + nnodes + 1));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[8] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1292,7 +1292,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                         thrust::raw_pointer_cast(countl.data()), 
                                                                         thrust::raw_pointer_cast(startl.data()), 
                                                                         thrust::raw_pointer_cast(childl.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[9] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1310,7 +1310,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                         thrust::raw_pointer_cast(rep_forces.data()),
                                                                         thrust::raw_pointer_cast(rep_forces.data() + nnodes + 1),
                                                                         thrust::raw_pointer_cast(norml.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[10] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1320,7 +1320,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 
             // compute attractive forces
             computeAttrForce(opt.n_points, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1342,7 +1342,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                         thrust::raw_pointer_cast(rep_forces.data()),
                                                                         thrust::raw_pointer_cast(gains.data()),
                                                                         thrust::raw_pointer_cast(old_forces.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
             thrust::transform(pts.begin(), pts.end(), random_vec.begin(), pts.begin(), thrust::plus<float>());
 
         end_time = std::chrono::high_resolution_clock::now();

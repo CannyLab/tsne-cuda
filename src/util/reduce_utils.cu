@@ -21,7 +21,7 @@ thrust::device_vector<float> tsnecuda::util::ReduceAlpha(cublasHandle_t &handle,
         thrust::device_vector<float> means(M);
 
         float kBeta = 0.f;
-        cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_T, N, M, &alpha,
+        CublasSafeCall(cublasSgemv(handle, CUBLAS_OP_T, N, M, &alpha,
                 thrust::raw_pointer_cast(d_matrix.data()), N,
                 thrust::raw_pointer_cast(ones.data()), 1, &kBeta,
                 thrust::raw_pointer_cast(means.data()), 1));
@@ -31,7 +31,7 @@ thrust::device_vector<float> tsnecuda::util::ReduceAlpha(cublasHandle_t &handle,
         thrust::device_vector<float> means(N);
 
         float kBeta = 0.f;
-        cublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, M, &alpha,
+        CublasSafeCall(cublasSgemv(handle, CUBLAS_OP_N, N, M, &alpha,
                 thrust::raw_pointer_cast(d_matrix.data()), N,
                 thrust::raw_pointer_cast(ones.data()), 1, &kBeta,
                 thrust::raw_pointer_cast(means.data()), 1));

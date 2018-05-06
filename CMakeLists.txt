@@ -109,6 +109,7 @@ set(SOURCES
     src/naive_tsne.cu
     src/naive_tsne_cpu.cu
     src/util/data_utils.cu
+    src/util/debug_utils.cu
     src/util/cuda_utils.cu
     src/util/thrust_utils.cu
     src/util/distance_utils.cu
@@ -118,8 +119,6 @@ set(SOURCES
     src/util/reduce_utils.cu
     src/ext/pymodule_ext.cu
     src/bh.cu
-    src/bh_tsne.cu
-    src/bh_tsne_ref.cu
 )
 #-------------------------------------------------------------------------------
 

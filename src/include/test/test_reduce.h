@@ -21,7 +21,7 @@ void test_reduce_sum_col(int N, int M) {
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
     auto d_sums = tsnecuda::util::ReduceSum(handle, d_points, N, M, 0);
@@ -59,7 +59,7 @@ void test_reduce_sum_row(int N, int M) {
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
     auto d_sums = tsnecuda::util::ReduceSum(handle, d_points, N, M, 1);
@@ -97,7 +97,7 @@ void test_reduce_mean_col(int N, int M) {
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
     auto d_sums = tsnecuda::util::ReduceMean(handle, d_points, N, M, 0);
@@ -135,7 +135,7 @@ void test_reduce_mean_row(int N, int M) {
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
     auto d_sums = tsnecuda::util::ReduceMean(handle, d_points, N, M, 1);
@@ -173,7 +173,7 @@ void test_reduce_alpha_col(int N, int M, float alpha) {
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
     auto d_sums = tsnecuda::util::ReduceAlpha(handle, d_points, N, M, alpha, 0);
@@ -211,7 +211,7 @@ void test_reduce_alpha_row(int N, int M, float alpha) {
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
-    cublasSafeCall(cublasCreate(&handle));
+    CublasSafeCall(cublasCreate(&handle));
 
     // Do the reduction
     auto d_sums = tsnecuda::util::ReduceAlpha(handle, d_points, N, M, alpha, 1);
