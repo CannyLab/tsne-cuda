@@ -72,9 +72,12 @@ _lib.pymodule_bhsnapshot.argtypes = [ N.ctypeslib.ndpointer(N.float32, ndim=2, f
                             ctypes.c_int, # Num snapshots
                         ]        
 
-def tsne_snapshots(points, n_components=2, perplexity=32.0, early_exaggeration=12, learning_rate=500, iterations=1000, y=None, num_snapshots=5):
+def tsne_snapshots(points, n_components=2, perplexity=50.0, early_exaggeration=2, learning_rate=200, iterations=1000, y=None, num_snapshots=5):
         if y is None:
-            Y = N.random.normal(size=(points.shape[0],2))
+            print('Initializing with random normal...')
+            Y = N.random.normal(0, 1, size=(points.shape[0],2))
+        else:
+            print('Did not initialize with random normal')
         points = N.require(points, N.float32, ['CONTIGUOUS', 'ALIGNED'])
         embedding_ = N.zeros(shape=(points.shape[0],2,num_snapshots))
         embedding_ = N.require(embedding_ , N.float32, ['F_CONTIGUOUS', 'ALIGNED', 'WRITEABLE'])
