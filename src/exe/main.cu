@@ -51,6 +51,7 @@ int main(int argc, char** argv) {
     if (result.count("help"))
     {
       std::cout << options.help({""}) << std::endl;
+      std::cout << "t-SNE CUDA Version "<< VERSION_STRING << ", Build number " << BUILD_NUMBER << "." << std::endl;
       exit(0);
     }
 
