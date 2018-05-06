@@ -11,7 +11,7 @@
 
 thrust::device_vector<float> tsne::util::RandomDeviceUniformZeroOneVector(
         const uint32_t vector_size) {
-    return tsne::util::RandomDeviceVectorInRange(0.0, 1.0);
+    return tsne::util::RandomDeviceVectorInRange(vector_size, 0.0, 1.0);
 }
 
 thrust::device_vector<float> tsne::util::RandomDeviceVectorInRange(
@@ -23,14 +23,14 @@ thrust::device_vector<float> tsne::util::RandomDeviceVectorInRange(
     // Construct a uniform real vector distribution
     std::uniform_real_distribution<float> distribution(lower_bound,
                                                        upper_bound);
-    float host_points = new float[vector_size];
+    float* host_points = new float[vector_size];
     for (size_t i = 0; i < vector_size; i++)
-        host_points[i] = distribution(andom_engine);
+        host_points[i] = distribution(random_engine);
 
     // Copy the matrix to the GPU
     thrust::device_vector<float> gpu_vector(vector_size);
     thrust::copy(host_points, host_points+vector_size,
                  gpu_vector.begin());
     delete[] host_points;
-    return vec;
+    return gpu_vector;
 }
