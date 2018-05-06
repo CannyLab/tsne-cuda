@@ -933,9 +933,9 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
         gpuErrchk(cudaDeviceSynchronize());
         
         // compute entropy of current row
-        row_sum = Reduce::reduce_sum(handle, pij, K, N, 0);
+        row_sum = tsne::util::ReduceSum(handle, pij, K, N, 0);
         thrust::transform(pij.begin(), pij.end(), entropy.begin(), func_entropy_kernel());
-        auto neg_entropy = Reduce::reduce_alpha(handle, entropy, K, N, -1.0f, 0);
+        auto neg_entropy = tsne::util::ReduceAlpha(handle, entropy, K, N, -1.0f, 0);
 
         // binary search for beta
         PerplexitySearchKernel<<<NBLOCKS2, BLOCKSIZE2>>>(N, perplexity_target, eps,

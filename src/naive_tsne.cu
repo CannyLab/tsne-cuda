@@ -64,7 +64,7 @@ void NaiveTSNE::thrust_search_perplexity(cublasHandle_t &handle,
     // printarray(entropy_, N, N);
     // std::cout << std::endl;
 
-    auto neg_entropy = Reduce::reduce_alpha(handle, entropy_, N, N, -1.0f, 1);
+    auto neg_entropy = tsne::util::ReduceAlpha(handle, entropy_, N, N, -1.0f, 1);
 
     // std::cout << "neg_entropy:" << std::endl;
     // printarray(neg_entropy, 1, N);
@@ -142,8 +142,8 @@ void NaiveTSNE::compute_pij(
     thrust::transform(pij.begin(), pij.end(), pij.begin(), func_exp());
     zero_diagonal(pij, N);
     
-    // Reduce::reduce_sum over cols? rows? Fuck if I know. 
-    auto sums = Reduce::reduce_sum(handle, pij, N, N, 1);
+    // tsne::util::ReduceSum over cols? rows? Fuck if I know. 
+    auto sums = tsne::util::ReduceSum(handle, pij, N, N, 1);
 
     // divide column by resulting vector
     tsne::util::BroadcastMatrixVector(pij, sums, N, N, thrust::divides<float>(), 0, 1.0f);
@@ -198,7 +198,7 @@ float NaiveTSNE::compute_gradients(cublasHandle_t &handle,
     float sum = thrust::reduce(dist.begin(), dist.end(), 0.0f, thrust::plus<float>());
     thrust::transform(dist.begin(), dist.end(), thrust::make_constant_iterator<float>(sum), qij.begin(), thrust::divides<float>());
 
-    // auto sums = Reduce::reduce_sum(handle, qij, N, N, 1);
+    // auto sums = tsne::util::ReduceSum(handle, qij, N, N, 1);
 
     // std::cout << std::endl << std::endl << "Sum-Dist" << std::endl;
     // printarray(sums, 1, N);

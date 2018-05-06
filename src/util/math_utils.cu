@@ -33,7 +33,7 @@ void tsne::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
         thrust::device_vector<float> &d_points, const uint32_t num_points,
         const uint32_t num_dims) {
     // Compute the means
-    auto d_means = Reduce::reduce_mean(handle, d_points, num_points,
+    auto d_means = tsne::util::ReduceMean(handle, d_points, num_points,
                                          num_dims, 0);
 
     // Zero-Center
@@ -43,7 +43,7 @@ void tsne::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
     // Compute the standard deviation
     thrust::device_vector<float> squared_vals(d_points.size());
     tsne::util::SquareDeviceVector(squared_vals, d_points);
-    auto norm_sum_of_squares = Reduce::reduce_alpha(handle, squared_vals,
+    auto norm_sum_of_squares = tsne::util::ReduceAlpha(handle, squared_vals,
             num_points, num_dims, 1.f / (num_points - 1), 0);
     thrust::device_vector<float> standard_deviation(norm_sum_of_squares.size());
     tsne::util::SqrtDeviceVector(standard_deviation, norm_sum_of_squares);
