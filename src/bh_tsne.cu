@@ -88,10 +88,11 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> sparse_pij_device;
     thrust::device_vector<int> pij_row_ptr_device;
     thrust::device_vector<int> pij_col_ind_device;
-    // TODO: fix order of arguments
     tsnecuda::util::SymmetrizeMatrix(sparse_handle, sparse_pij_device, pij_row_ptr_device,
                                         pij_col_ind_device, pij_non_symmetric_device, knn_indices_device,
                                         opt.magnitude_factor, num_points, num_near_neighbors);
+
+    const uint32_t num_nonzero = sparse_pij_device.size();
 
     // Clean up memory
     knn_indices_device.clear();
@@ -99,7 +100,27 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     pij_non_symmetric_device.clear();
     pij_non_symmetric_device.shrink_to_fit();
 
-    // TODO: compute coo_indices;
+    // Declare memory
+    thrust::device_vector<float> pij_x_qij_device(sparse_pij_device.size());
+    thrust::device_vector<float> repulsive_forces_device((num_nodes + 1) * 2, 0);
+    thrust::device_vector<float> attractive_forces_device(opt.num_points * 2, 0);
+    thrust::device_vector<float> gains_device(opt.num_points * 2, 1);
+    thrust::device_vector<float> old_forces_device(opt.num_points * 2, 0); // for momentum
+    thrust::device_vector<int> cell_starts_device(num_nodes + 1);
+    thrust::device_vector<int> children_device((num_nodes + 1) * 4);
+    thrust::device_vector<float> cell_mass_device(num_nodes + 1, 1.0); // TODO: probably don't need massl
+    thrust::device_vector<int> cell_counts_device(num_nodes + 1);
+    thrust::device_vector<int> cell_sorted_device(num_nodes + 1);
+    thrust::device_vector<float> normalization_vec_device(num_nodes + 1);
+    thrust::device_vector<float> x_max_device(blocks * FACTOR1);
+    thrust::device_vector<float> y_max_device(blocks * FACTOR1);
+    thrust::device_vector<float> x_min_device(blocks * FACTOR1);
+    thrust::device_vector<float> y_min_device(blocks * FACTOR1);
+    thrust::device_vector<float> ones_device(opt.num_points * 2, 1); // This is for reduce summing, etc.
+    thrust::device_vector<int> coo_indices_device(sparse_pij_device.size()*2);
+
+    tsnecuda::util::Csr2Coo(coo_indices_device, pij_row_ptr_device,
+                            pij_col_ind_device, num_points, num_nonzero);
 
     // Initialize Low-Dim Points
     thrust::device_vector<float> points_device((num_nodes + 1) * 2);
@@ -185,24 +206,6 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     if (opt.get_use_interactive()) 
         std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
 #endif
-    // Declare memory
-    thrust::device_vector<float> pij_x_qij_device(sparse_pij_device.size());
-    thrust::device_vector<float> repulsive_forces_device((num_nodes + 1) * 2, 0);
-    thrust::device_vector<float> attractive_forces_device(opt.num_points * 2, 0);
-    thrust::device_vector<float> gains_device(opt.num_points * 2, 1);
-    thrust::device_vector<float> old_forces_device(opt.num_points * 2, 0); // for momentum
-    thrust::device_vector<int> cell_starts_device(num_nodes + 1);
-    thrust::device_vector<int> children_device((num_nodes + 1) * 4);
-    thrust::device_vector<float> cell_mass_device(num_nodes + 1, 1.0); // TODO: probably don't need massl
-    thrust::device_vector<int> cell_counts_device(num_nodes + 1);
-    thrust::device_vector<int> cell_sorted_device(num_nodes + 1);
-    thrust::device_vector<float> normalization_vec_device(num_nodes + 1);
-    thrust::device_vector<float> x_max_device(blocks * FACTOR1);
-    thrust::device_vector<float> y_max_device(blocks * FACTOR1);
-    thrust::device_vector<float> x_min_device(blocks * FACTOR1);
-    thrust::device_vector<float> y_min_device(blocks * FACTOR1);
-    thrust::device_vector<float> ones_device(opt.num_points * 2, 1); // This is for reduce summing, etc.
-    thrust::device_vector<int> coo_indices_device(sparse_pij_device.size()*2);
 
     // Support for infinite iteration
     for (size_t step = 0; step != opt.iterations; step++) {

@@ -68,13 +68,15 @@ void tsnecuda::util::MaxNormalizeDeviceVector(
 }
 
 void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
-        thrust::device_vector<float> &d_values,
-        thrust::device_vector<int32_t> &d_indices,
         thrust::device_vector<float> &d_symmetrized_values,
         thrust::device_vector<int32_t> &d_symmetrized_colind,
         thrust::device_vector<int32_t> &d_symmetrized_rowptr,
-        uint32_t num_points, uint32_t num_near_neighbors,
-        float magnitude_factor) {
+        thrust::device_vector<float> &d_values,
+        thrust::device_vector<int32_t> &d_indices,
+        float magnitude_factor,
+        uint32_t num_points, 
+        uint32_t num_near_neighbors) 
+{
 
     // Allocate memory
     int32_t *csr_row_ptr_a = nullptr;
@@ -207,5 +209,42 @@ void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
     cudaFree(csr_row_ptr_a);
     cudaFree(csc_column_ptr_at);
     cudaFree(csc_row_ptr_at);
+}
+
+__global__
+void tsnecuda::util::Csr2CooKernel(volatile int * __restrict__ coo_indices,
+                             const int * __restrict__ pij_row_ptr,
+                             const int * __restrict__ pij_col_ind,
+                             const uint32_t num_points,
+                             const uint32_t num_nonzero)
+{
+    register int TID, i, j, start, end;
+    TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID >= nnz) return;
+    start = 0; end = N + 1;
+    i = (N + 1) >> 1;
+    while (end - start > 1) {
+      j = pij_row_ptr[i];
+      end = (j <= TID) ? end : i;
+      start = (j > TID) ? start : i;
+      i = (start + end) >> 1;
+    }
+    j = pij_col_ind[TID];
+    coo_indices[2*TID] = i;
+    coo_indices[2*TID+1] = j;
+}
+
+void tsnecuda::util::Csr2Coo(thrust::device_vector<int> &coo_indices,
+                             thrust::device_vector<int> &pij_row_ptr,
+                             thrust::device_vector<int> &pij_col_ind,
+                             const uint32_t num_points,
+                             const uint32_t num_nonzero)
+{
+    const uint32_t num_threads = 1024;
+    const uint32_t num_blocks = iDivUp(num_nonzero, num_threads);
+    tsnecuda::util::Csr2CooKernel<<<num_blocks, num_threads>>>(thrust::raw_pointer_cast(coo_indices.data()),
+                                                               thrust::raw_pointer_cast(pij_row_ptr.data()),
+                                                               thrust::raw_pointer_cast(pij_col_ind.data()),
+                                                               num_points, num_nonzero);
 }
 
