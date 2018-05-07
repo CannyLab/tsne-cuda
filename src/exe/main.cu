@@ -64,11 +64,11 @@ int main(int argc, char** argv) {
     cusparseHandle_t sparse_handle;
     CusparseSafeCall(cusparseCreate(&sparse_handle));
 
-    BHTSNE::TSNE_INIT init_type = BHTSNE::TSNE_INIT::UNIFORM;
+    tsnecuda::TSNE_INIT init_type = tsnecuda::TSNE_INIT::UNIFORM;
     if (SOPT(init).compare("unif") == 0) {
-        init_type = BHTSNE::TSNE_INIT::UNIFORM;
+        init_type = tsnecuda::TSNE_INIT::UNIFORM;
     } else {
-        init_type = BHTSNE::TSNE_INIT::GAUSSIAN;
+        init_type = tsnecuda::TSNE_INIT::GAUSSIAN;
     }
 
 
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
         printf("Starting TSNE calculation with %u points.\n", num_images);
 
         // Construct the options
-        BHTSNE::Options opt(nullptr, data, num_images, num_columns*num_rows);
+        tsnecuda::Options opt(nullptr, data, num_images, num_columns*num_rows);
         opt.perplexity = FOPT(perplexity);
         opt.learning_rate = FOPT(learning-rate);
         opt.early_exaggeration = FOPT(early-ex);
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
         opt.iterations_no_progress = IOPT(num-steps);
         opt.magnitude_factor = FOPT(magnitude-factor);
         opt.initialization = init_type;
-        opt.n_neighbors = IOPT(nearest-neighbors);
+        opt.num_neighbors = IOPT(nearest-neighbors);
 
         if (BOPT(dump)) {
             opt.enable_dump("dump_ys.txt", 1);
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        BHTSNE::tsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::run_tsne(dense_handle, sparse_handle, opt);
 
         // Clean up the data
         delete[] data;
@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
         printf("Starting TSNE calculation with %u points.\n", num_images);
 
         // Construct the options
-        BHTSNE::Options opt(nullptr, data, num_images, num_columns*num_rows*num_channels);
+        tsnecuda::Options opt(nullptr, data, num_images, num_columns*num_rows*num_channels);
         opt.perplexity = FOPT(perplexity);
         opt.learning_rate = FOPT(learning-rate);
         opt.early_exaggeration = FOPT(early-ex);
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
         opt.iterations_no_progress = IOPT(num-steps);
         opt.magnitude_factor = FOPT(magnitude-factor);
         opt.initialization = init_type;
-        opt.n_neighbors = IOPT(nearest-neighbors);
+        opt.num_neighbors = IOPT(nearest-neighbors);
 
         if (BOPT(dump)) {
             opt.enable_dump("dump_ys.txt", 1);
@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        BHTSNE::tsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::tsne(dense_handle, sparse_handle, opt);
 
         // Clean up the data
         delete[] data;
@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
         printf("Starting TSNE calculation with %u points.\n", num_images);
         
         // Construct the options
-        BHTSNE::Options opt(nullptr, data, num_images, num_columns*num_rows*num_channels);
+        tsnecuda::Options opt(nullptr, data, num_images, num_columns*num_rows*num_channels);
         opt.perplexity = FOPT(perplexity);
         opt.learning_rate = FOPT(learning-rate);
         opt.early_exaggeration = FOPT(early-ex);
@@ -163,7 +163,7 @@ int main(int argc, char** argv) {
         opt.iterations_no_progress = IOPT(num-steps);
         opt.magnitude_factor = FOPT(magnitude-factor);
         opt.initialization = init_type;
-        opt.n_neighbors = IOPT(nearest-neighbors);
+        opt.num_neighbors = IOPT(nearest-neighbors);
 
         if (BOPT(dump)) {
             opt.enable_dump("dump_ys.txt", 1);
@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        BHTSNE::tsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::run_tsne(dense_handle, sparse_handle, opt);
         
         // Clean up the data
         delete[] data;
@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
         printf("Starting TSNE calculation with %u points.\n", IOPT(num-points));
         
         // Construct the options
-        BHTSNE::Options opt(nullptr, thrust::raw_pointer_cast(h_X.data()), IOPT(num-points),  IOPT(dim));
+        tsnecuda::Options opt(nullptr, thrust::raw_pointer_cast(h_X.data()), IOPT(num-points),  IOPT(dim));
         opt.perplexity = FOPT(perplexity);
         opt.learning_rate = FOPT(learning-rate);
         opt.early_exaggeration = FOPT(early-ex);
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
         opt.iterations_no_progress = IOPT(num-steps);
         opt.magnitude_factor = FOPT(magnitude-factor);
         opt.initialization = init_type;
-        opt.n_neighbors = IOPT(nearest-neighbors);
+        opt.num_neighbors = IOPT(nearest-neighbors);
 
         if (BOPT(dump)) {
             opt.enable_dump("dump_ys.txt", 1);
@@ -216,7 +216,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        BHTSNE::tsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::tsne(dense_handle, sparse_handle, opt);
 
     } else {
         std::cout << "Dataset not recognized..." << std::endl;
