@@ -78,8 +78,8 @@ class NaiveTSNE(object):
             self.random_seed = os.urandom()
 
         # Build the hooks for the Naive T-SNE library
-        self._path = pkg_resources.resource_filename('pyctsne','') # Load from current location
-        self._lib = N.ctypeslib.load_library('libpyctsne', _path) # Load the ctypes library
+        self._path = pkg_resources.resource_filename('tsnecuda','') # Load from current location
+        self._lib = N.ctypeslib.load_library('libtsnecuda', _path) # Load the ctypes library
 
         # Hook the naive T-SNE function
         self._lib.pymodule_naive_tsne.restype = None

@@ -1,1 +1,1 @@
-from . import TSNE
+from .TSNE import TSNE

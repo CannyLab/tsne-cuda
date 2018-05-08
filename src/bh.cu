@@ -47,44 +47,89 @@ Author: Martin Burtscher <burtscher@txstate.edu>
 	#include <zmq.hpp>
 #endif
 
+// #ifdef __KEPLER__
 
-#ifdef __KEPLER__
+// #define GPU_ARCH "KEPLER"
 
-// thread count
-#define THREADS1 1024  /* must be a power of 2 */
-#define THREADS2 1024
-#define THREADS3 768
-#define THREADS4 128
-#define THREADS5 1024
-#define THREADS6 1024
+// // thread count
+// #define THREADS1 1024  /* must be a power of 2 */
+// #define THREADS2 1024
+// #define THREADS3 768
+// #define THREADS4 128
+// #define THREADS5 1024
+// #define THREADS6 1024
 
-// block count = factor * #SMs
-#define FACTOR1 2
-#define FACTOR2 2
-#define FACTOR3 1  /* must all be resident at the same time */
-#define FACTOR4 4  /* must all be resident at the same time */
-#define FACTOR5 2
-#define FACTOR6 2
+// // block count = factor * #SMs
+// #define FACTOR1 2
+// #define FACTOR2 2
+// #define FACTOR3 1  /* must all be resident at the same time */
+// #define FACTOR4 4  /* must all be resident at the same time */
+// #define FACTOR5 2
+// #define FACTOR6 2
 
-#else
+// #elif __MAXWELL__
+
+// #define GPU_ARCH "MAXWELL"
+
+// // thread count
+// #define THREADS1 512  /* must be a power of 2 */
+// #define THREADS2 512
+// #define THREADS3 128
+// #define THREADS4 64
+// #define THREADS5 256
+// #define THREADS6 1024
+
+// // block count = factor * #SMs
+// #define FACTOR1 3
+// #define FACTOR2 3
+// #define FACTOR3 6  /* must all be resident at the same time */
+// #define FACTOR4 6  /* must all be resident at the same time */
+// #define FACTOR5 5
+// #define FACTOR6 1
+
+// #elif __PASCAL__
+
+#define GPU_ARCH "PASCAL"
 
 // thread count
 #define THREADS1 512  /* must be a power of 2 */
 #define THREADS2 512
-#define THREADS3 128
-#define THREADS4 64
-#define THREADS5 256
+#define THREADS3 768
+#define THREADS4 128
+#define THREADS5 1024
 #define THREADS6 1024
+#define THREADS7 1024
 
 // block count = factor * #SMs
 #define FACTOR1 3
 #define FACTOR2 3
-#define FACTOR3 6  /* must all be resident at the same time */
-#define FACTOR4 6  /* must all be resident at the same time */
-#define FACTOR5 5
-#define FACTOR6 1
+#define FACTOR3 1  /* must all be resident at the same time */
+#define FACTOR4 4  /* must all be resident at the same time */
+#define FACTOR5 2
+#define FACTOR6 2
+#define FACTOR7 1
 
-#endif
+// #else
+
+// #define GPU_ARCH "UNKNOWN"
+
+// // thread count
+// #define THREADS1 512  /* must be a power of 2 */
+// #define THREADS2 512
+// #define THREADS3 128
+// #define THREADS4 64
+// #define THREADS5 256
+// #define THREADS6 1024
+
+// // block count = factor * #SMs
+// #define FACTOR1 3
+// #define FACTOR2 3
+// #define FACTOR3 6  /* must all be resident at the same time */
+// #define FACTOR4 6  /* must all be resident at the same time */
+// #define FACTOR5 5
+// #define FACTOR6 1
+
+// #endif
 
 #define WARPSIZE 32
 #define MAXDEPTH 32
@@ -493,7 +538,7 @@ void SummarizationKernel(const int nnodesd,
       }
     }
     __syncthreads();  
-    __threadfence();
+    // __threadfence();
     if (flag != 0) {
       massd[k] = cm;
       k += inc;
@@ -770,17 +815,20 @@ void ComputePijxQijKernel(int N, int nnz, int nnodes,
                     volatile float * __restrict forceProd,
                     volatile float * __restrict pts)
 {
-    register int TID, i, j;
+    register int TID, i, j; //, inc;
     register float ix, iy, jx, jy, dx, dy;
     TID = threadIdx.x + blockIdx.x * blockDim.x;
-    if (TID >= nnz) return;
-    i = indices[2*TID];
-    j = indices[2*TID+1];
-    ix = pts[i]; iy = pts[nnodes + 1 + i];
-    jx = pts[j]; jy = pts[nnodes + 1 + j];
-    dx = ix - jx;
-    dy = iy - jy;
-    forceProd[TID] = pij[TID] * 1 / (1 + dx*dx + dy*dy);
+    // inc = blockDim.x * gridDim.x;
+    // for (TID = threadIdx.x + blockIdx.x * blockDim.x; TID < nnz; TID += inc) {
+      if (TID >= nnz) return;
+      i = indices[2*TID];
+      j = indices[2*TID+1];
+      ix = pts[i]; iy = pts[nnodes + 1 + i];
+      jx = pts[j]; jy = pts[nnodes + 1 + j];
+      dx = ix - jx;
+      dy = iy - jy;
+      forceProd[TID] = pij[TID] * 1 / (1 + dx*dx + dy*dy);
+    // }
 }
 
 __global__
@@ -827,6 +875,8 @@ void PerplexitySearchKernel(const unsigned int N,
 void computeAttrForce(int N,
                         int nnz,
                         int nnodes,
+                        int attr_forces_grid_size,
+                        int attr_forces_block_size,
                         cusparseHandle_t &handle,
                         cusparseMatDescr_t &descr,
                         thrust::device_vector<float> &sparsePij,
@@ -839,19 +889,22 @@ void computeAttrForce(int N,
                         thrust::device_vector<int> &indices)      // N x 2 matrix of ones
 {
     // Computes pij*qij for each i,j
-    const int BLOCKSIZE = 128;
-    const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
-    ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
+    ComputePijxQijKernel<<<attr_forces_grid_size,attr_forces_block_size>>>(N, nnz, nnodes,
                                         thrust::raw_pointer_cast(indices.data()),
                                         thrust::raw_pointer_cast(sparsePij.data()),
                                         thrust::raw_pointer_cast(forceProd.data()),
                                         thrust::raw_pointer_cast(pts.data()));
-    gpuErrchk(cudaDeviceSynchronize());
+    // ComputePijxQijKernel<<<blocks*FACTOR7,THREADS7>>>(N, nnz, nnodes,
+    //                                     thrust::raw_pointer_cast(indices.data()),
+    //                                     thrust::raw_pointer_cast(sparsePij.data()),
+    //                                     thrust::raw_pointer_cast(forceProd.data()),
+    //                                     thrust::raw_pointer_cast(pts.data()));
+    GpuErrorCheck(cudaDeviceSynchronize());
 
     // compute forces_i = sum_j pij*qij*normalization*yi
     float alpha = 1.0f;
     float beta = 0.0f;
-    cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+    CusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                             N, 2, N, nnz, &alpha, descr,
                             thrust::raw_pointer_cast(forceProd.data()),
                             thrust::raw_pointer_cast(pijRowPtr.data()),
@@ -859,14 +912,14 @@ void computeAttrForce(int N,
                             thrust::raw_pointer_cast(ones.data()),
                             N, &beta, thrust::raw_pointer_cast(forces.data()),
                             N));
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
     thrust::transform(forces.begin(), forces.begin() + N, pts.begin(), forces.begin(), thrust::multiplies<float>());
     thrust::transform(forces.begin() + N, forces.end(), pts.begin() + nnodes + 1, forces.begin() + N, thrust::multiplies<float>());
 
     // compute forces_i = forces_i - sum_j pij*qij*normalization*yj
     alpha = -1.0f;
     beta = 1.0f;
-    cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+    CusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                             N, 2, N, nnz, &alpha, descr,
                             thrust::raw_pointer_cast(forceProd.data()),
                             thrust::raw_pointer_cast(pijRowPtr.data()),
@@ -874,7 +927,7 @@ void computeAttrForce(int N,
                             thrust::raw_pointer_cast(pts.data()),
                             nnodes + 1, &beta, thrust::raw_pointer_cast(forces.data()),
                             N));
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
     
 
 }
@@ -895,10 +948,6 @@ __global__ void postprocess_matrix(float* matrix,
     indices[TID] = (int) long_indices[TID];
     return;
 }
-
-struct func_entropy_kernel {
-  __host__ __device__ float operator()(const float &x) const { float val = x*log(x); return (val != val || isinf(val)) ? 0 : val; }
-};
 
 thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
                                                   thrust::device_vector<float> &knn_distances,
@@ -930,12 +979,12 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
         ComputePijKernel<<<NBLOCKS1, BLOCKSIZE1>>>(N, K, thrust::raw_pointer_cast(pij.data()),
                                                             thrust::raw_pointer_cast(knn_distances.data()),
                                                             thrust::raw_pointer_cast(betas.data()));
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
         
         // compute entropy of current row
-        row_sum = Reduce::reduce_sum(handle, pij, K, N, 0);
-        thrust::transform(pij.begin(), pij.end(), entropy.begin(), func_entropy_kernel());
-        auto neg_entropy = Reduce::reduce_alpha(handle, entropy, K, N, -1.0f, 0);
+        row_sum = tsnecuda::util::ReduceSum(handle, pij, K, N, 0);
+        thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsnecuda::util::FunctionalEntropy());
+        auto neg_entropy = tsnecuda::util::ReduceAlpha(handle, entropy, K, N, -1.0f, 0);
 
         // binary search for beta
         PerplexitySearchKernel<<<NBLOCKS2, BLOCKSIZE2>>>(N, perplexity_target, eps,
@@ -945,13 +994,13 @@ thrust::device_vector<float> search_perplexity(cublasHandle_t &handle,
                                                             thrust::raw_pointer_cast(found.data()),
                                                             thrust::raw_pointer_cast(neg_entropy.data()),
                                                             thrust::raw_pointer_cast(row_sum.data()));
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
         all_found = thrust::reduce(found.begin(), found.end(), 1, thrust::minimum<int>());
         iters++;
     } while (!all_found && iters < 200);
     // TODO: Warn if iters == 200 because perplexity not found?
 
-    Broadcast::broadcast_matrix_vector(pij, row_sum, K, N, thrust::divides<float>(), 1, 1.0f);
+    tsnecuda::util::BroadcastMatrixVector(pij, row_sum, K, N, thrust::divides<float>(), 1, 1.0f);
     return pij;
 }
 
@@ -1006,7 +1055,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
     start_time = std::chrono::high_resolution_clock::now();
 
         // Do KNN Call
-        Distance::knn(opt.points, knn_indices, knn_distances, opt.n_dims, opt.n_points, K);
+        tsnecuda::util::KNearestNeighbors(knn_indices, knn_distances, opt.points, opt.n_dims, opt.n_points, K);
         
     end_time = std::chrono::high_resolution_clock::now();
     times[1] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1016,7 +1065,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 
         // Allocate device distance memory
         thrust::device_vector<float> d_knn_distances(knn_distances, knn_distances + (opt.n_points * K));
-        Math::max_norm(d_knn_distances); // Here, the extra 0s floating around won't matter
+        tsnecuda::util::MaxNormalizeDeviceVector(d_knn_distances); // Here, the extra 0s floating around won't matter
         thrust::device_vector<float> d_pij = search_perplexity(dense_handle, d_knn_distances, opt.perplexity, opt.perplexity_search_epsilon, opt.n_points, K);
 
         // Clean up distance memory
@@ -1056,8 +1105,8 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         thrust::device_vector<float> sparsePij; // Device
         thrust::device_vector<int> pijRowPtr; // Device
         thrust::device_vector<int> pijColInd; // Device
-        int sym_nnz;
-        Sparse::sym_mat_gpu(d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, &sym_nnz, opt.n_points, K, opt.magnitude_factor);
+        tsnecuda::util::SymmetrizeMatrix(sparse_handle, 
+          d_pij, d_knn_indices, sparsePij, pijColInd, pijRowPtr, opt.n_points, K, opt.magnitude_factor);
 
         // Clear some old memory
         d_knn_indices.clear();
@@ -1080,6 +1129,8 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         exit(-1);
         }
         int blocks = deviceProp.multiProcessorCount;
+        std::cout << "Multiprocessor Count: " << blocks << std::endl;
+        std::cout << "GPU Architecture: " << GPU_ARCH << std::endl;
 
         // Figure out the number of nodes needed for the BH tree
         int nnodes = opt.n_points * 2;
@@ -1088,6 +1139,16 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         nnodes--;
 
         opt.n_nodes = nnodes;
+
+        std::cout << "Number of nodes chosen: " << nnodes << std::endl;
+
+        int attr_forces_block_size;
+        int attr_forces_min_grid_size;
+        int attr_forces_grid_size;
+        cudaOccupancyMaxPotentialBlockSize( &attr_forces_min_grid_size, &attr_forces_block_size, ComputePijxQijKernel, 0, 0);
+        attr_forces_grid_size = (sparsePij.size() + attr_forces_block_size - 1) / attr_forces_block_size;
+        std::cout << "Autotuned attractive force kernel - Grid size: " << attr_forces_grid_size << " Block Size: " << attr_forces_block_size << std::endl;
+        
 
         // Allocate memory for the barnes hut implementations
         thrust::device_vector<float> forceProd(sparsePij.size());
@@ -1116,14 +1177,14 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                         thrust::raw_pointer_cast(pijRowPtr.data()),
                                         thrust::raw_pointer_cast(pijColInd.data()),
                                         thrust::raw_pointer_cast(indices.data()));
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
 
         // Point initialization
         thrust::device_vector<float> pts((nnodes + 1) * 2);
         thrust::device_vector<float> random_vec(pts.size());
         
         if (opt.initialization == BHTSNE::TSNE_INIT::UNIFORM) { // Random uniform initialization
-            pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
+            pts = tsnecuda::util::RandomDeviceVectorInRange((nnodes+1)*2, -100, 100);
         } else if (opt.initialization == BHTSNE::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
             std::default_random_engine generator;
             std::normal_distribution<double> distribution1(0.0, 1.0);
@@ -1142,7 +1203,14 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
             }
         } else if (opt.initialization == BHTSNE::TSNE_INIT::VECTOR) { // Preinit from vector points only
             // Load only the poitns into the pre-init vector
-            pts = Random::rand_in_range((nnodes+1)*2, -100, 100);
+            std::default_random_engine generator;
+            std::normal_distribution<double> distribution1(0.0, 1.0);
+            thrust::host_vector<float> h_pts((nnodes + 1) * 2);
+            for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = 0.0001 * distribution1(generator);
+            thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
+            thrust::constant_iterator<float> mult(10);
+            thrust::transform(pts.begin(), pts.end(), mult, random_vec.begin(), thrust::multiplies<float>());
+            
             // Copy the pre-init data
             if(opt.preinit_data != nullptr) {
               thrust::copy(opt.preinit_data, opt.preinit_data+opt.n_points, pts.begin());
@@ -1167,7 +1235,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 
         // Initialize the GPU tree memory
         InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
 
     end_time = std::chrono::high_resolution_clock::now();
     times[4] = std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1257,7 +1325,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                             thrust::raw_pointer_cast(minxl.data()), 
                                                             thrust::raw_pointer_cast(minyl.data()));
 
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[6] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1271,7 +1339,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                                 thrust::raw_pointer_cast(pts.data()), 
                                                                                 thrust::raw_pointer_cast(pts.data() + nnodes + 1));
             ClearKernel2<<<blocks * 1, 1024>>>(nnodes, thrust::raw_pointer_cast(startl.data()), thrust::raw_pointer_cast(massl.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[7] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1284,7 +1352,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                                         thrust::raw_pointer_cast(massl.data()),
                                                                                         thrust::raw_pointer_cast(pts.data()),
                                                                                         thrust::raw_pointer_cast(pts.data() + nnodes + 1));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[8] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1296,7 +1364,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                         thrust::raw_pointer_cast(countl.data()), 
                                                                         thrust::raw_pointer_cast(startl.data()), 
                                                                         thrust::raw_pointer_cast(childl.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[9] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1314,7 +1382,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                         thrust::raw_pointer_cast(rep_forces.data()),
                                                                         thrust::raw_pointer_cast(rep_forces.data() + nnodes + 1),
                                                                         thrust::raw_pointer_cast(norml.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[10] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1323,8 +1391,8 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         start_time = std::chrono::high_resolution_clock::now();
 
             // compute attractive forces
-            computeAttrForce(opt.n_points, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
-            gpuErrchk(cudaDeviceSynchronize());
+            computeAttrForce(opt.n_points, sparsePij.size(), nnodes, attr_forces_grid_size, attr_forces_block_size, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
+            GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1346,7 +1414,7 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                         thrust::raw_pointer_cast(rep_forces.data()),
                                                                         thrust::raw_pointer_cast(gains.data()),
                                                                         thrust::raw_pointer_cast(old_forces.data()));
-            gpuErrchk(cudaDeviceSynchronize());
+            GpuErrorCheck(cudaDeviceSynchronize());
             thrust::transform(pts.begin(), pts.end(), random_vec.begin(), pts.begin(), thrust::plus<float>());
 
         end_time = std::chrono::high_resolution_clock::now();
@@ -1416,6 +1484,8 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
       std::cout << "\t\tIntegration: " << times[12] << "us" << std::endl;
       std::cout << "Total Time: " << p1_time + p2_time << "us" << std::endl << std::endl;
     }
+    std::cout << FACTOR1 << "," << FACTOR2 << "," << FACTOR3 << "," << FACTOR4 << "," << FACTOR5 << "," << FACTOR6 <<std::endl;
+    std::cout << THREADS1 << "," << THREADS2 << "," << THREADS3 << "," << THREADS4 << "," << THREADS5 << "," << THREADS6 << std::endl;
 
     if (opt.verbosity >= 1) std::cout << "Fin." << std::endl;
     

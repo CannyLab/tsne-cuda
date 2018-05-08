@@ -10,7 +10,6 @@
 #include "util/distance_utils.h"
 #include "naive_tsne.h"
 #include "naive_tsne_cpu.h"
-#include "bh_tsne_ref.h"
 #include "bh_tsne.h"
 #include <time.h>
 #include <string>
@@ -35,7 +34,7 @@ int main(int argc, char** argv) {
         ("e,early-ex", "Early Exaggeration Factor", cxxopts::value<float>()->default_value("2.0"))
         ("s,data", "Which program to run on <cifar10,cifar100,mnist,sim>", cxxopts::value<std::string>()->default_value("sim"))
         ("k,num-points", "How many simulated points to use", cxxopts::value<int>()->default_value("5000"))
-        ("u,nearest-neighbors", "How many nearest neighbors should we use", cxxopts::value<int>()->default_value("1023"))
+        ("u,nearest-neighbors", "How many nearest neighbors should we use", cxxopts::value<int>()->default_value("32"))
         ("n,num-steps", "How many steps to take", cxxopts::value<int>()->default_value("1000"))
         ("i,viz", "Use interactive visualization", cxxopts::value<bool>()->default_value("false"))
         ("d,dump", "Dump the output points", cxxopts::value<bool>()->default_value("false"))
@@ -52,6 +51,7 @@ int main(int argc, char** argv) {
     if (result.count("help"))
     {
       std::cout << options.help({""}) << std::endl;
+      std::cout << "t-SNE CUDA Version "<< VERSION_STRING << ", Build number " << BUILD_NUMBER << "." << std::endl;
       exit(0);
     }
 
@@ -60,9 +60,9 @@ int main(int argc, char** argv) {
 
     // --- Matrices allocation and initialization
     cublasHandle_t dense_handle;
-    cublasSafeCall(cublasCreate(&dense_handle));
+    CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
-    cusparseSafeCall(cusparseCreate(&sparse_handle));
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     BHTSNE::TSNE_INIT init_type = BHTSNE::TSNE_INIT::UNIFORM;
     if (SOPT(init).compare("unif") == 0) {
@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
 
         // Load the data
         int num_images, num_columns, num_rows;
-        float* data = Data::load_mnist(SOPT(fname), num_images, num_columns, num_rows);
+        float* data = tsnecuda::util::LoadMnist(SOPT(fname), num_images, num_columns, num_rows);
 
         // Do the T-SNE
         printf("Starting TSNE calculation with %u points.\n", num_images);
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
         int num_columns = 32;
         int num_rows = 32;
         int num_channels = 3;
-        float * data = Data::load_cifar10(SOPT(fname));
+        float * data = tsnecuda::util::LoadCifar10(SOPT(fname));
 
         // Do the T-SNE
         printf("Starting TSNE calculation with %u points.\n", num_images);
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
         int num_columns = 32;
         int num_rows = 32;
         int num_channels = 3;
-        float * data = Data::load_cifar100(SOPT(fname));
+        float * data = tsnecuda::util::LoadCifar100(SOPT(fname));
 
         // DO the T-SNE
         printf("Starting TSNE calculation with %u points.\n", num_images);

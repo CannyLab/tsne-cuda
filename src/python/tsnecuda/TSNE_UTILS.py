@@ -7,8 +7,8 @@ import ctypes
 import os
 import pkg_resources
 
-_path = pkg_resources.resource_filename('pyctsne','') # Load from current locationn
-_lib = N.ctypeslib.load_library('libpyctsne', _path) # Load the ctypes library
+_path = pkg_resources.resource_filename('tsnecuda','') # Load from current locationn
+_lib = N.ctypeslib.load_library('libtsnecuda', _path) # Load the ctypes library
 
 
 # Distance function hook
@@ -72,7 +72,7 @@ _lib.pymodule_bhsnapshot.argtypes = [ N.ctypeslib.ndpointer(N.float32, ndim=2, f
                             ctypes.c_int, # Num snapshots
                         ]        
 
-def tsne_snapshots(points, n_components=2, perplexity=32.0, early_exaggeration=12, learning_rate=500, iterations=1000, y=None, num_snapshots=5):
+def tsne_snapshots(points, n_components=2, perplexity=50.0, early_exaggeration=2, learning_rate=200, iterations=1000, y=None, num_snapshots=5):
         if y is None:
             y = N.random.rand(points.shape[0],2)
         points = N.require(points, N.float32, ['CONTIGUOUS', 'ALIGNED'])
