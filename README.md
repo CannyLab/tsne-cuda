@@ -6,29 +6,26 @@ To begin, check out our wiki: [https://github.com/rmrao/tsne-cuda/wiki/](https:/
 
 # Benchmarks
 ### Simulated Data
-![](https://github.com/CannyLab/tsne-cuda/docs/simulated_speedup.png)
+![](docs/simulated_speedup.png)
 
 Time taken compared to other state of the art algorithms on synthetic datasets with 50 dimensions and four clusters for varying numbers of points. Note the log scale on both the points and time axis, and that the scale of the $x$ axis is in thousands of points (thus, the values on the $x$ axis range from 1K to 10M points. Dashed lines represent projected times. Projected scaling assumes an $O(n\log(n))$ implementation.
 
 ### MNIST
-![](https://github.com/CannyLab/tsne-cuda/docs/mnist_speedup.png)
+![](docs/mnist_speedup.png)
 
 The performance of t-SNE-CUDA compared to other state-of-the-art implementations on the MNIST dataset. t-SNE-CUDA runs on the raw pixels of the MNIST dataset (60000 images x 768 dimensions) in under 7 seconds.
 
 ### CIFAR
-![](https://github.com/CannyLab/tsne-cuda/docs/cifar_speedup.png)
+![](docs/cifar_speedup.png)
 
 The performance of t-SNE-CUDA compared to other state-of-the-art implementations on the CIFAR-10 dataset. t-SNE-CUDA runs on the raw pixels of the CIFAR-10 training set (50000 images x 1024 dimensions x 3 channels) in under 12 seconds.
 
 ### Comparison of Embedding Quality
 The quality of the embeddings produced by t-SNE-CUDA do not differ significantly from the state of the art implementations. See below for a comparison of MNIST cluster outputs.
 
-![](https://github.com/CannyLab/tsne-cuda/docs/mnist_comparison.png)
+![](docs/mnist_comparison.jpg)
 
 Left: MULTICORE-4 (501s), Middle: BH-TSNE (1156s), Right: t-SNE-CUDA (Ours, 6.98s).
-
-
-TODO :)
 
 # Installation
 
