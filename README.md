@@ -8,7 +8,7 @@ To begin, check out our wiki: [https://github.com/rmrao/tsne-cuda/wiki/](https:/
 ### Simulated Data
 ![](docs/simulated_speedup.png)
 
-Time taken compared to other state of the art algorithms on synthetic datasets with 50 dimensions and four clusters for varying numbers of points. Note the log scale on both the points and time axis, and that the scale of the $x$ axis is in thousands of points (thus, the values on the $x$ axis range from 1K to 10M points. Dashed lines represent projected times. Projected scaling assumes an $O(n\log(n))$ implementation.
+Time taken compared to other state of the art algorithms on synthetic datasets with 50 dimensions and four clusters for varying numbers of points. Note the log scale on both the points and time axis, and that the scale of the x-axis is in thousands of points (thus, the values on the x-axis range from 1K to 10M points. Dashed lines represent projected times. Projected scaling assumes an O(nlog(n)) implementation.
 
 ### MNIST
 ![](docs/mnist_speedup.png)
