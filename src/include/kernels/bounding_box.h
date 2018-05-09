@@ -10,6 +10,8 @@
 #define SRC_INCLUDE_KERNELS_BOUNDING_BOX_H_
 
 #include "include/common.h"
+#include "include/tsne_vars.h"
+#include "include/util/cuda_utils.h"
 
  #ifdef __KEPLER__
 #define BOUNDING_BOX_THREADS 1024

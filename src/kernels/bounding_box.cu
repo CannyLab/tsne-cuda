@@ -53,10 +53,10 @@ void tsnecuda::bh::BoundingBoxKernel(
         __syncthreads();
         if (i < j) {
             k = i + j;
-            x_min_shared[i] = minx = fminf(minx, shared_minx[k]);
-            x_max_shared[i] = maxx = fmaxf(maxx, shared_maxx[k]);
-            y_min_shared[i] = miny = fminf(miny, shared_miny[k]);
-            y_max_shared[i] = maxy = fmaxf(maxy, shared_maxy[k]);
+            x_min_shared[i] = minx = fminf(minx, x_min_shared[k]);
+            x_max_shared[i] = maxx = fmaxf(maxx, x_max_shared[k]);
+            y_min_shared[i] = miny = fminf(miny, y_min_shared[k]);
+            y_max_shared[i] = maxy = fmaxf(maxy, y_max_shared[k]);
         }
     }
 

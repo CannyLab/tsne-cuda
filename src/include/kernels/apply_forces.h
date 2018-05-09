@@ -11,6 +11,7 @@
 #define SRC_INCLUDE_KERNELS_APPLY_FORCES_H_
 
 #include "include/common.h"
+#include "include/util/cuda_utils.h"
 
 #ifdef __KEPLER__
 #define INTEGRATION_THREADS 1024
@@ -33,7 +34,7 @@ void IntegrationKernel(
                                  const float eta,
                                  const float normalization,
                                  const float momentum,
-                                 const float exaggeration
+                                 const float exaggeration,
                                  const uint32_t num_nodes,
                                  const uint32_t num_points
                       );
@@ -68,7 +69,7 @@ void IntegrationKernel(
                       );
 
 
-void tsnecuda::naive::ApplyForces(thrust::device_vector<float> &points,
+void ApplyForces(thrust::device_vector<float> &points,
                                   thrust::device_vector<float> &forces,
                                   thrust::device_vector<float> &gains,
                                   thrust::device_vector<float> &old_forces,
@@ -78,5 +79,5 @@ void tsnecuda::naive::ApplyForces(thrust::device_vector<float> &points,
                                   const uint32_t num_blocks);
 
 }
-
 }
+#endif

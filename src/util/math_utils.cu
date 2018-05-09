@@ -220,9 +220,9 @@ void tsnecuda::util::Csr2CooKernel(volatile int * __restrict__ coo_indices,
 {
     register int TID, i, j, start, end;
     TID = threadIdx.x + blockIdx.x * blockDim.x;
-    if (TID >= nnz) return;
-    start = 0; end = N + 1;
-    i = (N + 1) >> 1;
+    if (TID >= num_nonzero) return;
+    start = 0; end = num_points + 1;
+    i = (num_points + 1) >> 1;
     while (end - start > 1) {
       j = pij_row_ptr[i];
       end = (j <= TID) ? end : i;

@@ -21,7 +21,7 @@ void tsnecuda::bh::IntegrationKernel(
                                  const float eta,
                                  const float normalization,
                                  const float momentum,
-                                 const float exaggeration
+                                 const float exaggeration,
                                  const uint32_t num_nodes,
                                  const uint32_t num_points)
 {
@@ -30,7 +30,7 @@ void tsnecuda::bh::IntegrationKernel(
 
   // iterate over all bodies assigned to thread
   inc = blockDim.x * gridDim.x;
-  for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
+  for (i = threadIdx.x + blockIdx.x * blockDim.x; i < num_points; i += inc) {
         ux = old_forces[i];
         uy = old_forces[num_points + i];
         gx = gains[i];
@@ -72,7 +72,7 @@ void tsnecuda::naive::IntegrationKernel(
 
   // iterate over all bodies assigned to thread
   inc = blockDim.x * gridDim.x;
-  for (i = threadIdx.x + blockIdx.x * blockDim.x; i < N; i += inc) {
+  for (i = threadIdx.x + blockIdx.x * blockDim.x; i < num_points; i += inc) {
         ux = old_forces[i];
         uy = old_forces[num_points + i];
         gx = gains[i];
@@ -119,7 +119,7 @@ void tsnecuda::bh::ApplyForces(thrust::device_vector<float> &points,
                     thrust::raw_pointer_cast(old_forces.data()),
                     eta, normalization, momentum, exaggeration,
                     num_nodes, num_points);
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 }
 
 void tsnecuda::naive::ApplyForces(thrust::device_vector<float> &points,
@@ -137,5 +137,5 @@ void tsnecuda::naive::ApplyForces(thrust::device_vector<float> &points,
                     thrust::raw_pointer_cast(gains.data()),
                     thrust::raw_pointer_cast(old_forces.data()),
                     eta, momentum, num_points);
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 }
