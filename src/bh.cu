@@ -1497,8 +1497,8 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
       std::cout << "\t\tIntegration: " << times[12] << "us" << std::endl;
       std::cout << "Total Time: " << p1_time + p2_time << "us" << std::endl << std::endl;
     }
-    std::cout << FACTOR1 << "," << FACTOR2 << "," << FACTOR3 << "," << FACTOR4 << "," << FACTOR5 << "," << FACTOR6 <<std::endl;
-    std::cout << THREADS1 << "," << THREADS2 << "," << THREADS3 << "," << THREADS4 << "," << THREADS5 << "," << THREADS6 << std::endl;
+    // std::cout << FACTOR1 << "," << FACTOR2 << "," << FACTOR3 << "," << FACTOR4 << "," << FACTOR5 << "," << FACTOR6 <<std::endl;
+    // std::cout << THREADS1 << "," << THREADS2 << "," << THREADS3 << "," << THREADS4 << "," << THREADS5 << "," << THREADS6 << std::endl;
 
     if (opt.verbosity >= 1) std::cout << "Fin." << std::endl;
     
