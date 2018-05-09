@@ -1188,11 +1188,13 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         } else if (opt.initialization == BHTSNE::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
             std::default_random_engine generator;
             std::normal_distribution<double> distribution1(0.0, 1.0);
-            thrust::host_vector<float> h_pts((nnodes + 1) * 2);
-            for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = 0.0001 * distribution1(generator);
+            thrust::host_vector<float> h_pts(opt.n_points);
+            for (int i = 0; i < opt.n_points; i++) 
+              h_pts[i] = 0.0001 * distribution1(generator);
             thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
-            thrust::constant_iterator<float> mult(10);
-            thrust::transform(pts.begin(), pts.end(), mult, random_vec.begin(), thrust::multiplies<float>());
+            for (int i = 0; i < opt.n_points; i++) 
+              h_pts[i] = 0.0001 * distribution1(generator);
+            thrust::copy(h_pts.begin(), h_pts.end(), pts.begin()+nnodes+1);
         } else if (opt.initialization == BHTSNE::TSNE_INIT::RESUME) { // Preinit from vector
             // Load from vector
             if(opt.preinit_data != nullptr) {
@@ -1202,19 +1204,11 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
               std::cout << "E: Invalid initialization. Initialization points are null." << std::endl;
             }
         } else if (opt.initialization == BHTSNE::TSNE_INIT::VECTOR) { // Preinit from vector points only
-            // Load only the poitns into the pre-init vector
-            std::default_random_engine generator;
-            std::normal_distribution<double> distribution1(0.0, 1.0);
-            thrust::host_vector<float> h_pts((nnodes + 1) * 2);
-            for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = 0.0001 * distribution1(generator);
-            thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
-            thrust::constant_iterator<float> mult(10);
-            thrust::transform(pts.begin(), pts.end(), mult, random_vec.begin(), thrust::multiplies<float>());
-            
             // Copy the pre-init data
             if(opt.preinit_data != nullptr) {
               thrust::copy(opt.preinit_data, opt.preinit_data+opt.n_points, pts.begin());
               thrust::copy(opt.preinit_data+opt.n_points+1, opt.preinit_data+opt.n_points*2 , pts.begin()+(nnodes+1));
+              tsnecuda::util::GaussianNormalizeDeviceVector(dense_handle, pts, (nnodes+1), 2);
             }
             else {
               std::cout << "E: Invalid initialization. Initialization points are null." << std::endl;
@@ -1291,7 +1285,13 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 
     // Support for infinite iteration
     float attr_exaggeration = opt.early_exaggeration;
-  
+
+    // Random noise handling
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution1(0.0, 1.0);
+    thrust::host_vector<float> h_pts(opt.n_points*2);
+    thrust::device_vector<float> rand_noise(opt.n_points*2);
+            
     for (int step = 0; step != opt.iterations; step++) {
 
         // Setup learning rate schedule
@@ -1414,8 +1414,14 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
                                                                         thrust::raw_pointer_cast(rep_forces.data()),
                                                                         thrust::raw_pointer_cast(gains.data()),
                                                                         thrust::raw_pointer_cast(old_forces.data()));
+            for (int i = 0; i < opt.n_points*2; i++) 
+              h_pts[i] = 0.001 * distribution1(generator);
             GpuErrorCheck(cudaDeviceSynchronize());
-            thrust::transform(pts.begin(), pts.end(), random_vec.begin(), pts.begin(), thrust::plus<float>());
+            thrust::copy(h_pts.begin(), h_pts.end(), rand_noise.begin());
+                                                            
+            // Add some random noise to the points
+            thrust::transform(pts.begin(), pts.begin()+opt.n_points, rand_noise.begin(), pts.begin(), thrust::plus<float>());
+            thrust::transform(pts.begin()+nnodes+1, pts.begin()+nnodes+1+opt.n_points, rand_noise.begin()+opt.n_points, pts.begin()+nnodes+1, thrust::plus<float>());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[12] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
