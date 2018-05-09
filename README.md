@@ -1,6 +1,6 @@
 # TSNE-CUDA
 
-<span style="color:blue">WARNING: This code is still in active development. While the core code is tested and working, some additional features need aditional testing.</span>.
+***WARNING: This code is still in active development. While the core code is tested and working, some additional features need aditional testing.***
 
 This repo is an optimized CUDA version of [Barnes-Hut t-SNE](https://github.com/lvdmaaten/bhtsne) by L. Van der Maaten with associated python modules. We find that our implementation of t-SNE can be up to 1200x faster than Sklearn, or up to 50x faster than Multicore-TSNE when used with the right GPU.
 
