@@ -36,6 +36,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     int snap_num = 0;
     if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT) {
       snap_interval = opt.iterations / (opt.num_snapshots-1);
+    }
 
     // Get constants from options
     const uint32_t num_points = opt.num_points;

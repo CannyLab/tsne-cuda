@@ -4,6 +4,9 @@ Kernel to initialize the global variables
 
 #include "include/kernels/initialization.h"
 
+__device__ volatile int stepd, bottomd, maxdepthd;
+__device__ unsigned int blkcntd;
+__device__ volatile float radiusd;
 
 /******************************************************************************/
 /*** initialize memory ********************************************************/
