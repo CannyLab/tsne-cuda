@@ -1398,16 +1398,13 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
 
-
         // Move the particles
         start_time = std::chrono::high_resolution_clock::now();
         
-            norm = thrust::reduce(norml.begin(), norml.begin() + opt.n_points, 0.0f, thrust::plus<float>());
-            if (opt.verbosity >= 1 && step % opt.print_interval == 0)
-                std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
-            // std::cout << "pos_f: " << attr_forces[0] << " " << attr_forces[opt.n_points] << std::endl;
-            // std::cout << "neg_f: " << rep_forces[0] / norm << " " << rep_forces[nnodes + 1] / norm << std::endl;
-            
+            // Compute the normalization constant
+            norm = thrust::reduce(norml.begin(), norml.end(), 0.0f, thrust::plus<float>());
+
+            // Integrate
             IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(opt.n_points, nnodes, eta, norm, momentum, attr_exaggeration,
                                                                         thrust::raw_pointer_cast(pts.data()),
                                                                         thrust::raw_pointer_cast(attr_forces.data()),
@@ -1418,6 +1415,16 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
               h_pts[i] = 0.001 * distribution1(generator);
             GpuErrorCheck(cudaDeviceSynchronize());
             thrust::copy(h_pts.begin(), h_pts.end(), rand_noise.begin());
+
+            // Compute the gradient norm
+            tsnecuda::util::SquareDeviceVector(attr_forces, old_forces);
+            thrust::transform(attr_forces.begin(), attr_forces.begin()+opt.n_points, 
+                              attr_forces.begin()+opt.n_points, attr_forces.begin(), thrust::plus<float>());
+            tsnecuda::util::SqrtDeviceVector(attr_forces, attr_forces);
+            float grad_norm = thrust::reduce(attr_forces.begin(), attr_forces.begin()+opt.n_points, 0.0f, thrust::plus<float>()) / opt.n_points;
+
+            if (opt.verbosity >= 1 && step % opt.print_interval == 0)
+              std::cout << "[Step " << step << "] Average Gradient Norm: " << grad_norm << std::endl;
                                                             
             // Add some random noise to the points
             thrust::transform(pts.begin(), pts.begin()+opt.n_points, rand_noise.begin(), pts.begin(), thrust::plus<float>());
