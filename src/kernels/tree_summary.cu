@@ -2,7 +2,7 @@
         Summarize position and mass of cells in quad-tree.
 */
 
-#include "tree_summary.h"
+#include "include/kernels/tree_summary.h"
 
 /******************************************************************************/
 /*** compute center of mass ***************************************************/

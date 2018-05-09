@@ -10,10 +10,14 @@
 #define SRC_INCLUDE_KERNELS_PERPLEXITY_SEARCH_H_
 
 #include "include/common.h"
+#include "include/util/cuda_utils.h"
+#include "include/util/reduce_utils.h"
+#include "include/util/matrix_broadcast_utils.h"
+#include "include/util/thrust_transform_functions.h"
 
 namespace tsnecuda {
 __global__
-void tsnecuda::PerplexitySearchKernel(
+void PerplexitySearchKernel(
                             volatile float * __restrict__ betas,
                             volatile float * __restrict__ lower_bound,
                             volatile float * __restrict__ upper_bound,

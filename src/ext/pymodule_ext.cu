@@ -1,7 +1,7 @@
 
 // Implementation file for the python extensions
 
-#include "ext/pymodule_ext.h"
+#include "include/ext/pymodule_ext.h"
 
 void pymodule_e_dist(float *points, float *dist, ssize_t *dims) {
     
@@ -96,20 +96,20 @@ void pymodule_bh_tsne(float *points, float *result, ssize_t *dims, int proj_dim,
     CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     // Construct the options
-    BHTSNE::Options opt(result, points, N_POINTS, N_DIMS);
+    tsnecuda::Options opt(result, points, N_POINTS, N_DIMS);
     opt.perplexity = perplexity;
     opt.learning_rate = learning_rate;
     opt.early_exaggeration = early_ex;
     opt.iterations = n_iter;
     opt.iterations_no_progress = n_iter_np;
-    opt.n_neighbors = 32;
+    opt.num_neighbors = 32;
     opt.min_gradient_norm = min_g_norm;
     
     // Return data setup
-    opt.return_style = BHTSNE::RETURN_STYLE::ONCE;
+    opt.return_style = tsnecuda::RETURN_STYLE::ONCE;
 
     // Do the t-SNE
-    BHTSNE::tsne(dense_handle, sparse_handle, opt);
+    tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
 
     // Copy the data back from the GPU
     cudaDeviceSynchronize();
@@ -129,25 +129,25 @@ void pymodule_bhsnapshot(float *points, float *result, ssize_t *dims, int proj_d
     CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     // Construct the options
-    BHTSNE::Options opt(result, points, N_POINTS, N_DIMS);
+    tsnecuda::Options opt(result, points, N_POINTS, N_DIMS);
     opt.perplexity = perplexity;
     opt.learning_rate = learning_rate;
     opt.early_exaggeration = early_ex;
     opt.iterations = n_iter;
     opt.iterations_no_progress = n_iter_np;
-    opt.n_neighbors = 32;
+    opt.num_neighbors = 32;
     opt.min_gradient_norm = min_g_norm;
     
     // Fancy initialization
     opt.preinit_data = preinit_data;
-    opt.initialization = BHTSNE::TSNE_INIT::VECTOR;
+    opt.initialization = tsnecuda::TSNE_INIT::VECTOR;
     
     // Return data setup
-    opt.return_style = BHTSNE::RETURN_STYLE::SNAPSHOT;
+    opt.return_style = tsnecuda::RETURN_STYLE::SNAPSHOT;
     opt.num_snapshots = num_snapshots;
 
     // Do the t-SNE
-    BHTSNE::tsne(dense_handle, sparse_handle, opt);
+    tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
 
     // Copy the data back from the GPU
     cudaDeviceSynchronize();

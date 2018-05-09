@@ -24,7 +24,7 @@ void tsnecuda::bh::ComputePijxQijKernel(
     i = coo_indices[2*TID];
     j = coo_indices[2*TID+1];
     ix = points[i]; iy = points[num_nodes + 1 + i];
-    jx = points[j]; jy = pointsnum_nodes + 1 + j];
+    jx = points[j]; jy = points[num_nodes + 1 + j];
     dx = ix - jx;
     dy = iy - jy;
     pij_x_qij[TID] = pij[TID] / (1 + dx*dx + dy*dy);
@@ -48,7 +48,7 @@ void tsnecuda::bh::ComputeAttractiveForces(
     // Computes pij*qij for each i,j
     // TODO: this is bad style
     const int BLOCKSIZE = 128;
-    const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
+    const int NBLOCKS = iDivUp(num_nonzero, BLOCKSIZE);
     tsnecuda::bh::ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(
                     thrust::raw_pointer_cast(pij_x_qij.data()),
                     thrust::raw_pointer_cast(sparse_pij.data()),
@@ -77,7 +77,7 @@ void tsnecuda::bh::ComputeAttractiveForces(
     alpha = -1.0f;
     beta = 1.0f;
     CusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                            num_points, 2, num_points, nnz, &alpha, descr,
+                            num_points, 2, num_points, num_nonzero, &alpha, descr,
                             thrust::raw_pointer_cast(pij_x_qij.data()),
                             thrust::raw_pointer_cast(pij_row_ptr.data()),
                             thrust::raw_pointer_cast(pij_col_ind.data()),

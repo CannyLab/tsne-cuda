@@ -10,6 +10,8 @@
 #define SRC_INCLUDE_KERNELS_BH_REP_FORCES_H_
 
 #include "include/common.h"
+#include "include/tsne_vars.h"
+#include "include/util/cuda_utils.h"
 
 #ifdef __KEPLER__
 #define REPULSIVE_FORCES_THREADS 1024

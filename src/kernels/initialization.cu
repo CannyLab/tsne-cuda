@@ -2,7 +2,7 @@
 Kernel to initialize the global variables
 */
 
-#include "kernels/include/initialization.h"
+#include "include/kernels/initialization.h"
 
 
 /******************************************************************************/
@@ -17,7 +17,7 @@ __global__ void tsnecuda::bh::InitializationKernel(int * __restrict errd)
     blkcntd = 0;
 }
 
-void tsnecuda::bh::Initialize(int * __restrict__ errd) 
+void tsnecuda::bh::Initialize(thrust::device_vector<int> &errd) 
 {
     cudaFuncSetCacheConfig(tsnecuda::bh::BoundingBoxKernel, cudaFuncCachePreferShared);
     cudaFuncSetCacheConfig(tsnecuda::bh::TreeBuildingKernel, cudaFuncCachePreferL1);
@@ -33,7 +33,7 @@ void tsnecuda::bh::Initialize(int * __restrict__ errd)
     cudaFuncSetCacheConfig(tsnecuda::bh::IntegrationKernel, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(tsnecuda::bh::ComputePijxQijKernel, cudaFuncCachePreferShared);
     
-    tsnecuda::bh::InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
+    tsnecuda::bh::InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errd.data()));
     GpuErrorCheck(cudaDeviceSynchronize());
 }
 

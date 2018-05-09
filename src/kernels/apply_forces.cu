@@ -49,6 +49,10 @@ void tsnecuda::bh::IntegrationKernel(
         points[i] += ux;
         points[i + num_nodes + 1] += uy;
 
+        attr_forces[i] = 0.0f;
+        attr_forces[num_points + i] = 0.0f;
+        rep_forces[i] = 0.0f;
+        rep_forces[i + num_nodes + 1] = 0.0f;
         old_forces[i] = ux;
         old_forces[num_points + i] = uy;
         gains[i] = gx;

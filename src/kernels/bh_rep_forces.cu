@@ -32,8 +32,8 @@ void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
 {
     register int i, j, k, n, depth, base, sbase, diff, pd, nd;
     register float px, py, vx, vy, dx, dy, normsum, tmp, mult;
-    __shared__ volatile int pos[MAXDEPTH * REPULSIVE_FORCES_THREADS/WARPSIZE], node[MAXDEPTH * REPULSIVE_FORCES_THREADS/WARPSIZE];
-    __shared__ float dq[MAXDEPTH * REPULSIVE_FORCES_THREADS/WARPSIZE];
+    __shared__ volatile int pos[MAXDEPTH_BH_TREE * REPULSIVE_FORCES_THREADS/WARPSIZE], node[MAXDEPTH_BH_TREE * REPULSIVE_FORCES_THREADS/WARPSIZE];
+    __shared__ float dq[MAXDEPTH_BH_TREE * REPULSIVE_FORCES_THREADS/WARPSIZE];
 
     if (0 == threadIdx.x) {
         dq[0] = (radiusd * radiusd) / (theta * theta); 
@@ -43,28 +43,28 @@ void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
         }
         dq[i - 1] += epsilon;
 
-        if (maxdepthd > MAXDEPTH) {
+        if (maxdepthd > MAXDEPTH_BH_TREE) {
             *errd = maxdepthd;
         }
     }
     __syncthreads();
 
-    if (maxdepthd <= MAXDEPTH) {
+    if (maxdepthd <= MAXDEPTH_BH_TREE) {
         // figure out first thread in each warp (lane 0)
         base = threadIdx.x / WARPSIZE;
         sbase = base * WARPSIZE;
-        j = base * MAXDEPTH;
+        j = base * MAXDEPTH_BH_TREE;
 
         diff = threadIdx.x - sbase;
         // make multiple copies to avoid index calculations later
-        if (diff < MAXDEPTH) {
+        if (diff < MAXDEPTH_BH_TREE) {
             dq[diff+j] = dq[diff];
         }
         __syncthreads();
         __threadfence_block();
 
         // iterate over all bodies assigned to thread
-        for (k = threadIdx.x + blockIdx.x * blockDim.x; k < nbodiesd; k += blockDim.x * gridDim.x) {
+        for (k = threadIdx.x + blockIdx.x * blockDim.x; k < num_points; k += blockDim.x * gridDim.x) {
             i = cell_sorted[k];    // get permuted/sorted index
             // cache position info
             px = x_pos_device[i];
@@ -78,7 +78,7 @@ void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
             depth = j;
             if (sbase == threadIdx.x) {
                 pos[j] = 0;
-                node[j] = nnodesd * 4;
+                node[j] = num_nodes * 4;
             }
 
             do {
@@ -94,7 +94,7 @@ void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
                         dx = px - x_pos_device[n];
                         dy = py - y_pos_device[n];
                         tmp = dx*dx + dy*dy + epsilon; // distance squared plus small constant to prevent zeros
-                        if ((n < nbodiesd) || __all_sync(__activemask(), tmp >= dq[depth])) {    // check if all threads agree that cell is far enough away (or is a body)
+                        if ((n < num_points) || __all_sync(__activemask(), tmp >= dq[depth])) {    // check if all threads agree that cell is far enough away (or is a body)
                             // from bhtsne - sptree.cpp
                             tmp = 1 / (1 + tmp);
                             mult = cell_mass[n] * tmp;

@@ -169,6 +169,7 @@ void tsnecuda::bh::ClearKernel2(volatile int * __restrict__ cell_starts, volatil
 void tsnecuda::bh::BuildTree(thrust::device_vector<int> &errd,
                                thrust::device_vector<int> &children,
                                thrust::device_vector<int> &cell_starts,
+                               thrust::device_vector<float> &cell_mass,
                                thrust::device_vector<float> &points,
                                const uint32_t num_nodes,
                                const uint32_t num_points,

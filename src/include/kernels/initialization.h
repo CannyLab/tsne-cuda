@@ -10,6 +10,8 @@
 #define SRC_INCLUDE_KERNELS_INITIALIZATION_H_
 
 #include "include/common.h"
+#include "include/tsne_vars.h"
+#include "include/util/cuda_utils.h"
 
 #include "include/kernels/apply_forces.h"
 #include "include/kernels/bh_attr_forces.h"
@@ -23,21 +25,11 @@
 
 namespace tsnecuda {
 namespace bh {
-__global__ void InitializationKernel(int * __restrict errd)
-{
-    *errd = 0;
-    stepd = -1;
-    maxdepthd = 1;
-    blkcntd = 0;
+__global__ void InitializationKernel(int * __restrict errd);
+void Initialize(thrust::device_vector<int> &errd);
 }
-
-void Initialize(int * __restrict__ errd) 
-}
-
 namespace naive {
-
 void Initialize();
-
 }
 }
 

@@ -71,7 +71,7 @@ void tsnecuda::PerplexitySearchKernel(
     register int i, is_found;
     register float perplexity, neg_ent, sum_P, perplexity_diff, beta, min_beta, max_beta;
     i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= N) return;
+    if (i >= num_points) return;
 
     neg_ent = neg_entropy[i];
     sum_P = row_sum[i];
@@ -135,14 +135,14 @@ void tsnecuda::bh::SearchPerplexity(cublasHandle_t &handle,
         
         // compute entropy of current row
         row_sum = tsnecuda::util::ReduceSum(handle, pij, num_near_neighbors, num_points, 0);
-        thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsnecuda::util::func_entropy_kernel());
+        thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsnecuda::util::FunctionalEntropy());
         neg_entropy = tsnecuda::util::ReduceAlpha(handle, entropy, num_near_neighbors, num_points, -1.0f, 0);
 
         // binary search for beta
         tsnecuda::PerplexitySearchKernel<<<NBLOCKS2, BLOCKSIZE2>>>(
                                                             thrust::raw_pointer_cast(betas.data()),
-                                                            thrust::raw_pointer_cast(lbs.data()),
-                                                            thrust::raw_pointer_cast(ubs.data()),
+                                                            thrust::raw_pointer_cast(lower_bound_beta.data()),
+                                                            thrust::raw_pointer_cast(upper_bound_beta.data()),
                                                             thrust::raw_pointer_cast(found.data()),
                                                             thrust::raw_pointer_cast(neg_entropy.data()),
                                                             thrust::raw_pointer_cast(row_sum.data()),
@@ -156,7 +156,6 @@ void tsnecuda::bh::SearchPerplexity(cublasHandle_t &handle,
     // TODO: Warn if iters == 200 because perplexity not found?
 
     tsnecuda::util::BroadcastMatrixVector(pij, row_sum, num_near_neighbors, num_points, thrust::divides<float>(), 1, 1.0f);
-    return pij;
 }
 
 void tsnecuda::naive::SearchPerplexity(cublasHandle_t &handle,
@@ -195,14 +194,14 @@ void tsnecuda::naive::SearchPerplexity(cublasHandle_t &handle,
         
         // compute entropy of current row
         row_sum = tsnecuda::util::ReduceSum(handle, pij, num_points, num_points, 0);
-        thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsnecuda::util::func_entropy_kernel());
+        thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsnecuda::util::FunctionalEntropy());
         neg_entropy = tsnecuda::util::ReduceAlpha(handle, entropy, num_points, num_points, -1.0f, 0);
 
         // binary search for beta
         tsnecuda::PerplexitySearchKernel<<<NBLOCKS2, BLOCKSIZE2>>>(
                                                             thrust::raw_pointer_cast(betas.data()),
-                                                            thrust::raw_pointer_cast(lbs.data()),
-                                                            thrust::raw_pointer_cast(ubs.data()),
+                                                            thrust::raw_pointer_cast(lower_bound_beta.data()),
+                                                            thrust::raw_pointer_cast(upper_bound_beta.data()),
                                                             thrust::raw_pointer_cast(found.data()),
                                                             thrust::raw_pointer_cast(neg_entropy.data()),
                                                             thrust::raw_pointer_cast(row_sum.data()),
@@ -216,5 +215,4 @@ void tsnecuda::naive::SearchPerplexity(cublasHandle_t &handle,
     // TODO: Warn if iters == 200 because perplexity not found?
 
     tsnecuda::util::BroadcastMatrixVector(pij, row_sum, num_points, num_points, thrust::divides<float>(), 1, 1.0f);
-    return pij;
 }

@@ -118,3 +118,37 @@ void tsnecuda::util::KNearestNeighbors(int64_t* indices, float* distances,
                      distances, indices);
     }
 }
+
+// TODO: Add -1 notification here... and how to deal with it if it happens
+// TODO: Maybe think about getting FAISS to return integers (long-term todo)
+__global__ 
+void tsnecuda::util::PostprocessNeighborIndicesKernel(
+                                    volatile int * __restrict__ indices,
+                                    const long * __restrict__ long_indices,
+                                    const uint32_t num_points,
+                                    const uint32_t num_neighbors) 
+{
+    register int TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID >= num_points * num_neighbors) return;
+    // Set pij to 0 for each of the broken values - Note: this should be handled in the ComputePijKernel now
+    // if (matrix[TID] == 1.0f) matrix[TID] = 0.0f;
+    indices[TID] = (int) long_indices[TID];
+}
+
+void tsnecuda::util::PostprocessNeighborIndices(
+                thrust::device_vector<int> &indices,
+                thrust::device_vector<int64_t> &long_indices,
+                const uint32_t num_points,
+                const uint32_t num_neighbors
+        )
+{
+    const uint32_t num_threads = 128;
+    const uint32_t num_blocks = iDivUp(num_points*num_neighbors, num_threads);
+    tsnecuda::util::PostprocessNeighborIndicesKernel<<<num_blocks, num_threads>>>(
+                        thrust::raw_pointer_cast(indices.data()),
+                        thrust::raw_pointer_cast(long_indices.data()),
+                        num_points,
+                        num_neighbors
+            );
+    GpuErrorCheck(cudaDeviceSynchronize());
+}

@@ -24,10 +24,22 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         exit(-1);
     }
     const uint32_t num_blocks = deviceProp.multiProcessorCount;
+    
+    // Construct sparse matrix descriptor
+    cusparseMatDescr_t sparse_matrix_descriptor;
+    cusparseCreateMatDescr(&sparse_matrix_descriptor);
+    cusparseSetMatType(sparse_matrix_descriptor, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(sparse_matrix_descriptor,CUSPARSE_INDEX_BASE_ZERO);
+    
+    // Setup some return information if we're working on snapshots
+    int snap_interval;
+    int snap_num = 0;
+    if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT) {
+      snap_interval = opt.iterations / (opt.num_snapshots-1);
 
     // Get constants from options
     const uint32_t num_points = opt.num_points;
-    const uint32_t num_near_neighbors = (opt.num_near_neighbors < num_points) ? opt.num_near_neighbors : num_points;
+    const uint32_t num_neighbors = (opt.num_neighbors < num_points) ? opt.num_neighbors : num_points;
     const float *high_dim_points = opt.points;
     const uint32_t high_dim = opt.num_dims;
     const float perplexity = opt.perplexity;
@@ -35,46 +47,46 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     const float eta = opt.learning_rate;
     float momentum = opt.pre_exaggeration_momentum;
     float attr_exaggeration = opt.early_exaggeration;
-    float norm;
+    float normalization;
 
     // Theta governs tolerance for Barnes-Hut recursion
     const float theta = opt.theta;
-    const float epsilon_squared = opt.epsilon_squared;
+    const float epsilon_squared = opt.epssq;
 
     // Figure out number of nodes needed for BH tree
-    uint32_t num_nodes = num_points * 2;
-    if (num_nodes < 1024 * num_blocks) num_nodes = 1024 * num_blocks;
-    while ((num_nodes & (WARPSIZE - 1)) != 0)
-        num_nodes++;
-    num_nodes--;
-    const uint32_t num_nodes = num_nodes;
+    uint32_t nnodes = num_points * 2;
+    if (nnodes < 1024 * num_blocks) nnodes = 1024 * num_blocks;
+    while ((nnodes & (WARPSIZE - 1)) != 0)
+        nnodes++;
+    nnodes--;
+    const uint32_t num_nodes = nnodes;
     opt.num_nodes = num_nodes;
     
     // Allocate host memory
-    float *knn_squared_distances = new float[num_points * num_near_neighbors];
-    memset(knn_squared_distances, 0, num_points * num_near_neighbors * sizeof(float));
-    long *knn_indices = new long[num_points * num_near_neighbors];
+    float *knn_squared_distances = new float[num_points * num_neighbors];
+    memset(knn_squared_distances, 0, num_points * num_neighbors * sizeof(float));
+    long *knn_indices = new long[num_points * num_neighbors];
 
     // Initialize global variables
     thrust::device_vector<int> err_device(1);
-    tsnecuda::bh::Iniitalize(err_device);
+    tsnecuda::bh::Initialize(err_device);
 
     // Compute approximate K Nearest Neighbors and squared distances
-    tsnecuda::util::KNearestNeighbors(knn_indices, knn_squared_distances, high_dim_points, num_near_neighbors);
-    thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_near_neighbors);
-    thrust::device_vector<int> knn_indices_device(num_points * num_near_neighbors);
+    tsnecuda::util::KNearestNeighbors(knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
+    thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
+    thrust::device_vector<int> knn_indices_device(num_points * num_neighbors);
     tsnecuda::util::PostprocessNeighborIndices(knn_indices_device, knn_indices_long_device, 
-                                                        num_points, num_near_neighbors);
+                                                        num_points, num_neighbors);
     
     // Max-norm the distances to avoid exponentiating by large numbers
-    thrust::device_vector<float> knn_squared_distances_device(knn_distances, 
-                                            knn_distances + (num_points * num_near_neighbors));
+    thrust::device_vector<float> knn_squared_distances_device(knn_squared_distances, 
+                                            knn_squared_distances + (num_points * num_neighbors));
     tsnecuda::util::MaxNormalizeDeviceVector(knn_squared_distances_device);
 
     // Search Perplexity
-    thrust::device_vector<float> pij_non_symmetric_device(num_points * num_near_neighbors);
+    thrust::device_vector<float> pij_non_symmetric_device(num_points * num_neighbors);
     tsnecuda::bh::SearchPerplexity(dense_handle, pij_non_symmetric_device, knn_squared_distances_device, 
-                                    perplexity, perplexity_search_epsilon, num_points, num_near_neighbors);
+                                    perplexity, perplexity_search_epsilon, num_points, num_neighbors);
 
     // Clean up memory
     knn_squared_distances_device.clear();
@@ -90,7 +102,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     thrust::device_vector<int> pij_col_ind_device;
     tsnecuda::util::SymmetrizeMatrix(sparse_handle, sparse_pij_device, pij_row_ptr_device,
                                         pij_col_ind_device, pij_non_symmetric_device, knn_indices_device,
-                                        opt.magnitude_factor, num_points, num_near_neighbors);
+                                        opt.magnitude_factor, num_points, num_neighbors);
 
     const uint32_t num_nonzero = sparse_pij_device.size();
 
@@ -112,10 +124,10 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     thrust::device_vector<int> cell_counts_device(num_nodes + 1);
     thrust::device_vector<int> cell_sorted_device(num_nodes + 1);
     thrust::device_vector<float> normalization_vec_device(num_nodes + 1);
-    thrust::device_vector<float> x_max_device(blocks * FACTOR1);
-    thrust::device_vector<float> y_max_device(blocks * FACTOR1);
-    thrust::device_vector<float> x_min_device(blocks * FACTOR1);
-    thrust::device_vector<float> y_min_device(blocks * FACTOR1);
+    thrust::device_vector<float> x_max_device(num_blocks * BOUNDING_BOX_BLOCKS);
+    thrust::device_vector<float> y_max_device(num_blocks * BOUNDING_BOX_BLOCKS);
+    thrust::device_vector<float> x_min_device(num_blocks * BOUNDING_BOX_BLOCKS);
+    thrust::device_vector<float> y_min_device(num_blocks * BOUNDING_BOX_BLOCKS);
     thrust::device_vector<float> ones_device(opt.num_points * 2, 1); // This is for reduce summing, etc.
     thrust::device_vector<int> coo_indices_device(sparse_pij_device.size()*2);
 
@@ -126,9 +138,9 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     thrust::device_vector<float> points_device((num_nodes + 1) * 2);
     thrust::device_vector<float> random_vector_device(points_device.size());
     // TODO: this will only work with gaussian init
-    if (opt.initialization == BHTSNE::TSNE_INIT::UNIFORM) { // Random uniform initialization
+    if (opt.initialization == tsnecuda::TSNE_INIT::UNIFORM) { // Random uniform initialization
         points_device = tsnecuda::util::RandomDeviceVectorInRange((num_nodes+1)*2, -100, 100);
-    } else if (opt.initialization == BHTSNE::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
+    } else if (opt.initialization == tsnecuda::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
         std::default_random_engine generator;
         std::normal_distribution<double> distribution1(0.0, 1.0);
         thrust::host_vector<float> h_points_device((num_nodes+ 1) * 2);
@@ -136,7 +148,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         thrust::copy(h_points_device.begin(), h_points_device.end(), points_device.begin());
         thrust::constant_iterator<float> mult(10);
         thrust::transform(points_device.begin(), points_device.end(), mult, random_vector_device.begin(), thrust::multiplies<float>());
-    } else if (opt.initialization == BHTSNE::TSNE_INIT::RESUME) { // Preinit from vector
+    } else if (opt.initialization == tsnecuda::TSNE_INIT::RESUME) { // Preinit from vector
         // Load from vector
         if(opt.preinit_data != nullptr) {
           thrust::copy(opt.preinit_data, opt.preinit_data+(num_nodes+1)*2, points_device.begin());
@@ -144,7 +156,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
           std::cerr << "E: Invalid initialization. Initialization points are null." << std::endl;
           exit(1);
         }
-    } else if (opt.initialization == BHTSNE::TSNE_INIT::VECTOR) { // Preinit from vector points only
+    } else if (opt.initialization == tsnecuda::TSNE_INIT::VECTOR) { // Preinit from vector points only
         // Load only the points into the pre-init vector
         points_device = tsnecuda::util::RandomDeviceVectorInRange((num_nodes+1)*2, -100, 100);
         // Copy the pre-init data
@@ -233,6 +245,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         tsnecuda::bh::BuildTree(err_device,
                                 children_device,
                                 cell_starts_device,
+                                cell_mass_device,
                                 points_device,
                                 num_nodes,
                                 num_points,
@@ -265,7 +278,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
                                              cell_mass_device,
                                              points_device,
                                              theta, 
-                                             epsilon,
+                                             epsilon_squared,
                                              num_nodes,
                                              num_points,
                                              num_blocks);
@@ -331,7 +344,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         }
 
         // Handle snapshoting
-        if (opt.return_style == BHTSNE::RETURN_STYLE::SNAPSHOT && step % snap_interval == 0 && opt.return_data != nullptr) {
+        if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && step % snap_interval == 0 && opt.return_data != nullptr) {
           thrust::copy(points_device.begin(),
                        points_device.begin()+opt.num_points, 
                        snap_num*opt.num_points*2 + opt.return_data);
@@ -349,46 +362,21 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
       dump_file.close();
     }
 
-    // With verbosity 2, print the timing data
-    if (opt.verbosity >= 2) {
-      int p1_time = times[0] + times[1] + times[2] + times[3];
-      int p2_time = times[4] + times[5] + times[6] + times[7] + times[8] + times[9] + times[10] + times[11] + times[12];
-      std::cout << "Timing data: " << std::endl;
-      std::cout << "\t Phase 1 (" << p1_time  << "us):" << std::endl;
-      std::cout << "\t\tKernel Setup: " << times[0] << "us" << std::endl;
-      std::cout << "\t\tKNN Computation: " << times[1] << "us" << std::endl;
-      std::cout << "\t\tPIJ Computation: " << times[2] << "us" << std::endl;
-      std::cout << "\t\tPIJ Symmetrization: " << times[3] << "us" << std::endl;
-      std::cout << "\t Phase 2 (" << p2_time << "us):" << std::endl;
-      std::cout << "\t\tKernel Setup: " << times[4] << "us" << std::endl;
-      std::cout << "\t\tForce Reset: " << times[5] << "us" << std::endl;
-      std::cout << "\t\tBounding Box: " << times[6] << "us" << std::endl;
-      std::cout << "\t\tTree Building: " << times[7] << "us" << std::endl;
-      std::cout << "\t\tTree Summarization: " << times[8] << "us" << std::endl;
-      std::cout << "\t\tSorting: " << times[9] << "us" << std::endl;
-      std::cout << "\t\tRepulsive Force Calculation: " << times[10] << "us" << std::endl;
-      std::cout << "\t\tAttractive Force Calculation: " << times[11] << "us" << std::endl;
-      std::cout << "\t\tIntegration: " << times[12] << "us" << std::endl;
-      std::cout << "Total Time: " << p1_time + p2_time << "us" << std::endl << std::endl;
-    }
-
-    if (opt.verbosity >= 1) std::cout << "Fin." << std::endl;
-    
     // Handle a once off return type
-    if (opt.return_style == BHTSNE::RETURN_STYLE::ONCE && opt.return_data != nullptr) {
+    if (opt.return_style == tsnecuda::RETURN_STYLE::ONCE && opt.return_data != nullptr) {
       thrust::copy(points_device.begin(), points_device.begin()+opt.num_points, opt.return_data);
       thrust::copy(points_device.begin()+num_nodes+1, points_device.begin()+num_nodes+1+opt.num_points, opt.return_data+opt.num_points);
     }
 
     // Handle snapshoting
-    if (opt.return_style == BHTSNE::RETURN_STYLE::SNAPSHOT && opt.return_data != nullptr) {
+    if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && opt.return_data != nullptr) {
       thrust::copy(points_device.begin(), points_device.begin()+opt.num_points, snap_num*opt.num_points*2 + opt.return_data);
       thrust::copy(points_device.begin()+num_nodes+1, points_device.begin()+num_nodes+1+opt.num_points, snap_num*opt.num_points*2 + opt.return_data+opt.num_points);
     }
 
     // Return some final values
     opt.trained = true;
-    opt.trained_norm = norm;
+    opt.trained_norm = normalization;
 
     return;
 }

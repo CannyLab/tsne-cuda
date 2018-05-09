@@ -19,6 +19,15 @@
 #include "util/thrust_utils.h"
 #include "include/util/thrust_transform_functions.h"
 
+#include "include/kernels/apply_forces.h"
+#include "include/kernels/bh_attr_forces.h"
+#include "include/kernels/bh_rep_forces.h"
+#include "include/kernels/bounding_box.h"
+#include "include/kernels/initialization.h"
+#include "include/kernels/perplexity_search.h"
+#include "include/kernels/tree_builder.h"
+#include "include/kernels/tree_sort.h"
+#include "include/kernels/tree_summary.h"
 
 namespace tsnecuda {
 
@@ -46,8 +55,8 @@ namespace tsnecuda {
         public:
             // Point information
             /*NECESSARY*/ float* points = nullptr;
-            /*NECESSARY*/ int n_points = 0;
-            /*NECESSARY*/ int n_dims = 0;
+            /*NECESSARY*/ int num_points = 0;
+            /*NECESSARY*/ int num_dims = 0;
 
             // Algorithm options
             float perplexity = 50.0f;
@@ -81,16 +90,16 @@ namespace tsnecuda {
             int num_snapshots = 0; //TODO: Allow for evenly spaced snapshots
 
             // Editable by the tsne method
-            int n_nodes = -1;
+            int num_nodes = -1;
             float trained_norm = -1.0;
             bool trained = false;
 
             // Various Constructors
             Options() {}
-            Options(float* return_data, float* points, int n_points, int n_dims) : 
-                return_data(return_data), points(points), n_points(n_points),
-                        n_dims(n_dims) {}
-            Options(float* points, int n_points, int n_dims, 
+            Options(float* return_data, float* points, int num_points, int num_dims) : 
+                return_data(return_data), points(points), num_points(num_points),
+                        num_dims(num_dims) {}
+            Options(float* points, int num_points, int num_dims, 
                     float perplexity, float learning_rate, float magnitude_factor, int num_neighbors,
                     int iterations, int iterations_no_progress, int force_magnify_iters, float perplexity_search_epsilon, float pre_exaggeration_momentum, float post_exaggeration_momentum, float theta, float epssq, float min_gradient_norm,
                     TSNE_INIT initialization, float* preinit_data, 
@@ -100,8 +109,8 @@ namespace tsnecuda {
                     int verbosity, int print_interval
                     ) :
                     points(points),
-                    n_points(n_points),
-                    n_dims(n_dims),
+                    num_points(num_points),
+                    num_dims(num_dims),
                     perplexity(perplexity),
                     learning_rate(learning_rate),
                     magnitude_factor(magnitude_factor),
@@ -142,8 +151,8 @@ namespace tsnecuda {
             }
             bool validate() {
                 if (this->points == nullptr) return false;
-                if (this->n_points == 0) return false;
-                if (this->n_dims == 0) return false;
+                if (this->num_points == 0) return false;
+                if (this->num_dims == 0) return false;
                 if (this->num_snapshots < 2 && this->return_style == RETURN_STYLE::SNAPSHOT) {
                     std::cout << "E: Need to record more than 1 snapshot when using snapshot capture. Use 'once' capture if you only want one return." << std::endl;
                     return false;

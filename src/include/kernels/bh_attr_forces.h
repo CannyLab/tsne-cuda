@@ -10,6 +10,7 @@
 #define SRC_INCLUDE_KERNELS_BH_ATTR_FORCES_H_
 
 #include "include/common.h"
+#include "include/util/cuda_utils.h"
 
 namespace tsnecuda {
 namespace bh {

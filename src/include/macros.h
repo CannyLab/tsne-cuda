@@ -9,6 +9,9 @@
 #ifndef MACROS_H
 #define MACROS_H
 
+#define MAXDEPTH_BH_TREE 32
+#define WARPSIZE 32
+
 // Nothin here yet!    
 
 #endif

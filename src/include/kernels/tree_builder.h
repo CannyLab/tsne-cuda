@@ -10,7 +10,8 @@
 #define SRC_INCLUDE_KERNELS_TREE_BUILDER_H_
 
 #include "include/common.h"
-#include "include/kernels/tsne_vars.h"
+#include "include/tsne_vars.h"
+#include "include/util/cuda_utils.h"
 
 #ifdef __KEPLER__
 #define TREE_THREADS 1024
@@ -42,6 +43,7 @@ void ClearKernel2(volatile int * __restrict__ cell_starts, volatile float * __re
 void BuildTree(thrust::device_vector<int> &errd,
                                thrust::device_vector<int> &children,
                                thrust::device_vector<int> &cell_starts,
+                               thrust::device_vector<float> &cell_mass,
                                thrust::device_vector<float> &points,
                                const uint32_t num_nodes,
                                const uint32_t num_points,
