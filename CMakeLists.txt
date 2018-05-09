@@ -10,7 +10,7 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" ON)
 option(BUILD_TEST "Build tests if ON" OFF)
 option(BUILD_PYTHON "Build python if ON" OFF)
-option(WITH_ZMQ "Build with interactive viz if ON" ON)
+option(WITH_ZMQ "Build with interactive viz if ON" OFF)
 option(WITH_FAISS_GPU_STANDALONE "Build standalone gpufaiss library ON" OFF)
 
 if(NOT WITH_ZMQ)
