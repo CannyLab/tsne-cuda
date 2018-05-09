@@ -10,7 +10,7 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" ON)
 option(BUILD_TEST "Build tests if ON" OFF)
 option(BUILD_PYTHON "Build python if ON" OFF)
-option(WITH_ZMQ "Build with interactive viz if ON" ON)
+option(WITH_ZMQ "Build with interactive viz if ON" OFF)
 option(WITH_FAISS_GPU_STANDALONE "Build standalone gpufaiss library ON" OFF)
 
 if(NOT WITH_ZMQ)
@@ -23,6 +23,24 @@ if(NOT WITH_FAISS_GPU_STANDALONE)
     message("-- Not building standalone gpufaiss lib. To build gpufaiss standalone use -DWITH_FAISS_GPU_STANDALONE=ON")
 endif()
 #-------------------------------------------------------------------------------
+
+# Build Number Generation
+#-------------------------------------------------------------------------------
+SET(BUILD_NUMBER "0")
+SET(VERSION_STRING "${cuda-tsne_VERSION_MAJOR}.${cuda-tsne_VERSION_MINOR}")
+find_package(Git)
+if(GIT_FOUND)
+    execute_process(
+            COMMAND ${GIT_EXECUTABLE} describe --match INITIAL_BUILD
+            OUTPUT_VARIABLE DESCRIBE_BUILD
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(REGEX MATCH "[0-9]+" BUILD_NUMBER ${DESCRIBE_BUILD})
+endif()
+ADD_DEFINITIONS(-DBUILD_NUMBER="${BUILD_NUMBER}")
+ADD_DEFINITIONS(-DVERSION_STRING="${VERSION_STRING}")
+#-------------------------------------------------------------------------------
+
+
 
 # CXX Configuration
 #-------------------------------------------------------------------------------
@@ -37,6 +55,7 @@ SET(CUDA_HOST_COMPILER ${CXX})
 SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
                     -O3 
+                    -Xptxas -dlcm=cg
                     #-gencode=arch=compute_30,code=sm_30
                     #-gencode=arch=compute_35,code=sm_35
                     -gencode=arch=compute_50,code=sm_50
@@ -94,6 +113,7 @@ file(GLOB_RECURSE faiss_gpu_cu third_party/faiss/gpu/*.cu)
 # Project Setup
 #-------------------------------------------------------------------------------
 include_directories(
+    src/
     src/include
     ${CUDA_INCLUDE_DIRECTORIES}
     third_party/gtest/googletest/include
@@ -105,9 +125,9 @@ link_directories(
     ${CUDA_LIB_PATH}
 )
 set(SOURCES
-    src/naive_tsne.cu
-    src/naive_tsne_cpu.cu
+    # Utils
     src/util/data_utils.cu
+    src/util/debug_utils.cu
     src/util/cuda_utils.cu
     src/util/thrust_utils.cu
     src/util/distance_utils.cu
@@ -115,24 +135,48 @@ set(SOURCES
     src/util/matrix_broadcast_utils.cu
     src/util/random_utils.cu
     src/util/reduce_utils.cu
+    # Kernels
+    src/kernels/apply_forces.cu
+    src/kernels/bh_attr_forces.cu
+    src/kernels/bh_rep_forces.cu
+    src/kernels/bounding_box.cu
+    src/kernels/initialization.cu
+    src/kernels/perplexity_search.cu
+    src/kernels/tree_builder.cu
+    src/kernels/tree_sort.cu
+    src/kernels/tree_summary.cu
+    # Method files
     src/ext/pymodule_ext.cu
-    src/bh.cu
     src/bh_tsne.cu
-    src/bh_tsne_ref.cu
+    src/naive_tsne.cu
 )
 #-------------------------------------------------------------------------------
 
 # Shared Library for Python Binding
 #-------------------------------------------------------------------------------
 if(BUILD_PYTHON)
-    cuda_add_library(pyctsne SHARED
+    set(PYTHON_SOURCES
+        src/python/CHANGES.txt
+        src/python/LICENSE.txt
+        src/python/MANIFEST.in
+        src/python/MANIFEST
+        src/python/README.txt
+        src/python/setup.py
+        src/python/tsnecuda/__init__.py
+        src/python/tsnecuda/NaiveTSNE.py
+        src/python/tsnecuda/TSNE_UTILS.py
+        src/python/tsnecuda/TSNE.py
+        src/python/tsnecuda/test/__init__.py
+        src/python/docs/FAQ.txt
+    )
+
+    cuda_add_library(tsnecuda SHARED
         ${faiss_gpu_headers} ${faiss_gpu_cpp} ${faiss_gpu_cuh} ${faiss_gpu_cu}
         ${SOURCES}
     )
-    set_target_properties(pyctsne PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
+    set_target_properties(tsnecuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
     if(WITH_ZMQ)
-        target_link_libraries(pyctsne
+        target_link_libraries(tsnecuda
             faiss
             gtest
             ${CUDA_LIBRARIES}
@@ -147,7 +191,7 @@ if(BUILD_PYTHON)
             -Wl,--allow-multiple-definition
         )
     else()
-        target_link_libraries(pyctsne
+        target_link_libraries(tsnecuda
             faiss
             gtest
             ${CUDA_LIBRARIES}
@@ -161,11 +205,23 @@ if(BUILD_PYTHON)
             -Wl,--allow-multiple-definition
         )
     endif()
-    add_custom_command(TARGET pyctsne POST_BUILD
+
+    # Copy the source files across
+    add_custom_target(python_source_files ALL SOURCES ${PYTHON_SOURCES})
+    add_dependencies(python_source_files tsnecuda)
+    add_custom_command(TARGET python_source_files POST_BUILD
                     COMMAND ${CMAKE_COMMAND} -E copy_directory
-                        ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:pyctsne>/python)
-    add_custom_command(TARGET pyctsne POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:pyctsne> $<TARGET_FILE_DIR:pyctsne>/python/pyctsne)
+                        ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:tsnecuda>/python
+                    )
+    add_custom_command(TARGET python_source_files POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:tsnecuda> $<TARGET_FILE_DIR:tsnecuda>/python/tsnecuda)
+    add_custom_target(write_version_string_to_python ALL SOURCES ${PYTHON_SOURCES})
+
+    # Write the version string
+    add_dependencies(write_version_string_to_python python_source_files)
+    add_custom_command(TARGET write_version_string_to_python POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -DVERSION_STRING=${VERSION_STRING} -DBUILD_NUMBER=${BUILD_NUMBER} -P 
+        ${CMAKE_CURRENT_BINARY_DIR}/../cmake/write_python_version_string.cmake)
 else()
     message("-- Not building python libraries. To build python libraries use -DBUILD_PYTHON=ON")
 endif()
