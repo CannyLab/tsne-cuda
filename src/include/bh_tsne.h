@@ -54,7 +54,7 @@ namespace tsnecuda {
             float learning_rate = 200.0f;
             float early_exaggeration = 2.0f;
             float magnitude_factor = 5.0f;
-            int n_neighbors = 1023;
+            int num_neighbors = 1023;
             int iterations = 1000;
             int iterations_no_progress = 1000;
             int force_magnify_iters = 250;
@@ -91,7 +91,7 @@ namespace tsnecuda {
                 return_data(return_data), points(points), n_points(n_points),
                         n_dims(n_dims) {}
             Options(float* points, int n_points, int n_dims, 
-                    float perplexity, float learning_rate, float magnitude_factor, int n_neighbors,
+                    float perplexity, float learning_rate, float magnitude_factor, int num_neighbors,
                     int iterations, int iterations_no_progress, int force_magnify_iters, float perplexity_search_epsilon, float pre_exaggeration_momentum, float post_exaggeration_momentum, float theta, float epssq, float min_gradient_norm,
                     TSNE_INIT initialization, float* preinit_data, 
                     bool dump_points, int dump_interval,
@@ -105,7 +105,7 @@ namespace tsnecuda {
                     perplexity(perplexity),
                     learning_rate(learning_rate),
                     magnitude_factor(magnitude_factor),
-                    n_neighbors(n_neighbors),
+                    num_neighbors(num_neighbors),
                     iterations(iterations),
                     iterations_no_progress(iterations_no_progress), 
                     force_magnify_iters(force_magnify_iters),
@@ -168,7 +168,7 @@ namespace tsnecuda {
 namespace bh {
 void RunTsne(cublasHandle_t &dense_handle, 
                             cusparseHandle_t &sparse_handle, 
-                            tsnecuda::Options &opt)
+                            tsnecuda::Options &opt);
 }
 }
 

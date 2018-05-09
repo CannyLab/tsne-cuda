@@ -87,7 +87,7 @@ void MaxNormalizeDeviceVector(thrust::device_vector<float> &d_vector);
  * @param num_near_neighbors The number of nearest neighbors
  * @param magnitude_factor The normalization magnitude factor
  */
-void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
+void SymmetrizeMatrix(cusparseHandle_t &handle,
         thrust::device_vector<float> &d_symmetrized_values,
         thrust::device_vector<int32_t> &d_symmetrized_colind,
         thrust::device_vector<int32_t> &d_symmetrized_rowptr,
@@ -98,13 +98,13 @@ void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
         uint32_t num_near_neighbors);
 
 __global__
-void tsnecuda::util::Csr2CooKernel(volatile int * __restrict__ coo_indices,
+void Csr2CooKernel(volatile int * __restrict__ coo_indices,
                              const int * __restrict__ pij_row_ptr,
                              const int * __restrict__ pij_col_ind,
                              const uint32_t num_points,
                              const uint32_t num_nonzero);
 
-void tsnecuda::util::Csr2Coo(thrust::device_vector<int> &coo_indices,
+void Csr2Coo(thrust::device_vector<int> &coo_indices,
                              thrust::device_vector<int> &pij_row_ptr,
                              thrust::device_vector<int> &pij_col_ind,
                              const uint32_t num_points,

@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::run_tsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
 
         // Clean up the data
         delete[] data;
@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::tsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
 
         // Clean up the data
         delete[] data;
@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::run_tsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
         
         // Clean up the data
         delete[] data;
@@ -216,7 +216,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::tsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
 
     } else {
         std::cout << "Dataset not recognized..." << std::endl;
