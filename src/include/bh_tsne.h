@@ -20,7 +20,7 @@
 #include "include/util/thrust_transform_functions.h"
 
 
-namespace BHTSNE {
+namespace tsnecuda {
 
     enum TSNE_INIT {
         UNIFORM, GAUSSIAN, RESUME, VECTOR
@@ -165,7 +165,12 @@ namespace BHTSNE {
             
     };
       
-    void tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle, BHTSNE::Options &opt);
+namespace bh {
+void RunTsne(cublasHandle_t &dense_handle, 
+                            cusparseHandle_t &sparse_handle, 
+                            tsnecuda::Options &opt)
 }
+}
+
 
 #endif
