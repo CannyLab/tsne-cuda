@@ -185,5 +185,5 @@ void tsnecuda::bh::BuildTree(thrust::device_vector<int> &errd,
     tsnecuda::bh::ClearKernel2<<<num_blocks, 1024>>>(thrust::raw_pointer_cast(cell_starts.data()),
                                                        thrust::raw_pointer_cast(cell_mass.data()),
                                                        num_nodes);
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 }

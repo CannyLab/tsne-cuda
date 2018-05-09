@@ -34,7 +34,7 @@ void tsnecuda::bh::Initialize(int * __restrict__ errd)
     cudaFuncSetCacheConfig(tsnecuda::bh::ComputePijxQijKernel, cudaFuncCachePreferShared);
     
     tsnecuda::bh::InitializationKernel<<<1, 1>>>(thrust::raw_pointer_cast(errl.data()));
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 }
 
 void tsnecuda::naive::Initialize() 

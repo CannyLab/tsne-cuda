@@ -156,5 +156,5 @@ void tsnecuda::bh::SummarizeTree(thrust::device_vector<int> &cell_counts,
                                                     thrust::raw_pointer_cast(pts_device.data() + num_nodes + 1),
                                                     thrust::raw_pointer_cast(children.data()),
                                                     num_nodes, num_points);
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 }

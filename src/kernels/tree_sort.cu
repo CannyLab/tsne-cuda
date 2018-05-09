@@ -67,5 +67,5 @@ void tsnecuda::bh::SortCells(thrust::device_vector<int> &cell_sorted,
                                 thrust::raw_pointer_cast(children.data()),
                                 thrust::raw_pointer_cast(cell_counts.data()),
                                 num_nodes, num_points);
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 }

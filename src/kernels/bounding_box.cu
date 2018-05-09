@@ -121,5 +121,5 @@ void tsnecuda::bh::ComputeBoundingBox(thrust::device_vector<int> &cell_starts,
                                                           thrust::raw_pointer_cast(x_min_device.data()),
                                                           thrust::raw_pointer_cast(y_min_device.data()),
                                                           num_nodes, num_points);
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 }

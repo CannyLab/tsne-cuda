@@ -153,5 +153,5 @@ void tsnecuda::bh::ComputeRepulsiveForces(thrust::device_vector<int> &errd,
                         thrust::raw_pointer_cast(points.data()),
                         thrust::raw_pointer_cast(points.data() + num_nodes + 1),
                         theta, epsilon, num_nodes, num_points);
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 }

@@ -56,12 +56,12 @@ void tsnecuda::bh::ComputeAttractiveForces(
                     thrust::raw_pointer_cast(coo_indices.data()),
                     num_nodes,
                     num_nonzero);
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 
     // compute forces_i = sum_j pij*qij*normalization*yi
     float alpha = 1.0f;
     float beta = 0.0f;
-    cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+    CusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                             num_points, 2, num_points, num_nonzero, &alpha, descr,
                             thrust::raw_pointer_cast(pij_x_qij.data()),
                             thrust::raw_pointer_cast(pij_row_ptr.data()),
@@ -69,14 +69,14 @@ void tsnecuda::bh::ComputeAttractiveForces(
                             thrust::raw_pointer_cast(ones.data()),
                             num_points, &beta, thrust::raw_pointer_cast(attr_forces.data()),
                             num_points));
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
     thrust::transform(attr_forces.begin(), attr_forces.begin() + num_points, points.begin(), attr_forces.begin(), thrust::multiplies<float>());
     thrust::transform(attr_forces.begin() + num_points, attr_forces.end(), points.begin() + num_nodes + 1, attr_forces.begin() + num_points, thrust::multiplies<float>());
 
     // compute forces_i = forces_i - sum_j pij*qij*normalization*yj
     alpha = -1.0f;
     beta = 1.0f;
-    cusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+    CusparseSafeCall(cusparseScsrmm(handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
                             num_points, 2, num_points, nnz, &alpha, descr,
                             thrust::raw_pointer_cast(pij_x_qij.data()),
                             thrust::raw_pointer_cast(pij_row_ptr.data()),
@@ -84,5 +84,5 @@ void tsnecuda::bh::ComputeAttractiveForces(
                             thrust::raw_pointer_cast(points.data()),
                             num_nodes + 1, &beta, thrust::raw_pointer_cast(attr_forces.data()),
                             num_points));
-    gpuErrchk(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize());
 }

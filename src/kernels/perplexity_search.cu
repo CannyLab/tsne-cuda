@@ -131,7 +131,7 @@ void tsnecuda::bh::SearchPerplexity(cublasHandle_t &handle,
                         thrust::raw_pointer_cast(squared_dist.data()),
                         thrust::raw_pointer_cast(betas.data()),
                         num_points, num_near_neighbors);
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
         
         // compute entropy of current row
         row_sum = tsnecuda::util::ReduceSum(handle, pij, num_near_neighbors, num_points, 0);
@@ -147,7 +147,7 @@ void tsnecuda::bh::SearchPerplexity(cublasHandle_t &handle,
                                                             thrust::raw_pointer_cast(neg_entropy.data()),
                                                             thrust::raw_pointer_cast(row_sum.data()),
                                                             perplexity_target, epsilon, num_points);
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
 
         // Check if searching is done
         all_found = thrust::reduce(found.begin(), found.end(), 1, thrust::minimum<int>());
@@ -191,7 +191,7 @@ void tsnecuda::naive::SearchPerplexity(cublasHandle_t &handle,
                         thrust::raw_pointer_cast(squared_dist.data()),
                         thrust::raw_pointer_cast(betas.data()),
                         num_points);
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
         
         // compute entropy of current row
         row_sum = tsnecuda::util::ReduceSum(handle, pij, num_points, num_points, 0);
@@ -207,7 +207,7 @@ void tsnecuda::naive::SearchPerplexity(cublasHandle_t &handle,
                                                             thrust::raw_pointer_cast(neg_entropy.data()),
                                                             thrust::raw_pointer_cast(row_sum.data()),
                                                             perplexity_target, epsilon, num_points);
-        gpuErrchk(cudaDeviceSynchronize());
+        GpuErrorCheck(cudaDeviceSynchronize());
 
         // Check if searching is done
         all_found = thrust::reduce(found.begin(), found.end(), 1, thrust::minimum<int>());
