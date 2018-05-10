@@ -49,7 +49,7 @@ void tsnecuda::bh::ComputeAttractiveForces(
 {
     // Computes pij*qij for each i,j
     // TODO: this is bad style
-    const int BLOCKSIZE = 128;
+    const int BLOCKSIZE = 1024;
     const int NBLOCKS = iDivUp(num_nonzero, BLOCKSIZE);
     tsnecuda::bh::ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(
                     thrust::raw_pointer_cast(pij_x_qij.data()),

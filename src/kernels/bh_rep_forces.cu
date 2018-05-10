@@ -94,8 +94,12 @@ void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
                         dx = px - x_pos_device[n];
                         dy = py - y_pos_device[n];
                         tmp = dx*dx + dy*dy + epsilon; // distance squared plus small constant to prevent zeros
-                        if ((n < num_points) || __all_sync(__activemask(), tmp >= dq[depth])) {    // check if all threads agree that cell is far enough away (or is a body)
-                            // from bhtsne - sptree.cpp
+                        #if (CUDART_VERSION >= 9000)
+                            if ((n < num_points) || __all_sync(__activemask(), tmp >= dq[depth])) {    // check if all threads agree that cell is far enough away (or is a body)
+                        #else
+                            if ((n < num_points) || __all(tmp >= dq[depth])) {
+                        #endif
+                                // from bhtsne - sptree.cpp
                             tmp = 1 / (1 + tmp);
                             mult = cell_mass[n] * tmp;
                             normsum += mult;
