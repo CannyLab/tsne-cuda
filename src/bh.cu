@@ -42,49 +42,99 @@ Author: Martin Burtscher <burtscher@txstate.edu>
 #include <cuda.h>
 #include <chrono>
 #include "bh_tsne.h"
+#include <cuda_runtime_api.h>
 
 #ifndef NO_ZMQ
 	#include <zmq.hpp>
 #endif
 
+#ifndef CUDART_VERSION
+#error CUDART_VERSION Undefined!
+#endif
 
-#ifdef __KEPLER__
+// #ifdef __KEPLER__
 
-// thread count
-#define THREADS1 1024  /* must be a power of 2 */
-#define THREADS2 1024
-#define THREADS3 768
-#define THREADS4 128
-#define THREADS5 1024
-#define THREADS6 1024
+// #define GPU_ARCH "KEPLER"
 
-// block count = factor * #SMs
-#define FACTOR1 2
-#define FACTOR2 2
-#define FACTOR3 1  /* must all be resident at the same time */
-#define FACTOR4 4  /* must all be resident at the same time */
-#define FACTOR5 2
-#define FACTOR6 2
+// // thread count
+// #define THREADS1 1024  /* must be a power of 2 */
+// #define THREADS2 1024
+// #define THREADS3 768
+// #define THREADS4 128
+// #define THREADS5 1024
+// #define THREADS6 1024
 
-#else
+// // block count = factor * #SMs
+// #define FACTOR1 2
+// #define FACTOR2 2
+// #define FACTOR3 1  /* must all be resident at the same time */
+// #define FACTOR4 4  /* must all be resident at the same time */
+// #define FACTOR5 2
+// #define FACTOR6 2
+
+// #elif __MAXWELL__
+
+// #define GPU_ARCH "MAXWELL"
+
+// // thread count
+// #define THREADS1 512  /* must be a power of 2 */
+// #define THREADS2 512
+// #define THREADS3 128
+// #define THREADS4 64
+// #define THREADS5 256
+// #define THREADS6 1024
+
+// // block count = factor * #SMs
+// #define FACTOR1 3
+// #define FACTOR2 3
+// #define FACTOR3 6  /* must all be resident at the same time */
+// #define FACTOR4 6  /* must all be resident at the same time */
+// #define FACTOR5 5
+// #define FACTOR6 1
+
+// #elif __PASCAL__
+
+#define GPU_ARCH "PASCAL"
 
 // thread count
 #define THREADS1 512  /* must be a power of 2 */
 #define THREADS2 512
-#define THREADS3 128
-#define THREADS4 64
-#define THREADS5 256
+#define THREADS3 768
+#define THREADS4 128
+#define THREADS5 1024
 #define THREADS6 1024
+#define THREADS7 1024
 
 // block count = factor * #SMs
 #define FACTOR1 3
 #define FACTOR2 3
-#define FACTOR3 6  /* must all be resident at the same time */
-#define FACTOR4 6  /* must all be resident at the same time */
-#define FACTOR5 5
-#define FACTOR6 1
+#define FACTOR3 1  /* must all be resident at the same time */
+#define FACTOR4 4  /* must all be resident at the same time */
+#define FACTOR5 2
+#define FACTOR6 2
+#define FACTOR7 1
 
-#endif
+// #else
+
+// #define GPU_ARCH "UNKNOWN"
+
+// // thread count
+// #define THREADS1 512  /* must be a power of 2 */
+// #define THREADS2 512
+// #define THREADS3 128
+// #define THREADS4 64
+// #define THREADS5 256
+// #define THREADS6 1024
+
+// // block count = factor * #SMs
+// #define FACTOR1 3
+// #define FACTOR2 3
+// #define FACTOR3 6  /* must all be resident at the same time */
+// #define FACTOR4 6  /* must all be resident at the same time */
+// #define FACTOR5 5
+// #define FACTOR6 1
+
+// #endif
 
 #define WARPSIZE 32
 #define MAXDEPTH 32
@@ -493,7 +543,7 @@ void SummarizationKernel(const int nnodesd,
       }
     }
     __syncthreads();  
-    __threadfence();
+    // __threadfence();
     if (flag != 0) {
       massd[k] = cm;
       k += inc;
@@ -632,7 +682,11 @@ void ForceCalculationKernel(int nnodesd,
             dx = px - posxd[n];
             dy = py - posyd[n];
             tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
-            if ((n < nbodiesd) || __all_sync(__activemask(), tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+            #if (CUDART_VERSION >= 9000)
+              if ((n < nbodiesd) || __all_sync(__activemask(), tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+            #else
+              if ((n < nbodiesd) || __all(tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+            #endif
               // from bhtsne - sptree.cpp
               tmp = 1 / (1 + tmp);
               mult = massd[n] * tmp;
@@ -770,17 +824,20 @@ void ComputePijxQijKernel(int N, int nnz, int nnodes,
                     volatile float * __restrict forceProd,
                     volatile float * __restrict pts)
 {
-    register int TID, i, j;
+    register int TID, i, j; //, inc;
     register float ix, iy, jx, jy, dx, dy;
     TID = threadIdx.x + blockIdx.x * blockDim.x;
-    if (TID >= nnz) return;
-    i = indices[2*TID];
-    j = indices[2*TID+1];
-    ix = pts[i]; iy = pts[nnodes + 1 + i];
-    jx = pts[j]; jy = pts[nnodes + 1 + j];
-    dx = ix - jx;
-    dy = iy - jy;
-    forceProd[TID] = pij[TID] * 1 / (1 + dx*dx + dy*dy);
+    // inc = blockDim.x * gridDim.x;
+    // for (TID = threadIdx.x + blockIdx.x * blockDim.x; TID < nnz; TID += inc) {
+      if (TID >= nnz) return;
+      i = indices[2*TID];
+      j = indices[2*TID+1];
+      ix = pts[i]; iy = pts[nnodes + 1 + i];
+      jx = pts[j]; jy = pts[nnodes + 1 + j];
+      dx = ix - jx;
+      dy = iy - jy;
+      forceProd[TID] = pij[TID] * 1 / (1 + dx*dx + dy*dy);
+    // }
 }
 
 __global__
@@ -827,6 +884,8 @@ void PerplexitySearchKernel(const unsigned int N,
 void computeAttrForce(int N,
                         int nnz,
                         int nnodes,
+                        int attr_forces_grid_size,
+                        int attr_forces_block_size,
                         cusparseHandle_t &handle,
                         cusparseMatDescr_t &descr,
                         thrust::device_vector<float> &sparsePij,
@@ -839,13 +898,16 @@ void computeAttrForce(int N,
                         thrust::device_vector<int> &indices)      // N x 2 matrix of ones
 {
     // Computes pij*qij for each i,j
-    const int BLOCKSIZE = 128;
-    const int NBLOCKS = iDivUp(nnz, BLOCKSIZE);
-    ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(N, nnz, nnodes,
+    ComputePijxQijKernel<<<attr_forces_grid_size,attr_forces_block_size>>>(N, nnz, nnodes,
                                         thrust::raw_pointer_cast(indices.data()),
                                         thrust::raw_pointer_cast(sparsePij.data()),
                                         thrust::raw_pointer_cast(forceProd.data()),
                                         thrust::raw_pointer_cast(pts.data()));
+    // ComputePijxQijKernel<<<blocks*FACTOR7,THREADS7>>>(N, nnz, nnodes,
+    //                                     thrust::raw_pointer_cast(indices.data()),
+    //                                     thrust::raw_pointer_cast(sparsePij.data()),
+    //                                     thrust::raw_pointer_cast(forceProd.data()),
+    //                                     thrust::raw_pointer_cast(pts.data()));
     GpuErrorCheck(cudaDeviceSynchronize());
 
     // compute forces_i = sum_j pij*qij*normalization*yi
@@ -1076,6 +1138,8 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         exit(-1);
         }
         int blocks = deviceProp.multiProcessorCount;
+        std::cout << "Multiprocessor Count: " << blocks << std::endl;
+        std::cout << "GPU Architecture: " << GPU_ARCH << std::endl;
 
         // Figure out the number of nodes needed for the BH tree
         int nnodes = opt.n_points * 2;
@@ -1084,6 +1148,16 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         nnodes--;
 
         opt.n_nodes = nnodes;
+
+        std::cout << "Number of nodes chosen: " << nnodes << std::endl;
+
+        int attr_forces_block_size;
+        int attr_forces_min_grid_size;
+        int attr_forces_grid_size;
+        cudaOccupancyMaxPotentialBlockSize( &attr_forces_min_grid_size, &attr_forces_block_size, ComputePijxQijKernel, 0, 0);
+        attr_forces_grid_size = (sparsePij.size() + attr_forces_block_size - 1) / attr_forces_block_size;
+        std::cout << "Autotuned attractive force kernel - Grid size: " << attr_forces_grid_size << " Block Size: " << attr_forces_block_size << std::endl;
+        
 
         // Allocate memory for the barnes hut implementations
         thrust::device_vector<float> forceProd(sparsePij.size());
@@ -1123,11 +1197,13 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         } else if (opt.initialization == BHTSNE::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
             std::default_random_engine generator;
             std::normal_distribution<double> distribution1(0.0, 1.0);
-            thrust::host_vector<float> h_pts((nnodes + 1) * 2);
-            for (int i = 0; i < (nnodes + 1) * 2; i++) h_pts[i] = 0.0001 * distribution1(generator);
+            thrust::host_vector<float> h_pts(opt.n_points);
+            for (int i = 0; i < opt.n_points; i++) 
+              h_pts[i] = 0.0001 * distribution1(generator);
             thrust::copy(h_pts.begin(), h_pts.end(), pts.begin());
-            thrust::constant_iterator<float> mult(10);
-            thrust::transform(pts.begin(), pts.end(), mult, random_vec.begin(), thrust::multiplies<float>());
+            for (int i = 0; i < opt.n_points; i++) 
+              h_pts[i] = 0.0001 * distribution1(generator);
+            thrust::copy(h_pts.begin(), h_pts.end(), pts.begin()+nnodes+1);
         } else if (opt.initialization == BHTSNE::TSNE_INIT::RESUME) { // Preinit from vector
             // Load from vector
             if(opt.preinit_data != nullptr) {
@@ -1137,12 +1213,11 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
               std::cout << "E: Invalid initialization. Initialization points are null." << std::endl;
             }
         } else if (opt.initialization == BHTSNE::TSNE_INIT::VECTOR) { // Preinit from vector points only
-            // Load only the poitns into the pre-init vector
-            pts = tsnecuda::util::RandomDeviceVectorInRange((nnodes+1)*2, -100, 100);
             // Copy the pre-init data
             if(opt.preinit_data != nullptr) {
               thrust::copy(opt.preinit_data, opt.preinit_data+opt.n_points, pts.begin());
               thrust::copy(opt.preinit_data+opt.n_points+1, opt.preinit_data+opt.n_points*2 , pts.begin()+(nnodes+1));
+              tsnecuda::util::GaussianNormalizeDeviceVector(dense_handle, pts, (nnodes+1), 2);
             }
             else {
               std::cout << "E: Invalid initialization. Initialization points are null." << std::endl;
@@ -1219,7 +1294,13 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
 
     // Support for infinite iteration
     float attr_exaggeration = opt.early_exaggeration;
-  
+
+    // Random noise handling
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution1(0.0, 1.0);
+    thrust::host_vector<float> h_pts(opt.n_points*2);
+    thrust::device_vector<float> rand_noise(opt.n_points*2);
+            
     for (int step = 0; step != opt.iterations; step++) {
 
         // Setup learning rate schedule
@@ -1319,31 +1400,44 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
         start_time = std::chrono::high_resolution_clock::now();
 
             // compute attractive forces
-            computeAttrForce(opt.n_points, sparsePij.size(), nnodes, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
+            computeAttrForce(opt.n_points, sparsePij.size(), nnodes, attr_forces_grid_size, attr_forces_block_size, sparse_handle, descr, sparsePij, pijRowPtr, pijColInd, forceProd, pts, attr_forces, ones, indices);
             GpuErrorCheck(cudaDeviceSynchronize());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[11] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
 
 
-
         // Move the particles
         start_time = std::chrono::high_resolution_clock::now();
         
-            norm = thrust::reduce(norml.begin(), norml.begin() + opt.n_points, 0.0f, thrust::plus<float>());
-            if (opt.verbosity >= 1 && step % opt.print_interval == 0)
-                std::cout << "Step: " << step << ", Norm: " << norm << std::endl;
-            // std::cout << "pos_f: " << attr_forces[0] << " " << attr_forces[opt.n_points] << std::endl;
-            // std::cout << "neg_f: " << rep_forces[0] / norm << " " << rep_forces[nnodes + 1] / norm << std::endl;
-            
+            // Compute the normalization constant
+            norm = thrust::reduce(norml.begin(), norml.end(), 0.0f, thrust::plus<float>());
+
+            // Integrate
             IntegrationKernel<<<blocks * FACTOR6, THREADS6>>>(opt.n_points, nnodes, eta, norm, momentum, attr_exaggeration,
                                                                         thrust::raw_pointer_cast(pts.data()),
                                                                         thrust::raw_pointer_cast(attr_forces.data()),
                                                                         thrust::raw_pointer_cast(rep_forces.data()),
                                                                         thrust::raw_pointer_cast(gains.data()),
                                                                         thrust::raw_pointer_cast(old_forces.data()));
+            for (int i = 0; i < opt.n_points*2; i++) 
+              h_pts[i] = 0.001 * distribution1(generator);
             GpuErrorCheck(cudaDeviceSynchronize());
-            thrust::transform(pts.begin(), pts.end(), random_vec.begin(), pts.begin(), thrust::plus<float>());
+            thrust::copy(h_pts.begin(), h_pts.end(), rand_noise.begin());
+
+            // Compute the gradient norm
+            tsnecuda::util::SquareDeviceVector(attr_forces, old_forces);
+            thrust::transform(attr_forces.begin(), attr_forces.begin()+opt.n_points, 
+                              attr_forces.begin()+opt.n_points, attr_forces.begin(), thrust::plus<float>());
+            tsnecuda::util::SqrtDeviceVector(attr_forces, attr_forces);
+            float grad_norm = thrust::reduce(attr_forces.begin(), attr_forces.begin()+opt.n_points, 0.0f, thrust::plus<float>()) / opt.n_points;
+
+            if (opt.verbosity >= 1 && step % opt.print_interval == 0)
+              std::cout << "[Step " << step << "] Average Gradient Norm: " << grad_norm << std::endl;
+                                                            
+            // Add some random noise to the points
+            thrust::transform(pts.begin(), pts.begin()+opt.n_points, rand_noise.begin(), pts.begin(), thrust::plus<float>());
+            thrust::transform(pts.begin()+nnodes+1, pts.begin()+nnodes+1+opt.n_points, rand_noise.begin()+opt.n_points, pts.begin()+nnodes+1, thrust::plus<float>());
 
         end_time = std::chrono::high_resolution_clock::now();
         times[12] += std::chrono::duration_cast<std::chrono::microseconds>(end_time-start_time).count();
@@ -1412,6 +1506,8 @@ void BHTSNE::tsne(cublasHandle_t &dense_handle, cusparseHandle_t &sparse_handle,
       std::cout << "\t\tIntegration: " << times[12] << "us" << std::endl;
       std::cout << "Total Time: " << p1_time + p2_time << "us" << std::endl << std::endl;
     }
+    // std::cout << FACTOR1 << "," << FACTOR2 << "," << FACTOR3 << "," << FACTOR4 << "," << FACTOR5 << "," << FACTOR6 <<std::endl;
+    // std::cout << THREADS1 << "," << THREADS2 << "," << THREADS3 << "," << THREADS4 << "," << THREADS5 << "," << THREADS6 << std::endl;
 
     if (opt.verbosity >= 1) std::cout << "Fin." << std::endl;
     
