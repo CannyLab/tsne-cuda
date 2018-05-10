@@ -84,7 +84,7 @@ void MaxNormalizeDeviceVector(thrust::device_vector<float> &d_vector);
  * @param d_symmetrized_colind The symmetrized column indicies
  * @param d_symmetrized_rowptr The symmetrized row values
  * @param num_points The number of points
- * @param num_near_neighbors The number of nearest neighbors
+ * @param num_neighbors The number of nearest neighbors
  * @param magnitude_factor The normalization magnitude factor
  */
 void SymmetrizeMatrix(cusparseHandle_t &handle,
@@ -93,9 +93,9 @@ void SymmetrizeMatrix(cusparseHandle_t &handle,
         thrust::device_vector<int32_t> &d_symmetrized_rowptr,
         thrust::device_vector<float> &d_values,
         thrust::device_vector<int32_t> &d_indices,
-        float magnitude_factor,
-        int num_points, 
-        int num_near_neighbors);
+        const float magnitude_factor,
+        const int num_points, 
+        const int num_neighbors);
 
 __global__
 void Csr2CooKernel(volatile int * __restrict__ coo_indices,
@@ -104,7 +104,8 @@ void Csr2CooKernel(volatile int * __restrict__ coo_indices,
                              const int num_points,
                              const int num_nonzero);
 
-void Csr2Coo(thrust::device_vector<int> &coo_indices,
+void Csr2Coo(
+                             thrust::device_vector<int> &coo_indices,
                              thrust::device_vector<int> &pij_row_ptr,
                              thrust::device_vector<int> &pij_col_ind,
                              const int num_points,

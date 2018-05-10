@@ -69,13 +69,13 @@ void tsnecuda::util::MaxNormalizeDeviceVector(
 
 void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
         thrust::device_vector<float> &d_symmetrized_values,
-        thrust::device_vector<int32_t> &d_symmetrized_colind,
         thrust::device_vector<int32_t> &d_symmetrized_rowptr,
+        thrust::device_vector<int32_t> &d_symmetrized_colind,
         thrust::device_vector<float> &d_values,
         thrust::device_vector<int32_t> &d_indices,
-        float magnitude_factor,
-        int num_points, 
-        int num_near_neighbors) 
+        const float magnitude_factor,
+        const int num_points, 
+        const int num_neighbors) 
 {
 
     // Allocate memory
@@ -89,7 +89,7 @@ void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
     thrust::device_vector<int> d_vector_memory(csr_row_ptr_a,
             csr_row_ptr_a+num_points+1);
     thrust::sequence(d_vector_memory.begin(), d_vector_memory.end(),
-                     0, static_cast<int32_t>(num_near_neighbors));
+                     0, static_cast<int32_t>(num_neighbors));
     thrust::copy(d_vector_memory.begin(), d_vector_memory.end(), csr_row_ptr_a);
     cudaDeviceSynchronize();
 
@@ -106,7 +106,7 @@ void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
 
     // step 1: Allocate memory buffer
     cusparseXcsrsort_bufferSizeExt(handle, num_points, num_points,
-            num_points*num_near_neighbors, csr_row_ptr_a,
+            num_points*num_neighbors, csr_row_ptr_a,
             csr_column_ptr_a, &permutation_buffer_byte_size);
     cudaDeviceSynchronize();
     cudaMalloc(&permutation_buffer,
@@ -114,22 +114,22 @@ void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
 
     // step 2: Setup permutation vector permutation to be the identity
     cudaMalloc(reinterpret_cast<void**>(&permutation),
-            sizeof(int32_t)*num_points*num_near_neighbors);
-    cusparseCreateIdentityPermutation(handle, num_points*num_near_neighbors,
+            sizeof(int32_t)*num_points*num_neighbors);
+    cusparseCreateIdentityPermutation(handle, num_points*num_neighbors,
                                       permutation);
     cudaDeviceSynchronize();
 
     // step 3: Sort CSR format
     cusparseXcsrsort(handle, num_points, num_points,
-            num_points*num_near_neighbors, matrix_descriptor, csr_row_ptr_a,
+            num_points*num_neighbors, matrix_descriptor, csr_row_ptr_a,
             csr_column_ptr_a, permutation, permutation_buffer);
     cudaDeviceSynchronize();
 
     // step 4: Gather sorted csr_values
     float* csr_values_a_sorted = nullptr;
     cudaMalloc(reinterpret_cast<void**>(&csr_values_a_sorted),
-            (num_points*num_near_neighbors)*sizeof(float));
-    cusparseSgthr(handle, num_points*num_near_neighbors, csr_values_a,
+            (num_points*num_neighbors)*sizeof(float));
+    cusparseSgthr(handle, num_points*num_neighbors, csr_values_a,
             csr_values_a_sorted, permutation, CUSPARSE_INDEX_BASE_ZERO);
     cudaDeviceSynchronize();
 
@@ -141,17 +141,17 @@ void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
     // We need A^T, so we do a csr2csc() call
     int32_t* csc_row_ptr_at = nullptr;
     cudaMalloc(reinterpret_cast<void**>(&csc_row_ptr_at),
-            (num_points*num_near_neighbors)*sizeof(int32_t));
+            (num_points*num_neighbors)*sizeof(int32_t));
     int32_t* csc_column_ptr_at = nullptr;
     cudaMalloc(reinterpret_cast<void**>(&csc_column_ptr_at),
             (num_points+1)*sizeof(int32_t));
     float* csc_values_at = nullptr;
     cudaMalloc(reinterpret_cast<void**>(&csc_values_at),
-            (num_points*num_near_neighbors)*sizeof(float));
+            (num_points*num_neighbors)*sizeof(float));
 
     // Do the transpose operation
     cusparseScsr2csc(handle, num_points, num_points,
-                     num_near_neighbors*num_points, csr_values_a, csr_row_ptr_a,
+                     num_neighbors*num_points, csr_values_a, csr_row_ptr_a,
                      csr_column_ptr_a, csc_values_at, csc_row_ptr_at,
                      csc_column_ptr_at, CUSPARSE_ACTION_NUMERIC,
                      CUSPARSE_INDEX_BASE_ZERO);
@@ -163,9 +163,9 @@ void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
     cusparseSetPointerMode(handle, CUSPARSE_POINTER_MODE_HOST);
     d_symmetrized_rowptr.resize(num_points+1);
     cusparseXcsrgeamNnz(handle, num_points, num_points,
-            matrix_descriptor, num_points*num_near_neighbors, csr_row_ptr_a,
+            matrix_descriptor, num_points*num_neighbors, csr_row_ptr_a,
                 csr_column_ptr_a,
-            matrix_descriptor, num_points*num_near_neighbors, csc_column_ptr_at,
+            matrix_descriptor, num_points*num_neighbors, csc_column_ptr_at,
                 csc_row_ptr_at,
             matrix_descriptor,
             thrust::raw_pointer_cast(d_symmetrized_rowptr.data()),
@@ -193,9 +193,9 @@ void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
     float kBeta = 1.0f / (2.0f * num_points);
 
     cusparseScsrgeam(handle, num_points, num_points,
-            &kAlpha, matrix_descriptor, num_points*num_near_neighbors,
+            &kAlpha, matrix_descriptor, num_points*num_neighbors,
             csr_values_a, csr_row_ptr_a, csr_column_ptr_a,
-            &kBeta, matrix_descriptor, num_points*num_near_neighbors,
+            &kBeta, matrix_descriptor, num_points*num_neighbors,
             csc_values_at, csc_column_ptr_at, csc_row_ptr_at,
             matrix_descriptor,
             thrust::raw_pointer_cast(d_symmetrized_values.data()),
@@ -225,8 +225,8 @@ void tsnecuda::util::Csr2CooKernel(volatile int * __restrict__ coo_indices,
     i = (num_points + 1) >> 1;
     while (end - start > 1) {
       j = pij_row_ptr[i];
-      end = (j <= TID) ? end : i;
-      start = (j > TID) ? start : i;
+      end = (j > TID) ? i : end;
+      start = (j <= TID) ? i : start;
       i = (start + end) >> 1;
     }
     j = pij_col_ind[TID];
@@ -234,7 +234,8 @@ void tsnecuda::util::Csr2CooKernel(volatile int * __restrict__ coo_indices,
     coo_indices[2*TID+1] = j;
 }
 
-void tsnecuda::util::Csr2Coo(thrust::device_vector<int> &coo_indices,
+void tsnecuda::util::Csr2Coo(
+                             thrust::device_vector<int> &coo_indices,
                              thrust::device_vector<int> &pij_row_ptr,
                              thrust::device_vector<int> &pij_col_ind,
                              const int num_points,
@@ -242,9 +243,11 @@ void tsnecuda::util::Csr2Coo(thrust::device_vector<int> &coo_indices,
 {
     const int num_threads = 1024;
     const int num_blocks = iDivUp(num_nonzero, num_threads);
+    
     tsnecuda::util::Csr2CooKernel<<<num_blocks, num_threads>>>(thrust::raw_pointer_cast(coo_indices.data()),
                                                                thrust::raw_pointer_cast(pij_row_ptr.data()),
                                                                thrust::raw_pointer_cast(pij_col_ind.data()),
                                                                num_points, num_nonzero);
+    GpuErrorCheck(cudaDeviceSynchronize());
 }
 

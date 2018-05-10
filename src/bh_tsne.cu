@@ -320,6 +320,9 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         // Add a bit of random motion to prevent points from being on top of each other
         thrust::transform(points_device.begin(), points_device.end(), random_vector_device.begin(),
                             points_device.begin(), thrust::plus<float>());
+
+        if (step % opt.print_interval == 0)
+            std::cout << "Step: " << step << ", Norm: " << normalization << std::endl;
         
         #ifndef NO_ZMQ
             if (send_zmq) {
