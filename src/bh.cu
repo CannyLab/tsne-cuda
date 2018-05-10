@@ -42,9 +42,14 @@ Author: Martin Burtscher <burtscher@txstate.edu>
 #include <cuda.h>
 #include <chrono>
 #include "bh_tsne.h"
+#include <cuda_runtime_api.h>
 
 #ifndef NO_ZMQ
 	#include <zmq.hpp>
+#endif
+
+#ifndef CUDART_VERSION
+#error CUDART_VERSION Undefined!
 #endif
 
 // #ifdef __KEPLER__
@@ -677,7 +682,11 @@ void ForceCalculationKernel(int nnodesd,
             dx = px - posxd[n];
             dy = py - posyd[n];
             tmp = dx*dx + dy*dy + epssqd; // distance squared plus small constant to prevent zeros
-            if ((n < nbodiesd) || __all_sync(__activemask(), tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+            #if (CUDART_VERSION >= 9000)
+              if ((n < nbodiesd) || __all_sync(__activemask(), tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+            #else
+              if ((n < nbodiesd) || __all(tmp >= dq[depth])) {  // check if all threads agree that cell is far enough away (or is a body)
+            #endif
               // from bhtsne - sptree.cpp
               tmp = 1 / (1 + tmp);
               mult = massd[n] * tmp;
