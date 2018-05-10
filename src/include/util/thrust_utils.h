@@ -66,7 +66,7 @@ class StridedRange {
  * @param d_vector 
  */
 void ZeroDeviceMatrixDiagonal(thrust::device_vector<float> &d_vector,
-                              const uint32_t N);
+                              const int N);
 
 }  // namespace util
 }  // namespace tsnecuda

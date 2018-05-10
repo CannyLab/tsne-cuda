@@ -61,7 +61,7 @@ float* LoadCifar100(std::string file_name);
  * @param num_dims The number of dimensions in the array
  */
 void Save(const float * const points, std::string file_name,
-    const uint32_t num_points, const uint32_t num_dims);
+    const int num_points, const int num_dims);
 
 /**
  * @brief Save a device vector to disk
@@ -72,7 +72,7 @@ void Save(const float * const points, std::string file_name,
  * @param num_dims The number of dimensions of points in the array
  */
 void Save(thrust::device_vector<float> d_points, std::string file_name,
-    const uint32_t num_points, const uint32_t num_dims);
+    const int num_points, const int num_dims);
 float* Load(std::string file_name);
 
 }  // namespace util

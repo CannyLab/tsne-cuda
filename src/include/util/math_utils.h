@@ -29,7 +29,7 @@ namespace util {
 */
 void GaussianNormalizeDeviceVector(cublasHandle_t &handle,
         thrust::device_vector<float> &d_points,
-        const uint32_t num_points, const uint32_t num_dims);
+        const int num_points, const int num_dims);
 
 /**
 * @brief Square a vector element-wise
@@ -94,21 +94,21 @@ void SymmetrizeMatrix(cusparseHandle_t &handle,
         thrust::device_vector<float> &d_values,
         thrust::device_vector<int32_t> &d_indices,
         float magnitude_factor,
-        uint32_t num_points, 
-        uint32_t num_near_neighbors);
+        int num_points, 
+        int num_near_neighbors);
 
 __global__
 void Csr2CooKernel(volatile int * __restrict__ coo_indices,
                              const int * __restrict__ pij_row_ptr,
                              const int * __restrict__ pij_col_ind,
-                             const uint32_t num_points,
-                             const uint32_t num_nonzero);
+                             const int num_points,
+                             const int num_nonzero);
 
 void Csr2Coo(thrust::device_vector<int> &coo_indices,
                              thrust::device_vector<int> &pij_row_ptr,
                              thrust::device_vector<int> &pij_col_ind,
-                             const uint32_t num_points,
-                             const uint32_t num_nonzero);
+                             const int num_points,
+                             const int num_nonzero);
 
 }  // namespace util
 }  // namespace tsnecuda

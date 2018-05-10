@@ -22,8 +22,8 @@ void tsnecuda::bh::IntegrationKernel(
                                  const float normalization,
                                  const float momentum,
                                  const float exaggeration,
-                                 const uint32_t num_nodes,
-                                 const uint32_t num_points)
+                                 const int num_nodes,
+                                 const int num_points)
 {
   register int i, inc;
   register float dx, dy, ux, uy, gx, gy;
@@ -69,7 +69,7 @@ void tsnecuda::naive::IntegrationKernel(
                                  volatile float * __restrict__ old_forces,
                                  const float eta,
                                  const float momentum,
-                                 const uint32_t num_points)
+                                 const int num_points)
 {
   register int i, inc;
   register float dx, dy, ux, uy, gx, gy;
@@ -111,9 +111,9 @@ void tsnecuda::bh::ApplyForces(thrust::device_vector<float> &points,
                                const float normalization,
                                const float momentum,
                                const float exaggeration,
-                               const uint32_t num_nodes,
-                               const uint32_t num_points,
-                               const uint32_t num_blocks)
+                               const int num_nodes,
+                               const int num_points,
+                               const int num_blocks)
 {
     tsnecuda::bh::IntegrationKernel<<<num_blocks * INTEGRATION_BLOCKS, INTEGRATION_THREADS>>>(
                     thrust::raw_pointer_cast(points.data()),
@@ -132,8 +132,8 @@ void tsnecuda::naive::ApplyForces(thrust::device_vector<float> &points,
                                   thrust::device_vector<float> &old_forces,
                                   const float eta,
                                   const float momentum,
-                                  const uint32_t num_points,
-                                  const uint32_t num_blocks)
+                                  const int num_points,
+                                  const int num_blocks)
 {
     tsnecuda::naive::IntegrationKernel<<<num_blocks * INTEGRATION_BLOCKS, INTEGRATION_THREADS>>>(
                     thrust::raw_pointer_cast(points.data()),

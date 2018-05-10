@@ -23,7 +23,7 @@ namespace util {
 * @return thrust::device_vector<float> 
 */
 thrust::device_vector<float> RandomDeviceUniformZeroOneVector(
-        const uint32_t vector_size);
+        const int vector_size);
 
 /**
  * @brief Returns a uniform random device vector in the specified range
@@ -33,7 +33,7 @@ thrust::device_vector<float> RandomDeviceUniformZeroOneVector(
  * @param upper_bound The upper bound
  * @return thrust::device_vector<float> The random vector
  */
-thrust::device_vector<float> RandomDeviceVectorInRange(const uint32_t vector_size,
+thrust::device_vector<float> RandomDeviceVectorInRange(const int vector_size,
         float lower_bound, float upper_bound);
 
 }

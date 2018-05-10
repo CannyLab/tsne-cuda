@@ -11,7 +11,7 @@
 
 // Assumes that vec is an N x N matrix
 void tsnecuda::util::ZeroDeviceMatrixDiagonal(
-        thrust::device_vector<float> &d_vector, const uint32_t N) {
+        thrust::device_vector<float> &d_vector, const int N) {
     typedef thrust::device_vector<float>::iterator Iterator;
     StridedRange<Iterator> return_vector(d_vector.begin(),
             d_vector.end(), N + 1);

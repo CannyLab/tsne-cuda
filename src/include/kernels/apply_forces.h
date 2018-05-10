@@ -35,8 +35,8 @@ void IntegrationKernel(
                                  const float normalization,
                                  const float momentum,
                                  const float exaggeration,
-                                 const uint32_t num_nodes,
-                                 const uint32_t num_points
+                                 const int num_nodes,
+                                 const int num_points
                       );
 
 void ApplyForces(thrust::device_vector<float> &points,
@@ -48,9 +48,9 @@ void ApplyForces(thrust::device_vector<float> &points,
                                const float normalization,
                                const float momentum,
                                const float exaggeration,
-                               const uint32_t num_nodes,
-                               const uint32_t num_points,
-                               const uint32_t num_blocks
+                               const int num_nodes,
+                               const int num_points,
+                               const int num_blocks
                       );
 }
 
@@ -65,7 +65,7 @@ void IntegrationKernel(
                                  volatile float * __restrict__ old_forces,
                                  const float eta,
                                  const float momentum,
-                                 const uint32_t num_points
+                                 const int num_points
                       );
 
 
@@ -75,8 +75,8 @@ void ApplyForces(thrust::device_vector<float> &points,
                                   thrust::device_vector<float> &old_forces,
                                   const float eta,
                                   const float momentum,
-                                  const uint32_t num_points,
-                                  const uint32_t num_blocks);
+                                  const int num_points,
+                                  const int num_blocks);
 
 }
 }

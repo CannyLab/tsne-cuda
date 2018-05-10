@@ -15,13 +15,13 @@ template<typename BinaryFunction, typename T>
 __global__ void tsnecuda::util::BroadcastRowVector(
         T * __restrict__ d_matrix,
         const T * __restrict__ d_vector,
-        const uint32_t N,
-        const uint32_t M,
+        const int N,
+        const int M,
         BinaryFunction binary_operation,
         const T alpha) {
-    const uint32_t TID = threadIdx.x + blockIdx.x * blockDim.x;
-    const uint32_t i = TID % N;
-    const uint32_t j = TID / N;
+    const int TID = threadIdx.x + blockIdx.x * blockDim.x;
+    const int i = TID % N;
+    const int j = TID / N;
     if (j < M) d_matrix[j * N + i] = binary_operation(d_matrix[j * N + i],
                                             alpha * d_vector[j]);
 }
@@ -32,13 +32,13 @@ template<typename BinaryFunction, typename T>
 __global__ void tsnecuda::util::BroadcastColumnVector(
         T * __restrict__ d_matrix,
         const T * __restrict__ d_vector,
-        const uint32_t N,
-        const uint32_t M,
+        const int N,
+        const int M,
         BinaryFunction binary_operation,
         const T alpha) {
-     const uint32_t TID = threadIdx.x + blockIdx.x * blockDim.x;
-     const uint32_t i = TID % N;
-     const uint32_t j = TID / N;
+     const int TID = threadIdx.x + blockIdx.x * blockDim.x;
+     const int i = TID % N;
+     const int j = TID / N;
 
      if (j < M) d_matrix[j * N + i] = binary_operation(d_matrix[j * N + i],
                                             alpha * d_vector[i]);
@@ -48,18 +48,18 @@ template<typename BinaryFunction, typename T>
 void tsnecuda::util::BroadcastMatrixVector(
         thrust::device_vector<T> &d_matrix,
         const thrust::device_vector<T> &d_vector,
-        const uint32_t N,
-        const uint32_t M,
+        const int N,
+        const int M,
         BinaryFunction binary_operation,
-        const uint32_t axis,
+        const int axis,
         const T alpha) {
     // Checks to make sure dimensions are correct
     assert(d_matrix.size() >= N * M);
     assert((axis == 0 && d_vector.size() >= N) ||
             (axis == 1 && d_vector.size() >= M));
 
-    const uint32_t kBlockSize = 32;
-    const uint32_t kNumBlocks = iDivUp(N * M, kBlockSize);
+    const int kBlockSize = 32;
+    const int kNumBlocks = iDivUp(N * M, kBlockSize);
     if (axis == 0) {
     tsnecuda::util::BroadcastColumnVector<<<kNumBlocks, kBlockSize>>>(
             thrust::raw_pointer_cast(d_matrix.data()),
@@ -78,16 +78,16 @@ void tsnecuda::util::BroadcastMatrixVector(
 template void tsnecuda::util::BroadcastMatrixVector<thrust::divides<float>, float>(
         thrust::device_vector<float> &d_matrix,
         const thrust::device_vector<float> &d_vector,
-        const uint32_t N,
-        const uint32_t M,
+        const int N,
+        const int M,
         thrust::divides<float> binary_operation,
-        const uint32_t axis,
+        const int axis,
         const float alpha);
 template void tsnecuda::util::BroadcastMatrixVector<thrust::minus<float>, float>(
         thrust::device_vector<float> &d_matrix,
         const thrust::device_vector<float> &d_vector,
-        const uint32_t N,
-        const uint32_t M,
+        const int N,
+        const int M,
         thrust::minus<float> binary_operation,
-        const uint32_t axis,
+        const int axis,
         const float alpha);

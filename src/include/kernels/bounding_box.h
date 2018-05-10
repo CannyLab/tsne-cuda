@@ -35,8 +35,8 @@ void BoundingBoxKernel(
                        volatile float * __restrict__ y_max_device, 
                        volatile float * __restrict__ x_min_device, 
                        volatile float * __restrict__ y_min_device,
-                       const uint32_t num_nodes,
-                       const uint32_t num_points);
+                       const int num_nodes,
+                       const int num_points);
 
 void ComputeBoundingBox(thrust::device_vector<int> &cell_starts,
                                       thrust::device_vector<int> &children,
@@ -46,9 +46,9 @@ void ComputeBoundingBox(thrust::device_vector<int> &cell_starts,
                                       thrust::device_vector<float> &y_max_device,
                                       thrust::device_vector<float> &x_min_device,
                                       thrust::device_vector<float> &y_min_device,
-                                      const uint32_t num_nodes,
-                                      const uint32_t num_points,
-                                      const uint32_t num_blocks);
+                                      const int num_nodes,
+                                      const int num_points,
+                                      const int num_blocks);
 }
 }
 

@@ -14,8 +14,8 @@ void tsnecuda::bh::ComputePijxQijKernel(
                             const float * __restrict__ pij,
                             const float * __restrict__ points,
                             const int * __restrict__ coo_indices,
-                            const uint32_t num_nodes,
-                            const uint32_t num_nonzero)
+                            const int num_nodes,
+                            const int num_nonzero)
 {
     register int TID, i, j;
     register float ix, iy, jx, jy, dx, dy;
@@ -41,9 +41,9 @@ void tsnecuda::bh::ComputeAttractiveForces(
                     thrust::device_vector<int> &coo_indices,
                     thrust::device_vector<float> &points,
                     thrust::device_vector<float> &ones,
-                    const uint32_t num_nodes,
-                    const uint32_t num_points,
-                    const uint32_t num_nonzero)
+                    const int num_nodes,
+                    const int num_points,
+                    const int num_nonzero)
 {
     // Computes pij*qij for each i,j
     // TODO: this is bad style

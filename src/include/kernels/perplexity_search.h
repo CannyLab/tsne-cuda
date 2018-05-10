@@ -26,7 +26,7 @@ void PerplexitySearchKernel(
                             const float * __restrict__ row_sum,
                             const float perplexity_target,
                             const float epsilon,
-                            const uint32_t num_points);
+                            const int num_points);
 namespace bh {
 __global__
 void ComputePijKernel(
@@ -41,8 +41,8 @@ void SearchPerplexity(cublasHandle_t &handle,
                                      thrust::device_vector<float> &squared_dist,
                                      const float perplexity_target,
                                      const float epsilon,
-                                     const uint32_t num_points,
-                                     const uint32_t num_near_neighbors);
+                                     const int num_points,
+                                     const int num_near_neighbors);
 }
 
 namespace naive {
@@ -58,7 +58,7 @@ void SearchPerplexity(cublasHandle_t &handle,
                                      thrust::device_vector<float> &squared_dist,
                                      const float perplexity_target,
                                      const float epsilon,
-                                     const uint32_t num_points);
+                                     const int num_points);
 }
 }
 

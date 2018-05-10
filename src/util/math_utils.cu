@@ -10,8 +10,8 @@
 #include "util/math_utils.h"
 
 void tsnecuda::util::GaussianNormalizeDeviceVector(cublasHandle_t &handle,
-        thrust::device_vector<float> &d_points, const uint32_t num_points,
-        const uint32_t num_dims) {
+        thrust::device_vector<float> &d_points, const int num_points,
+        const int num_dims) {
     // Compute the means
     auto d_means = tsnecuda::util::ReduceMean(handle, d_points, num_points,
                                          num_dims, 0);
@@ -74,8 +74,8 @@ void tsnecuda::util::SymmetrizeMatrix(cusparseHandle_t &handle,
         thrust::device_vector<float> &d_values,
         thrust::device_vector<int32_t> &d_indices,
         float magnitude_factor,
-        uint32_t num_points, 
-        uint32_t num_near_neighbors) 
+        int num_points, 
+        int num_near_neighbors) 
 {
 
     // Allocate memory
@@ -215,8 +215,8 @@ __global__
 void tsnecuda::util::Csr2CooKernel(volatile int * __restrict__ coo_indices,
                              const int * __restrict__ pij_row_ptr,
                              const int * __restrict__ pij_col_ind,
-                             const uint32_t num_points,
-                             const uint32_t num_nonzero)
+                             const int num_points,
+                             const int num_nonzero)
 {
     register int TID, i, j, start, end;
     TID = threadIdx.x + blockIdx.x * blockDim.x;
@@ -237,11 +237,11 @@ void tsnecuda::util::Csr2CooKernel(volatile int * __restrict__ coo_indices,
 void tsnecuda::util::Csr2Coo(thrust::device_vector<int> &coo_indices,
                              thrust::device_vector<int> &pij_row_ptr,
                              thrust::device_vector<int> &pij_col_ind,
-                             const uint32_t num_points,
-                             const uint32_t num_nonzero)
+                             const int num_points,
+                             const int num_nonzero)
 {
-    const uint32_t num_threads = 1024;
-    const uint32_t num_blocks = iDivUp(num_nonzero, num_threads);
+    const int num_threads = 1024;
+    const int num_blocks = iDivUp(num_nonzero, num_threads);
     tsnecuda::util::Csr2CooKernel<<<num_blocks, num_threads>>>(thrust::raw_pointer_cast(coo_indices.data()),
                                                                thrust::raw_pointer_cast(pij_row_ptr.data()),
                                                                thrust::raw_pointer_cast(pij_col_ind.data()),

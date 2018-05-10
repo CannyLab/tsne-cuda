@@ -25,7 +25,7 @@ namespace tsnecuda {
 namespace bh {
 __global__
 __launch_bounds__(1024, 1)
-void ClearKernel1(volatile int * __restrict__ children, const uint32_t num_nodes, const uint32_t num_points);
+void ClearKernel1(volatile int * __restrict__ children, const int num_nodes, const int num_points);
 
 __global__
 __launch_bounds__(TREE_THREADS, TREE_BLOCKS)
@@ -33,21 +33,21 @@ void TreeBuildingKernel(volatile int * __restrict__ errd,
                                         volatile int * __restrict__ children, 
                                         volatile float * __restrict__ x_pos_device, 
                                         volatile float * __restrict__ y_pos_device,
-                                        const uint32_t num_nodes,
-                                        const uint32_t num_points);
+                                        const int num_nodes,
+                                        const int num_points);
 
 __global__
 __launch_bounds__(1024, 1)
-void ClearKernel2(volatile int * __restrict__ cell_starts, volatile float * __restrict__ cell_mass, const uint32_t num_nodes);
+void ClearKernel2(volatile int * __restrict__ cell_starts, volatile float * __restrict__ cell_mass, const int num_nodes);
 
 void BuildTree(thrust::device_vector<int> &errd,
                                thrust::device_vector<int> &children,
                                thrust::device_vector<int> &cell_starts,
                                thrust::device_vector<float> &cell_mass,
                                thrust::device_vector<float> &points,
-                               const uint32_t num_nodes,
-                               const uint32_t num_points,
-                               const uint32_t num_blocks);
+                               const int num_nodes,
+                               const int num_points,
+                               const int num_blocks);
 }
 }
 

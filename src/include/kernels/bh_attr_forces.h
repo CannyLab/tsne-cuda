@@ -20,8 +20,8 @@ void ComputePijxQijKernel(
                             const float * __restrict__ pij,
                             const float * __restrict__ points,
                             const int * __restrict__ coo_indices,
-                            const uint32_t num_nodes,
-                            const uint32_t num_nonzero);
+                            const int num_nodes,
+                            const int num_nonzero);
 
 void ComputeAttractiveForces(
                     cusparseHandle_t &handle,
@@ -34,9 +34,9 @@ void ComputeAttractiveForces(
                     thrust::device_vector<int> &coo_indices,
                     thrust::device_vector<float> &points,
                     thrust::device_vector<float> &ones,
-                    const uint32_t num_nodes,
-                    const uint32_t num_points,
-                    const uint32_t num_nonzero);
+                    const int num_nodes,
+                    const int num_points,
+                    const int num_nonzero);
 }
 }
 

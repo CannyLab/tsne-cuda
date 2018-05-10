@@ -20,8 +20,8 @@ namespace util {
 template<typename BinaryFunction, typename T>
 __global__ void BroadcastRowVector(T * __restrict__ matrix,
                         const T * __restrict__ vector,
-                        const uint32_t N,
-                        const uint32_t M,
+                        const int N,
+                        const int M,
                         BinaryFunction binary_operation,
                         const T alpha);
 
@@ -29,8 +29,8 @@ __global__ void BroadcastRowVector(T * __restrict__ matrix,
 template<typename BinaryFunction, typename T>
 __global__ void BroadcastColumnVector(T * __restrict__ matrix,
                         const T * __restrict__ vector,
-                        const uint32_t N,
-                        const uint32_t M,
+                        const int N,
+                        const int M,
                         BinaryFunction binary_operation,
                         const T alpha);
 
@@ -53,10 +53,10 @@ __global__ void BroadcastColumnVector(T * __restrict__ matrix,
 template<typename BinaryFunction, typename T>
 void BroadcastMatrixVector(thrust::device_vector<T> &d_matrix,
                             const thrust::device_vector<T> &d_vector,
-                            const uint32_t N,
-                            const uint32_t M,
+                            const int N,
+                            const int M,
                             BinaryFunction binary_operation,
-                            const uint32_t axis,
+                            const int axis,
                             const T alpha);
 }  // namespace util
 }  // namespace tsnecuda

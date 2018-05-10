@@ -26,7 +26,7 @@ namespace debug {
  */
 template <typename T>
 void PrintArray(const thrust::device_vector<T> &d_matrix,
-    const uint32_t N, const uint32_t M);
+    const int N, const int M);
 
 }  // namespace debug
 }  // namespace tsnecuda

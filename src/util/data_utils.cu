@@ -159,8 +159,8 @@ float* tsnecuda::util::LoadCifar100(std::string file_name) {
 }
 
 void tsnecuda::util::Save(const float * const points,
-        std::string file_name,  const uint32_t num_points,
-        const uint32_t num_dims) {
+        std::string file_name,  const int num_points,
+        const int num_dims) {
     std::ofstream save_file(file_name, std::ios::out | std::ios::binary);
     save_file << num_points << num_dims;
     for (size_t i = 0; i < num_points; i++) {
@@ -172,8 +172,8 @@ void tsnecuda::util::Save(const float * const points,
 }
 
 void tsnecuda::util::Save(thrust::device_vector<float> d_points,
-        std::string file_name,  const uint32_t num_points,
-        const uint32_t num_dims) {
+        std::string file_name,  const int num_points,
+        const int num_dims) {
     float *data = new float[num_points * num_dims];
     thrust::copy(d_points.begin(), d_points.end(), data);
     tsnecuda::util::Save(data, file_name, num_points, num_dims);
@@ -182,16 +182,16 @@ void tsnecuda::util::Save(thrust::device_vector<float> d_points,
 
 float* tsnecuda::util::Load(std::string file_name) {
     std::ifstream load_file(file_name, std::ios::in | std::ios::binary);
-    uint32_t num_points;
-    uint32_t num_dims;
+    int num_points;
+    int num_dims;
     float kPoint = 0.0f;
 
-    load_file.read(reinterpret_cast<char *>(&num_points), sizeof(uint32_t));
-    load_file.read(reinterpret_cast<char *>(&num_dims), sizeof(uint32_t));
+    load_file.read(reinterpret_cast<char *>(&num_points), sizeof(int));
+    load_file.read(reinterpret_cast<char *>(&num_dims), sizeof(int));
     float *data = new float[num_points * num_dims];
     for (size_t i = 0; i < num_points; i++) {
         for (size_t j = 0; j < num_dims; j++) {
-            load_file.read(reinterpret_cast<char*>(&kPoint), sizeof(uint32_t));
+            load_file.read(reinterpret_cast<char*>(&kPoint), sizeof(int));
             data[i * num_dims + j] = kPoint;
         }
     }

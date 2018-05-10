@@ -14,8 +14,8 @@ void tsnecuda::bh::SortKernel(int * __restrict__ cell_sorted,
                               volatile int * __restrict__ cell_starts, 
                               int * __restrict__ children,
                               const int * __restrict__ cell_counts, 
-                              const uint32_t num_nodes,
-                              const uint32_t num_points)
+                              const int num_nodes,
+                              const int num_points)
 {
     register int i, j, k, ch, dec, start, bottom;
 
@@ -57,9 +57,9 @@ void tsnecuda::bh::SortCells(thrust::device_vector<int> &cell_sorted,
                              thrust::device_vector<int> &cell_starts,
                              thrust::device_vector<int> &children,
                              thrust::device_vector<int> &cell_counts,
-                             const uint32_t num_nodes,
-                             const uint32_t num_points,
-                             const uint32_t num_blocks)
+                             const int num_nodes,
+                             const int num_points,
+                             const int num_blocks)
 {
     tsnecuda::bh::SortKernel<<<num_blocks * SORT_BLOCKS, SORT_THREADS>>>(
                                 thrust::raw_pointer_cast(cell_sorted.data()),

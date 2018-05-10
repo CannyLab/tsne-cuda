@@ -12,10 +12,10 @@
 // expects matrix of size N x M
 thrust::device_vector<float> tsnecuda::util::ReduceAlpha(cublasHandle_t &handle,
         const thrust::device_vector<float> &d_matrix,
-        const uint32_t N,
-        const uint32_t M,
+        const int N,
+        const int M,
         float alpha,
-        const uint32_t axis) {
+        const int axis) {
     if (axis == 0) {
         thrust::device_vector<float> ones(N, 1.f);
         thrust::device_vector<float> means(M);
@@ -43,9 +43,9 @@ thrust::device_vector<float> tsnecuda::util::ReduceAlpha(cublasHandle_t &handle,
 
 thrust::device_vector<float> tsnecuda::util::ReduceMean(cublasHandle_t &handle,
         const thrust::device_vector<float> &d_matrix,
-        const uint32_t N,
-        const uint32_t M,
-        const uint32_t axis) {
+        const int N,
+        const int M,
+        const int axis) {
     float alpha = 1.f / N;
     return tsnecuda::util::ReduceAlpha(handle, d_matrix, N, M, alpha, axis);
 }
@@ -53,9 +53,9 @@ thrust::device_vector<float> tsnecuda::util::ReduceMean(cublasHandle_t &handle,
 
 thrust::device_vector<float> tsnecuda::util::ReduceSum(cublasHandle_t &handle,
         const thrust::device_vector<float> &d_matrix,
-        const uint32_t N,
-        const uint32_t M,
-        const uint32_t axis) {
+        const int N,
+        const int M,
+        const int axis) {
     float alpha = 1.f;
     return tsnecuda::util::ReduceAlpha(handle, d_matrix, N, M, alpha, axis);
 }

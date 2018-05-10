@@ -43,8 +43,8 @@ void ForceCalculationKernel(volatile int * __restrict__ errd,
                                           volatile float * __restrict__ y_pos_device,
                                           const float theta,
                                           const float epsilon,
-                                          const uint32_t num_nodes,
-                                          const uint32_t num_points);
+                                          const int num_nodes,
+                                          const int num_points);
 
 void ComputeRepulsiveForces(thrust::device_vector<int> &errd,
                                           thrust::device_vector<float> &repulsive_forces,
@@ -55,9 +55,9 @@ void ComputeRepulsiveForces(thrust::device_vector<int> &errd,
                                           thrust::device_vector<float> &points,
                                           const float theta,
                                           const float epsilon,
-                                          const uint32_t num_nodes,
-                                          const uint32_t num_points,
-                                          const uint32_t num_blocks);
+                                          const int num_nodes,
+                                          const int num_points,
+                                          const int num_blocks);
  
 }
 }

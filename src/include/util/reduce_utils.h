@@ -29,10 +29,10 @@ namespace util {
 */
 thrust::device_vector<float> ReduceAlpha(cublasHandle_t &handle,
                             const thrust::device_vector<float> &d_matrix,
-                            const uint32_t N,
-                            const uint32_t M,
+                            const int N,
+                            const int M,
                             float alpha,
-                            const uint32_t axis);
+                            const int axis);
 
 /**
 * @brief Reduce a matrix by computing the mean of the reduction axis
@@ -46,9 +46,9 @@ thrust::device_vector<float> ReduceAlpha(cublasHandle_t &handle,
 */
 thrust::device_vector<float> ReduceMean(cublasHandle_t &handle,
                                 const thrust::device_vector<float> &d_matrix,
-                                const uint32_t N,
-                                const uint32_t M,
-                                const uint32_t axis);
+                                const int N,
+                                const int M,
+                                const int axis);
 
 /**
 * @brief Reduce a matrix by computing the sum of the reduction axis
@@ -62,9 +62,9 @@ thrust::device_vector<float> ReduceMean(cublasHandle_t &handle,
 */
 thrust::device_vector<float> ReduceSum(cublasHandle_t &handle,
                                 const thrust::device_vector<float> &d_matrix,
-                                const uint32_t N,
-                                const uint32_t M,
-                                const uint32_t axis);
+                                const int N,
+                                const int M,
+                                const int axis);
 
 }  // namespace util
 }  // namespace tsnecuda

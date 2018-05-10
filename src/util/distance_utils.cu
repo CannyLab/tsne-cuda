@@ -16,9 +16,9 @@
 __global__ void tsnecuda::util::AssembleDistances(
         const float * __restrict__ d_squared_norms,
         float * __restrict__ d_dot_products,
-        const uint32_t num_points) {
-    const uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
-    const uint32_t j = threadIdx.y + blockIdx.y * blockDim.y;
+        const int num_points) {
+    const int i = threadIdx.x + blockIdx.x * blockDim.x;
+    const int j = threadIdx.y + blockIdx.y * blockDim.y;
 
     if ((i < num_points) && (j < num_points))
         d_dot_products[i * num_points + j] = fabs(d_squared_norms[j] +
@@ -33,9 +33,9 @@ __global__ void tsnecuda::util::AssembleDistances(
 void tsnecuda::util::SquaredPairwiseDistance(cublasHandle_t &handle,
         thrust::device_vector<float> &d_distances,
         const thrust::device_vector<float> &d_points,
-        const uint32_t num_points,
-        const uint32_t num_dims) {
-    const uint32_t kBlockSize = 16;
+        const int num_points,
+        const int num_dims) {
+    const int kBlockSize = 16;
     float kAlpha = 1.f;
     float kBeta = 0.f;
 
@@ -65,16 +65,16 @@ void tsnecuda::util::SquaredPairwiseDistance(cublasHandle_t &handle,
 void tsnecuda::util::PairwiseDistance(cublasHandle_t &handle,
         thrust::device_vector<float> &d_distances,
         const thrust::device_vector<float> &d_points,
-        const uint32_t num_points,
-        const uint32_t num_dims) {
+        const int num_points,
+        const int num_dims) {
     tsnecuda::util::SquaredPairwiseDistance(handle, d_distances, d_points,
                                           num_points, num_dims);
     tsnecuda::util::SqrtDeviceVector(d_distances, d_distances);
 }
 
 void tsnecuda::util::KNearestNeighbors(int64_t* indices, float* distances,
-        const float* const points, const uint32_t num_dims,
-        const uint32_t num_points, const uint32_t num_near_neighbors) {
+        const float* const points, const int num_dims,
+        const int num_points, const int num_near_neighbors) {
     const int32_t kNumCells = static_cast<int32_t>(
             std::sqrt(static_cast<float>(num_points)));
     const int32_t kNumCellsToProbe = 20;
@@ -125,8 +125,8 @@ __global__
 void tsnecuda::util::PostprocessNeighborIndicesKernel(
                                     volatile int * __restrict__ indices,
                                     const long * __restrict__ long_indices,
-                                    const uint32_t num_points,
-                                    const uint32_t num_neighbors) 
+                                    const int num_points,
+                                    const int num_neighbors) 
 {
     register int TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= num_points * num_neighbors) return;
@@ -138,12 +138,12 @@ void tsnecuda::util::PostprocessNeighborIndicesKernel(
 void tsnecuda::util::PostprocessNeighborIndices(
                 thrust::device_vector<int> &indices,
                 thrust::device_vector<int64_t> &long_indices,
-                const uint32_t num_points,
-                const uint32_t num_neighbors
+                const int num_points,
+                const int num_neighbors
         )
 {
-    const uint32_t num_threads = 128;
-    const uint32_t num_blocks = iDivUp(num_points*num_neighbors, num_threads);
+    const int num_threads = 128;
+    const int num_blocks = iDivUp(num_points*num_neighbors, num_threads);
     tsnecuda::util::PostprocessNeighborIndicesKernel<<<num_blocks, num_threads>>>(
                         thrust::raw_pointer_cast(indices.data()),
                         thrust::raw_pointer_cast(long_indices.data()),

@@ -23,7 +23,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
         exit(-1);
     }
-    const uint32_t num_blocks = deviceProp.multiProcessorCount;
+    const int num_blocks = deviceProp.multiProcessorCount;
     
     // Construct sparse matrix descriptor
     cusparseMatDescr_t sparse_matrix_descriptor;
@@ -39,10 +39,10 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     }
 
     // Get constants from options
-    const uint32_t num_points = opt.num_points;
-    const uint32_t num_neighbors = (opt.num_neighbors < num_points) ? opt.num_neighbors : num_points;
+    const int num_points = opt.num_points;
+    const int num_neighbors = (opt.num_neighbors < num_points) ? opt.num_neighbors : num_points;
     const float *high_dim_points = opt.points;
-    const uint32_t high_dim = opt.num_dims;
+    const int high_dim = opt.num_dims;
     const float perplexity = opt.perplexity;
     const float perplexity_search_epsilon = opt.perplexity_search_epsilon;
     const float eta = opt.learning_rate;
@@ -55,12 +55,12 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     const float epsilon_squared = opt.epssq;
 
     // Figure out number of nodes needed for BH tree
-    uint32_t nnodes = num_points * 2;
+    int nnodes = num_points * 2;
     if (nnodes < 1024 * num_blocks) nnodes = 1024 * num_blocks;
     while ((nnodes & (WARPSIZE - 1)) != 0)
         nnodes++;
     nnodes--;
-    const uint32_t num_nodes = nnodes;
+    const int num_nodes = nnodes;
     opt.num_nodes = num_nodes;
     
     // Allocate host memory
@@ -105,7 +105,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
                                         pij_col_ind_device, pij_non_symmetric_device, knn_indices_device,
                                         opt.magnitude_factor, num_points, num_neighbors);
 
-    const uint32_t num_nonzero = sparse_pij_device.size();
+    const int num_nonzero = sparse_pij_device.size();
 
     // Clean up memory
     knn_indices_device.clear();

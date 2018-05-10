@@ -41,7 +41,7 @@ namespace util {
 __global__ void AssembleDistances(
         const float * __restrict__ d_squared_norms,
         float * __restrict__ d_dot_products,
-        const uint32_t num_points);
+        const int num_points);
 
 /**
 * @brief Compute the squared pairwise euclidean distance between the given points
@@ -55,8 +55,8 @@ __global__ void AssembleDistances(
 void SquaredPairwiseDistance(cublasHandle_t &handle,
         thrust::device_vector<float> &d_distances,
         const thrust::device_vector<float> &d_points,
-        const uint32_t num_points,
-        const uint32_t num_dims);
+        const int num_points,
+        const int num_dims);
 
 /**
 * @brief Compute the pairwise euclidean distance between the given poitns
@@ -70,8 +70,8 @@ void SquaredPairwiseDistance(cublasHandle_t &handle,
 void PairwiseDistance(cublasHandle_t &handle, 
         thrust::device_vector<float> &d_distances,
         const thrust::device_vector<float> &d_points,
-        const uint32_t num_points,
-        const uint32_t num_dims);
+        const int num_points,
+        const int num_dims);
 
 
 /**
@@ -86,21 +86,21 @@ void PairwiseDistance(cublasHandle_t &handle,
 */
 void KNearestNeighbors(int64_t* indices, float* distances,
         const float* const points,
-        const uint32_t num_dims, const uint32_t num_points,
-        const uint32_t num_near_neighbots);
+        const int num_dims, const int num_points,
+        const int num_near_neighbots);
 
 __global__
 void PostprocessNeighborIndicesKernel(
                                     volatile int * __restrict__ indices,
                                     const long * __restrict__ long_indices,
-                                    const uint32_t num_points,
-                                    const uint32_t num_neighbors); 
+                                    const int num_points,
+                                    const int num_neighbors); 
 
 void PostprocessNeighborIndices(
                 thrust::device_vector<int> &indices,
                 thrust::device_vector<int64_t> &long_indices,
-                const uint32_t num_points,
-                const uint32_t num_neighbors);
+                const int num_points,
+                const int num_neighbors);
 
 }
 }
