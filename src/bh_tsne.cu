@@ -333,7 +333,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
                                          0.0f, thrust::plus<float>()) / num_points;
         thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
 
-        if (grad_norm < opt.min_grad_norm) {
+        if (grad_norm < opt.min_gradient_norm) {
             if (opt.verbosity >= 1) std::cout << "Reached minimum gradient norm: " << grad_norm << std::endl;
             break;
         }

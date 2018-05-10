@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.8)
 project(cuda-tsne)
-set (cuda-tsne_VERSION_MAJOR 0)
-set (cuda-tsne_VERSION_MINOR 1)
+set (cuda-tsne_VERSION_MAJOR 1)
+set (cuda-tsne_VERSION_MINOR 0)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
@@ -135,6 +135,7 @@ set(SOURCES
     src/util/matrix_broadcast_utils.cu
     src/util/random_utils.cu
     src/util/reduce_utils.cu
+    
     # Kernels
     src/kernels/apply_forces.cu
     src/kernels/bh_attr_forces.cu
@@ -145,6 +146,7 @@ set(SOURCES
     src/kernels/tree_builder.cu
     src/kernels/tree_sort.cu
     src/kernels/tree_summary.cu
+    
     # Method files
     src/ext/pymodule_ext.cu
     src/bh_tsne.cu
