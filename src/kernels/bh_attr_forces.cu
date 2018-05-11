@@ -23,6 +23,8 @@ void tsnecuda::bh::ComputePijxQijKernel(
     if (TID >= num_nonzero) return;
     i = coo_indices[2*TID];
     j = coo_indices[2*TID+1];
+    if (i >= num_nodes || i < 0 || j >= num_nodes || j < 0)
+        printf("%d, %d\n", i, j);
     ix = points[i]; iy = points[num_nodes + 1 + i];
     jx = points[j]; jy = points[num_nodes + 1 + j];
     dx = ix - jx;
@@ -47,7 +49,7 @@ void tsnecuda::bh::ComputeAttractiveForces(
 {
     // Computes pij*qij for each i,j
     // TODO: this is bad style
-    const int BLOCKSIZE = 128;
+    const int BLOCKSIZE = 1024;
     const int NBLOCKS = iDivUp(num_nonzero, BLOCKSIZE);
     tsnecuda::bh::ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(
                     thrust::raw_pointer_cast(pij_x_qij.data()),

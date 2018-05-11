@@ -1,12 +1,33 @@
 # TSNE-CUDA
 
+***WARNING: This code is still in active development. While the core code is tested and working, some additional features need aditional testing.***
+
 This repo is an optimized CUDA version of [Barnes-Hut t-SNE](https://github.com/lvdmaaten/bhtsne) by L. Van der Maaten with associated python modules. We find that our implementation of t-SNE can be up to 1200x faster than Sklearn, or up to 50x faster than Multicore-TSNE when used with the right GPU.
 
-To begin, check out our wiki: [https://github.com/rmrao/tsne-cuda/wiki/](https://github.com/rmrao/tsne-cuda/wiki/)
+To begin, check out our wiki for install instructions and usage: [https://github.com/rmrao/tsne-cuda/wiki/](https://github.com/rmrao/tsne-cuda/wiki/) 
 
 # Benchmarks
+### Simulated Data
+![](docs/simulated_speedup.png)
 
-TODO :)
+Time taken compared to other state of the art algorithms on synthetic datasets with 50 dimensions and four clusters for varying numbers of points. Note the log scale on both the points and time axis, and that the scale of the x-axis is in thousands of points (thus, the values on the x-axis range from 1K to 10M points. Dashed lines represent projected times. Projected scaling assumes an O(nlog(n)) implementation.
+
+### MNIST
+![](docs/mnist_speedup.png)
+
+The performance of t-SNE-CUDA compared to other state-of-the-art implementations on the MNIST dataset. t-SNE-CUDA runs on the raw pixels of the MNIST dataset (60000 images x 768 dimensions) in under 7 seconds.
+
+### CIFAR
+![](docs/cifar_speedup.png)
+
+The performance of t-SNE-CUDA compared to other state-of-the-art implementations on the CIFAR-10 dataset. t-SNE-CUDA runs on the raw pixels of the CIFAR-10 training set (50000 images x 1024 dimensions x 3 channels) in under 12 seconds.
+
+### Comparison of Embedding Quality
+The quality of the embeddings produced by t-SNE-CUDA do not differ significantly from the state of the art implementations. See below for a comparison of MNIST cluster outputs.
+
+![](docs/mnist_comparison.jpg)
+
+Left: MULTICORE-4 (501s), Middle: BH-TSNE (1156s), Right: t-SNE-CUDA (Ours, 6.98s).
 
 # Installation
 
@@ -73,4 +94,4 @@ This library is built on top of the following technology, without this tech, non
 
 # License
 
-Our code is built using components from FAISS, the Lonestar GPU library, GTest, CXXopts, and OrangeOwl's CUDA utilities. Each portion of the code is governed by their respective licenses - however our code is governed by the MIT license found in LICENSE.txt
+Our code is built using components from FAISS, the Lonestar GPU library, GTest, CXXopts, and OrangeOwl's CUDA utilities. Each portion of the code is governed by their respective licenses - however our code is governed by the BSD-3 license found in LICENSE.txt

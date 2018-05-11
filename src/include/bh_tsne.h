@@ -81,7 +81,7 @@ namespace tsnecuda {
             float* preinit_data = nullptr;
 
             // Verbosity control
-            int verbosity = 1;
+            int verbosity = 20;
             int print_interval= 10;
             
             // Return methods

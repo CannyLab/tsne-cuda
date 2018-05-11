@@ -138,17 +138,22 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     // Initialize Low-Dim Points
     thrust::device_vector<float> points_device((num_nodes + 1) * 2);
     thrust::device_vector<float> random_vector_device(points_device.size());
+
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution1(0.0, 1.0);
+    thrust::host_vector<float> h_points_device((num_nodes+ 1) * 2);
+
+    // Initialize random noise vector
+    for (int i = 0; i < (num_nodes+1)*2; i++) h_points_device[i] = 0.001 * distribution1(generator);
+    thrust::copy(h_points_device.begin(), h_points_device.end(), random_vector_device.begin());
+
     // TODO: this will only work with gaussian init
     if (opt.initialization == tsnecuda::TSNE_INIT::UNIFORM) { // Random uniform initialization
-        points_device = tsnecuda::util::RandomDeviceVectorInRange((num_nodes+1)*2, -100, 100);
+        points_device = tsnecuda::util::RandomDeviceVectorInRange((num_nodes+1)*2, -5, 5);
     } else if (opt.initialization == tsnecuda::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
-        std::default_random_engine generator;
-        std::normal_distribution<double> distribution1(0.0, 1.0);
-        thrust::host_vector<float> h_points_device((num_nodes+ 1) * 2);
+        // Generate some Gaussian noise for the points
         for (int i = 0; i < (num_nodes+ 1) * 2; i++) h_points_device[i] = 0.0001 * distribution1(generator);
         thrust::copy(h_points_device.begin(), h_points_device.end(), points_device.begin());
-        thrust::constant_iterator<float> mult(10);
-        thrust::transform(points_device.begin(), points_device.end(), mult, random_vector_device.begin(), thrust::multiplies<float>());
     } else if (opt.initialization == tsnecuda::TSNE_INIT::RESUME) { // Preinit from vector
         // Load from vector
         if(opt.preinit_data != nullptr) {
@@ -158,8 +163,6 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
           exit(1);
         }
     } else if (opt.initialization == tsnecuda::TSNE_INIT::VECTOR) { // Preinit from vector points only
-        // Load only the points into the pre-init vector
-        points_device = tsnecuda::util::RandomDeviceVectorInRange((num_nodes+1)*2, -100, 100);
         // Copy the pre-init data
         if(opt.preinit_data != nullptr) {
           thrust::copy(opt.preinit_data, opt.preinit_data+opt.num_points, points_device.begin());
@@ -172,7 +175,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         std::cerr << "E: Invalid initialization type specified." << std::endl;
         exit(1);
     }
-
+    
     // Dump file
     float *host_ys = nullptr;
     std::ofstream dump_file;
@@ -182,43 +185,42 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         dump_file << num_points << " " << 2 << std::endl;
     }
 
-#ifndef NO_ZMQ 
-	bool send_zmq = opt.get_use_interactive();
-	zmq::context_t context(1);
-	zmq::socket_t publisher(context, ZMQ_REQ);
-	if (opt.get_use_interactive()) {
+    #ifndef NO_ZMQ 
+        bool send_zmq = opt.get_use_interactive();
+        zmq::context_t context(1);
+        zmq::socket_t publisher(context, ZMQ_REQ);
+        if (opt.get_use_interactive()) {
 
-    // Try to connect to the socket
-        if (opt.verbosity >= 1)
-            std::cout << "Initializing Connection...." << std::endl;
-        publisher.setsockopt(ZMQ_RCVTIMEO, opt.get_viz_timeout());
-        publisher.setsockopt(ZMQ_SNDTIMEO, opt.get_viz_timeout());
-        if (opt.verbosity >= 1)
-            std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
-        publisher.connect(opt.get_viz_server());
-
-        // Send the number of points we should be expecting to the server
-        std::string message = std::to_string(opt.num_points);
-        send_zmq = publisher.send(message.c_str(), message.length());
-
-        // Wait for server reply
-        zmq::message_t request;
-        send_zmq = publisher.recv (&request);
-        
-        // If there's a time-out, don't bother.
-        if (send_zmq) {
+        // Try to connect to the socket
             if (opt.verbosity >= 1)
-                std::cout << "Visualization connected!" << std::endl;
-        } else {
-            std::cout << "No Visualization Terminal, continuing..." << std::endl;
-            send_zmq = false;
+                std::cout << "Initializing Connection...." << std::endl;
+            publisher.setsockopt(ZMQ_RCVTIMEO, opt.get_viz_timeout());
+            publisher.setsockopt(ZMQ_SNDTIMEO, opt.get_viz_timeout());
+            if (opt.verbosity >= 1)
+                std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
+            publisher.connect(opt.get_viz_server());
+
+            // Send the number of points we should be expecting to the server
+            std::string message = std::to_string(opt.num_points);
+            send_zmq = publisher.send(message.c_str(), message.length());
+
+            // Wait for server reply
+            zmq::message_t request;
+            send_zmq = publisher.recv (&request);
+            
+            // If there's a time-out, don't bother.
+            if (send_zmq) {
+                if (opt.verbosity >= 1)
+                    std::cout << "Visualization connected!" << std::endl;
+            } else {
+                std::cout << "No Visualization Terminal, continuing..." << std::endl;
+                send_zmq = false;
+            }
         }
-    }
-#endif
-#ifdef NO_ZMQ
-    if (opt.get_use_interactive()) 
-        std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
-#endif
+    #else
+        if (opt.get_use_interactive()) 
+            std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
+    #endif
 
     // Support for infinite iteration
     for (size_t step = 0; step != opt.iterations; step++) {
@@ -320,6 +322,26 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         // Add a bit of random motion to prevent points from being on top of each other
         thrust::transform(points_device.begin(), points_device.end(), random_vector_device.begin(),
                             points_device.begin(), thrust::plus<float>());
+
+        // Compute the gradient norm
+        tsnecuda::util::SquareDeviceVector(attractive_forces_device, old_forces_device);
+        thrust::transform(attractive_forces_device.begin(), attractive_forces_device.begin()+num_points, 
+                          attractive_forces_device.begin()+num_points, attractive_forces_device.begin(), 
+                          thrust::plus<float>());
+        tsnecuda::util::SqrtDeviceVector(attractive_forces_device, attractive_forces_device);
+        float grad_norm = thrust::reduce(attractive_forces_device.begin(), attractive_forces_device.begin()+num_points, 
+                                         0.0f, thrust::plus<float>()) / num_points;
+        thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
+
+        if (grad_norm < opt.min_gradient_norm) {
+            if (opt.verbosity >= 1) std::cout << "Reached minimum gradient norm: " << grad_norm << std::endl;
+            break;
+        }
+
+        if (opt.verbosity >= 1 && step % opt.print_interval == 0) {
+            std::cout << "[Step " << step << "] Avg. Gradient Norm: " << grad_norm << std::endl;
+        }
+            
         
         #ifndef NO_ZMQ
             if (send_zmq) {
