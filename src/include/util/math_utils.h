@@ -12,6 +12,7 @@
 #define SRC_INCLUDE_UTIL_MATH_UTILS_H_
 
 #include "include/common.h"
+#include "include/options.h"
 #include "include/util/matrix_broadcast_utils.h"
 #include "include/util/reduce_utils.h"
 #include "include/util/thrust_transform_functions.h"
@@ -104,7 +105,7 @@ void Csr2CooKernel(volatile int * __restrict__ coo_indices,
                              const int num_points,
                              const int num_nonzero);
 
-void Csr2Coo(
+void Csr2Coo(                tsnecuda::GpuOptions &gpu_opt,
                              thrust::device_vector<int> &coo_indices,
                              thrust::device_vector<int> &pij_row_ptr,
                              thrust::device_vector<int> &pij_col_ind,

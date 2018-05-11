@@ -11,20 +11,12 @@
 #define SRC_INCLUDE_KERNELS_APPLY_FORCES_H_
 
 #include "include/common.h"
+#include "include/options.h"
 #include "include/util/cuda_utils.h"
-
-#ifdef __KEPLER__
-#define INTEGRATION_THREADS 1024
-#define INTEGRATION_BLOCKS 2
-#else
-#define INTEGRATION_THREADS 1024
-#define INTEGRATION_BLOCKS 1
-#endif
  
 namespace tsnecuda {
 namespace bh {
 __global__
-__launch_bounds__(INTEGRATION_THREADS, INTEGRATION_BLOCKS)
 void IntegrationKernel(
                                  volatile float * __restrict__ points,
                                  volatile float * __restrict__ attr_forces,
@@ -39,25 +31,26 @@ void IntegrationKernel(
                                  const int num_points
                       );
 
-void ApplyForces(thrust::device_vector<float> &points,
-                               thrust::device_vector<float> &attr_forces,
-                               thrust::device_vector<float> &rep_forces,
-                               thrust::device_vector<float> &gains, 
-                               thrust::device_vector<float> &old_forces,
-                               const float eta,
-                               const float normalization,
-                               const float momentum,
-                               const float exaggeration,
-                               const int num_nodes,
-                               const int num_points,
-                               const int num_blocks
-                      );
+void ApplyForces(
+                    tsnecuda::GpuOptions &gpu_opt,
+                    thrust::device_vector<float> &points,
+                    thrust::device_vector<float> &attr_forces,
+                    thrust::device_vector<float> &rep_forces,
+                    thrust::device_vector<float> &gains, 
+                    thrust::device_vector<float> &old_forces,
+                    const float eta,
+                    const float normalization,
+                    const float momentum,
+                    const float exaggeration,
+                    const int num_nodes,
+                    const int num_points,
+                    const int num_blocks
+            );
 }
 
 namespace naive {
 
 __global__
-__launch_bounds__(INTEGRATION_THREADS, INTEGRATION_BLOCKS)
 void IntegrationKernel(
                                  volatile float * __restrict__ points,
                                  volatile float * __restrict__ forces,

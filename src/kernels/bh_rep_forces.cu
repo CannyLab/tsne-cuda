@@ -15,7 +15,6 @@
 /******************************************************************************/
 
 __global__
-__launch_bounds__(REPULSIVE_FORCES_THREADS, REPULSIVE_FORCES_BLOCKS)
 void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
                                           volatile float * __restrict__ x_vel_device,
                                           volatile float * __restrict__ y_vel_device,
@@ -28,12 +27,17 @@ void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
                                           const float theta,
                                           const float epsilon,
                                           const int num_nodes,
-                                          const int num_points)
+                                          const int num_points,
+                                          const int maxdepth_bh_tree,
+                                          const int repulsive_force_threads
+                                          )
 {
     register int i, j, k, n, depth, base, sbase, diff, pd, nd;
     register float px, py, vx, vy, dx, dy, normsum, tmp, mult;
-    __shared__ volatile int pos[MAXDEPTH_BH_TREE * REPULSIVE_FORCES_THREADS/WARPSIZE], node[MAXDEPTH_BH_TREE * REPULSIVE_FORCES_THREADS/WARPSIZE];
-    __shared__ float dq[MAXDEPTH_BH_TREE * REPULSIVE_FORCES_THREADS/WARPSIZE];
+    extern __shared__ int force_shared_memory[];
+    int* pos = (int*) force_shared_memory;
+    int* node = (int*) (pos + maxdepth_bh_tree*repulsive_force_threads/32);
+    float* dq = (float*) (node + maxdepth_bh_tree*repulsive_force_threads/32);
 
     if (0 == threadIdx.x) {
         dq[0] = (radiusd * radiusd) / (theta * theta); 
@@ -43,21 +47,21 @@ void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
         }
         dq[i - 1] += epsilon;
 
-        if (maxdepthd > MAXDEPTH_BH_TREE) {
+        if (maxdepthd > maxdepth_bh_tree) {
             *errd = maxdepthd;
         }
     }
     __syncthreads();
 
-    if (maxdepthd <= MAXDEPTH_BH_TREE) {
+    if (maxdepthd <= maxdepth_bh_tree) {
         // figure out first thread in each warp (lane 0)
-        base = threadIdx.x / WARPSIZE;
-        sbase = base * WARPSIZE;
-        j = base * MAXDEPTH_BH_TREE;
+        base = threadIdx.x / 32;
+        sbase = base * 32;
+        j = base * maxdepth_bh_tree;
 
         diff = threadIdx.x - sbase;
         // make multiple copies to avoid index calculations later
-        if (diff < MAXDEPTH_BH_TREE) {
+        if (diff < maxdepth_bh_tree) {
             dq[diff+j] = dq[diff];
         }
         __syncthreads();
@@ -133,7 +137,8 @@ void tsnecuda::bh::ForceCalculationKernel(volatile int * __restrict__ errd,
     }
 }
 
-void tsnecuda::bh::ComputeRepulsiveForces(thrust::device_vector<int> &errd,
+void tsnecuda::bh::ComputeRepulsiveForces(tsnecuda::GpuOptions &gpu_opt,
+                                          thrust::device_vector<int> &errd,
                                           thrust::device_vector<float> &repulsive_forces,
                                           thrust::device_vector<float> &normalization_vec,
                                           thrust::device_vector<int> &cell_sorted,
@@ -146,7 +151,10 @@ void tsnecuda::bh::ComputeRepulsiveForces(thrust::device_vector<int> &errd,
                                           const int num_points,
                                           const int num_blocks)
 {
-    tsnecuda::bh::ForceCalculationKernel<<<num_blocks * REPULSIVE_FORCES_BLOCKS, REPULSIVE_FORCES_THREADS>>>(
+    tsnecuda::bh::ForceCalculationKernel<<<num_blocks * gpu_opt.repulsive_kernel_factor,
+                                           gpu_opt.repulsive_kernel_threads,
+                                           sizeof(int)*2*32*gpu_opt.repulsive_kernel_threads/32 +
+                                           sizeof(float)*32*gpu_opt.repulsive_kernel_threads/32>>>(
                         thrust::raw_pointer_cast(errd.data()),
                         thrust::raw_pointer_cast(repulsive_forces.data()),
                         thrust::raw_pointer_cast(repulsive_forces.data() + num_nodes + 1),
@@ -156,6 +164,8 @@ void tsnecuda::bh::ComputeRepulsiveForces(thrust::device_vector<int> &errd,
                         thrust::raw_pointer_cast(cell_mass.data()),
                         thrust::raw_pointer_cast(points.data()),
                         thrust::raw_pointer_cast(points.data() + num_nodes + 1),
-                        theta, epsilon, num_nodes, num_points);
+                        theta, epsilon, num_nodes, num_points, 32, //TODO: Encode this variable somewhere
+                        gpu_opt.repulsive_kernel_threads
+                    );
     GpuErrorCheck(cudaDeviceSynchronize());
 }

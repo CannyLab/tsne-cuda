@@ -33,6 +33,7 @@ void tsnecuda::bh::ComputePijxQijKernel(
 }
 
 void tsnecuda::bh::ComputeAttractiveForces(
+                    tsnecuda::GpuOptions &gpu_opt,
                     cusparseHandle_t &handle,
                     cusparseMatDescr_t &descr,
                     thrust::device_vector<float> &attr_forces,

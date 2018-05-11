@@ -10,6 +10,7 @@
 #define SRC_INCLUDE_KERNELS_INITIALIZATION_H_
 
 #include "include/common.h"
+#include "include/options.h"
 #include "include/tsne_vars.h"
 #include "include/util/cuda_utils.h"
 
@@ -26,7 +27,7 @@
 namespace tsnecuda {
 namespace bh {
 __global__ void InitializationKernel(int * __restrict errd);
-void Initialize(thrust::device_vector<int> &errd);
+void Initialize(tsnecuda::GpuOptions &gpu_opt, thrust::device_vector<int> &errd);
 }
 namespace naive {
 void Initialize();

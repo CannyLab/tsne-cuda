@@ -89,11 +89,8 @@ void pymodule_bh_tsne(float *points, float *result, ssize_t *dims, int proj_dim,
     ssize_t N_POINTS = dims[0];
     ssize_t N_DIMS = dims[1];
 
-    // Create the CUBLAS handles
-    cublasHandle_t dense_handle;
-    CublasSafeCall(cublasCreate(&dense_handle));
-    cusparseHandle_t sparse_handle;
-    CusparseSafeCall(cusparseCreate(&sparse_handle));
+    // Construct the GPU options
+    tsnecuda::GpuOptions gpu_opt(0);
 
     // Construct the options
     tsnecuda::Options opt(result, points, N_POINTS, N_DIMS);
@@ -109,7 +106,7 @@ void pymodule_bh_tsne(float *points, float *result, ssize_t *dims, int proj_dim,
     opt.return_style = tsnecuda::RETURN_STYLE::ONCE;
 
     // Do the t-SNE
-    tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
+    tsnecuda::bh::RunTsne(opt, gpu_opt);
 
     // Copy the data back from the GPU
     cudaDeviceSynchronize();
@@ -122,11 +119,8 @@ void pymodule_bhsnapshot(float *points, float *result, ssize_t *dims, int proj_d
     ssize_t N_POINTS = dims[0];
     ssize_t N_DIMS = dims[1];
 
-    // Create the CUBLAS handles
-    cublasHandle_t dense_handle;
-    CublasSafeCall(cublasCreate(&dense_handle));
-    cusparseHandle_t sparse_handle;
-    CusparseSafeCall(cusparseCreate(&sparse_handle));
+    // Construct the GPU options
+    tsnecuda::GpuOptions gpu_opt(0);
 
     // Construct the options
     tsnecuda::Options opt(result, points, N_POINTS, N_DIMS);
@@ -147,7 +141,7 @@ void pymodule_bhsnapshot(float *points, float *result, ssize_t *dims, int proj_d
     opt.num_snapshots = num_snapshots;
 
     // Do the t-SNE
-    tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
+    tsnecuda::bh::RunTsne(opt, gpu_opt);
 
     // Copy the data back from the GPU
     cudaDeviceSynchronize();

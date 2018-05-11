@@ -9,7 +9,6 @@
 /******************************************************************************/
 
 __global__
-__launch_bounds__(BOUNDING_BOX_THREADS, BOUNDING_BOX_BLOCKS)
 void tsnecuda::bh::BoundingBoxKernel(
                        volatile int * __restrict__ cell_starts, 
                        volatile int * __restrict__ children, 
@@ -21,20 +20,25 @@ void tsnecuda::bh::BoundingBoxKernel(
                        volatile float * __restrict__ x_min_device, 
                        volatile float * __restrict__ y_min_device,
                        const int num_nodes,
-                       const int num_points) 
+                       const int num_points,
+                       const int bounding_box_threads) 
 {
     register int i, j, k, inc;
     register float val, minx, maxx, miny, maxy;
-    __shared__ volatile float x_min_shared[BOUNDING_BOX_THREADS], x_max_shared[BOUNDING_BOX_THREADS], y_min_shared[BOUNDING_BOX_THREADS], y_max_shared[BOUNDING_BOX_THREADS];
-
+    extern __shared__ float bounding_shared_memory[];
+    float* x_min_shared = bounding_shared_memory;
+    float* x_max_shared = x_min_shared + bounding_box_threads;
+    float* y_min_shared = x_max_shared + bounding_box_threads;
+    float* y_max_shared = y_min_shared + bounding_box_threads;
+   
     // initialize with valid data (in case #bodies < #threads)
     minx = maxx = x_pos_device[0];
     miny = maxy = y_pos_device[0];
 
     // scan all bodies
     i = threadIdx.x;
-    inc = BOUNDING_BOX_THREADS * gridDim.x;
-    for (j = i + blockIdx.x * BOUNDING_BOX_THREADS; j < num_points; j += inc) {
+    inc = bounding_box_threads * gridDim.x;
+    for (j = i + blockIdx.x * bounding_box_threads; j < num_points; j += inc) {
         val = x_pos_device[j];
         minx = fminf(minx, val);
         maxx = fmaxf(maxx, val);
@@ -49,7 +53,7 @@ void tsnecuda::bh::BoundingBoxKernel(
     y_min_shared[i] = miny;
     y_max_shared[i] = maxy;
 
-    for (j = BOUNDING_BOX_THREADS / 2; j > 0; j /= 2) {
+    for (j = bounding_box_threads / 2; j > 0; j /= 2) {
         __syncthreads();
         if (i < j) {
             k = i + j;
@@ -98,7 +102,8 @@ void tsnecuda::bh::BoundingBoxKernel(
     }
 }
 
-void tsnecuda::bh::ComputeBoundingBox(thrust::device_vector<int> &cell_starts,
+void tsnecuda::bh::ComputeBoundingBox(tsnecuda::GpuOptions &gpu_opt,
+                                      thrust::device_vector<int> &cell_starts,
                                       thrust::device_vector<int> &children,
                                       thrust::device_vector<float> &cell_mass,
                                       thrust::device_vector<float> &points,
@@ -110,7 +115,9 @@ void tsnecuda::bh::ComputeBoundingBox(thrust::device_vector<int> &cell_starts,
                                       const int num_points,
                                       const int num_blocks)
 {
-    tsnecuda::bh::BoundingBoxKernel<<<num_blocks * BOUNDING_BOX_BLOCKS, BOUNDING_BOX_THREADS>>>(
+    tsnecuda::bh::BoundingBoxKernel<<<num_blocks * gpu_opt.bounding_kernel_factor,
+                                      gpu_opt.bounding_kernel_threads,
+                                      sizeof(float)*4*gpu_opt.bounding_kernel_threads>>>(
                                                           thrust::raw_pointer_cast(cell_starts.data()),
                                                           thrust::raw_pointer_cast(children.data()),
                                                           thrust::raw_pointer_cast(cell_mass.data()),
@@ -120,6 +127,7 @@ void tsnecuda::bh::ComputeBoundingBox(thrust::device_vector<int> &cell_starts,
                                                           thrust::raw_pointer_cast(y_max_device.data()),
                                                           thrust::raw_pointer_cast(x_min_device.data()),
                                                           thrust::raw_pointer_cast(y_min_device.data()),
-                                                          num_nodes, num_points);
+                                                          num_nodes, num_points,
+                                                          gpu_opt.bounding_kernel_threads);
     GpuErrorCheck(cudaDeviceSynchronize());
 }

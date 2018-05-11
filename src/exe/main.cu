@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
         ("f,fname", "File name for loaded data...", cxxopts::value<std::string>()->default_value("../train-images.idx3-ubyte"))
         ("c,connection", "Address for connection to vis server", cxxopts::value<std::string>()->default_value("tcp://localhost:5556"))
         ("q,dim", "Point Dimensions", cxxopts::value<int>()->default_value("50"))
+        ("j,device", "Device to run on", cxxopts::value<int>()->default_value("0"))
         ("h,help", "Print help");
     
     // Parse command line options
@@ -55,14 +56,11 @@ int main(int argc, char** argv) {
       exit(0);
     }
 
+    // Construction the objectes
+    tsnecuda::GpuOptions gpu_opt(IOPT(device));
+
     // Common initialization
     srand (time(NULL));
-
-    // --- Matrices allocation and initialization
-    cublasHandle_t dense_handle;
-    CublasSafeCall(cublasCreate(&dense_handle));
-    cusparseHandle_t sparse_handle;
-    CusparseSafeCall(cusparseCreate(&sparse_handle));
 
     tsnecuda::TSNE_INIT init_type = tsnecuda::TSNE_INIT::UNIFORM;
     if (SOPT(init).compare("unif") == 0) {
@@ -100,7 +98,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::RunTsne(opt, gpu_opt);
 
         // Clean up the data
         delete[] data;
@@ -136,7 +134,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::RunTsne(opt, gpu_opt);
 
         // Clean up the data
         delete[] data;
@@ -173,7 +171,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::RunTsne(opt, gpu_opt);
         
         // Clean up the data
         delete[] data;
@@ -216,7 +214,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::RunTsne(dense_handle, sparse_handle, opt);
+        tsnecuda::bh::RunTsne(opt, gpu_opt);
 
     } else {
         std::cout << "Dataset not recognized..." << std::endl;

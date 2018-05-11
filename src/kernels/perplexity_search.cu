@@ -98,7 +98,8 @@ void tsnecuda::PerplexitySearchKernel(
     found[i] = is_found;
 }
 
-void tsnecuda::bh::SearchPerplexity(cublasHandle_t &handle,
+void tsnecuda::bh::SearchPerplexity(tsnecuda::GpuOptions &gpu_opt,
+                                     cublasHandle_t &handle,
                                      thrust::device_vector<float> &pij,
                                      thrust::device_vector<float> &squared_dist,
                                      const float perplexity_target,
@@ -158,7 +159,8 @@ void tsnecuda::bh::SearchPerplexity(cublasHandle_t &handle,
     tsnecuda::util::BroadcastMatrixVector(pij, row_sum, num_near_neighbors, num_points, thrust::divides<float>(), 1, 1.0f);
 }
 
-void tsnecuda::naive::SearchPerplexity(cublasHandle_t &handle,
+void tsnecuda::naive::SearchPerplexity(
+                                     cublasHandle_t &handle,
                                      thrust::device_vector<float> &pij,
                                      thrust::device_vector<float> &squared_dist,
                                      const float perplexity_target,

@@ -10,28 +10,18 @@
 #define SRC_INCLUDE_KERNELS_BH_REP_FORCES_H_
 
 #include "include/common.h"
+#include "include/options.h"
 #include "include/tsne_vars.h"
 #include "include/util/cuda_utils.h"
 
-#ifdef __KEPLER__
-#define REPULSIVE_FORCES_THREADS 1024
-#define REPULSIVE_FORCE_BLOCKS 2
-#else
-#define REPULSIVE_FORCES_THREADS 256
-#define REPULSIVE_FORCES_BLOCKS 5
-#endif
-
 namespace tsnecuda {
 namespace bh {
-
-
 
 /******************************************************************************/
 /*** compute force ************************************************************/
 /******************************************************************************/
 
 __global__
-__launch_bounds__(REPULSIVE_FORCES_THREADS, REPULSIVE_FORCES_BLOCKS)
 void ForceCalculationKernel(volatile int * __restrict__ errd,
                                           volatile float * __restrict__ x_vel_device,
                                           volatile float * __restrict__ y_vel_device,
@@ -44,20 +34,23 @@ void ForceCalculationKernel(volatile int * __restrict__ errd,
                                           const float theta,
                                           const float epsilon,
                                           const int num_nodes,
-                                          const int num_points);
-
-void ComputeRepulsiveForces(thrust::device_vector<int> &errd,
-                                          thrust::device_vector<float> &repulsive_forces,
-                                          thrust::device_vector<float> &normalization_vec,
-                                          thrust::device_vector<int> &cell_sorted,
-                                          thrust::device_vector<int> &children,
-                                          thrust::device_vector<float> &cell_mass,
-                                          thrust::device_vector<float> &points,
-                                          const float theta,
-                                          const float epsilon,
-                                          const int num_nodes,
                                           const int num_points,
-                                          const int num_blocks);
+                                          const int maxdepth_bh_tree,
+                                          const int repulsive_force_threads);
+
+void ComputeRepulsiveForces(tsnecuda::GpuOptions &gpu_opt,
+                                        thrust::device_vector<int> &errd,
+                                        thrust::device_vector<float> &repulsive_forces,
+                                        thrust::device_vector<float> &normalization_vec,
+                                        thrust::device_vector<int> &cell_sorted,
+                                        thrust::device_vector<int> &children,
+                                        thrust::device_vector<float> &cell_mass,
+                                        thrust::device_vector<float> &points,
+                                        const float theta,
+                                        const float epsilon,
+                                        const int num_nodes,
+                                        const int num_points,
+                                        const int num_blocks);
  
 }
 }

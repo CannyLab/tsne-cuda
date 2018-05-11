@@ -29,7 +29,6 @@ __global__ void tsnecuda::util::AssembleDistances(
 // Expects num_points x num_dims matrix in points
 // Squared norms taken from diagnoal of dot product which should be faster
 // and result in actually zeroing out the diagonal in assemble_final_result
-
 void tsnecuda::util::SquaredPairwiseDistance(cublasHandle_t &handle,
         thrust::device_vector<float> &d_distances,
         const thrust::device_vector<float> &d_points,
@@ -72,7 +71,8 @@ void tsnecuda::util::PairwiseDistance(cublasHandle_t &handle,
     tsnecuda::util::SqrtDeviceVector(d_distances, d_distances);
 }
 
-void tsnecuda::util::KNearestNeighbors(int64_t* indices, float* distances,
+void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
+        int64_t* indices, float* distances,
         const float* const points, const int num_dims,
         const int num_points, const int num_near_neighbors) {
     const int32_t kNumCells = static_cast<int32_t>(
@@ -136,6 +136,7 @@ void tsnecuda::util::PostprocessNeighborIndicesKernel(
 }
 
 void tsnecuda::util::PostprocessNeighborIndices(
+                tsnecuda::GpuOptions &gpu_opt,
                 thrust::device_vector<int> &indices,
                 thrust::device_vector<int64_t> &long_indices,
                 const int num_points,

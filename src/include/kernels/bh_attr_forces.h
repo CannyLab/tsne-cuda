@@ -10,6 +10,7 @@
 #define SRC_INCLUDE_KERNELS_BH_ATTR_FORCES_H_
 
 #include "include/common.h"
+#include "include/options.h"
 #include "include/util/cuda_utils.h"
 
 namespace tsnecuda {
@@ -24,6 +25,7 @@ void ComputePijxQijKernel(
                             const int num_nonzero);
 
 void ComputeAttractiveForces(
+                    tsnecuda::GpuOptions &gpu_opt,
                     cusparseHandle_t &handle,
                     cusparseMatDescr_t &descr,
                     thrust::device_vector<float> &attr_forces,

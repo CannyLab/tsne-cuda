@@ -4,11 +4,8 @@
 
 #include "bh_tsne.h"
 
-#define WARPSIZE 32
-
-void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle, 
-                            cusparseHandle_t &sparse_handle, 
-                            tsnecuda::Options &opt)
+void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
+                            tsnecuda::GpuOptions &gpu_opt)
 {
     // Check the validity of the options file
     if (!opt.validate()) {
@@ -16,14 +13,14 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         return;
     }
 
+    // Construct the handles
+    cublasHandle_t dense_handle;
+    CublasSafeCall(cublasCreate(&dense_handle));
+    cusparseHandle_t sparse_handle;
+    CusparseSafeCall(cusparseCreate(&sparse_handle));
+
     // Set CUDA device properties
-    cudaDeviceProp deviceProp;
-    cudaGetDeviceProperties(&deviceProp, 0);
-    if (deviceProp.warpSize != WARPSIZE) {
-        fprintf(stderr, "Warp size must be %d\n", deviceProp.warpSize);
-        exit(-1);
-    }
-    const int num_blocks = deviceProp.multiProcessorCount;
+    const int num_blocks = gpu_opt.sm_count;
     
     // Construct sparse matrix descriptor
     cusparseMatDescr_t sparse_matrix_descriptor;
@@ -57,7 +54,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     // Figure out number of nodes needed for BH tree
     int nnodes = num_points * 2;
     if (nnodes < 1024 * num_blocks) nnodes = 1024 * num_blocks;
-    while ((nnodes & (WARPSIZE - 1)) != 0)
+    while ((nnodes & (gpu_opt.warp_size - 1)) != 0)
         nnodes++;
     nnodes--;
     const int num_nodes = nnodes;
@@ -70,13 +67,13 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
 
     // Initialize global variables
     thrust::device_vector<int> err_device(1);
-    tsnecuda::bh::Initialize(err_device);
+    tsnecuda::bh::Initialize(gpu_opt, err_device);
 
     // Compute approximate K Nearest Neighbors and squared distances
-    tsnecuda::util::KNearestNeighbors(knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
+    tsnecuda::util::KNearestNeighbors(gpu_opt, knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
     thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
     thrust::device_vector<int> knn_indices_device(num_points * num_neighbors);
-    tsnecuda::util::PostprocessNeighborIndices(knn_indices_device, knn_indices_long_device, 
+    tsnecuda::util::PostprocessNeighborIndices(gpu_opt, knn_indices_device, knn_indices_long_device, 
                                                         num_points, num_neighbors);
     
     // Max-norm the distances to avoid exponentiating by large numbers
@@ -86,7 +83,7 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
 
     // Search Perplexity
     thrust::device_vector<float> pij_non_symmetric_device(num_points * num_neighbors);
-    tsnecuda::bh::SearchPerplexity(dense_handle, pij_non_symmetric_device, knn_squared_distances_device, 
+    tsnecuda::bh::SearchPerplexity(gpu_opt, dense_handle, pij_non_symmetric_device, knn_squared_distances_device, 
                                     perplexity, perplexity_search_epsilon, num_points, num_neighbors);
 
     // Clean up memory
@@ -125,14 +122,14 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
     thrust::device_vector<int> cell_counts_device(num_nodes + 1);
     thrust::device_vector<int> cell_sorted_device(num_nodes + 1);
     thrust::device_vector<float> normalization_vec_device(num_nodes + 1);
-    thrust::device_vector<float> x_max_device(num_blocks * BOUNDING_BOX_BLOCKS);
-    thrust::device_vector<float> y_max_device(num_blocks * BOUNDING_BOX_BLOCKS);
-    thrust::device_vector<float> x_min_device(num_blocks * BOUNDING_BOX_BLOCKS);
-    thrust::device_vector<float> y_min_device(num_blocks * BOUNDING_BOX_BLOCKS);
+    thrust::device_vector<float> x_max_device(num_blocks * gpu_opt.bounding_kernel_factor);
+    thrust::device_vector<float> y_max_device(num_blocks * gpu_opt.bounding_kernel_factor);
+    thrust::device_vector<float> x_min_device(num_blocks * gpu_opt.bounding_kernel_factor);
+    thrust::device_vector<float> y_min_device(num_blocks * gpu_opt.bounding_kernel_factor);
     thrust::device_vector<float> ones_device(opt.num_points * 2, 1); // This is for reduce summing, etc.
     thrust::device_vector<int> coo_indices_device(sparse_pij_device.size()*2);
 
-    tsnecuda::util::Csr2Coo(coo_indices_device, pij_row_ptr_device,
+    tsnecuda::util::Csr2Coo(gpu_opt, coo_indices_device, pij_row_ptr_device,
                             pij_col_ind_device, num_points, num_nonzero);
 
     // Initialize Low-Dim Points
@@ -232,7 +229,8 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
         }
 
         // Compute Bounding Box
-        tsnecuda::bh::ComputeBoundingBox(cell_starts_device,
+        tsnecuda::bh::ComputeBoundingBox(gpu_opt,
+                                         cell_starts_device,
                                          children_device,
                                          cell_mass_device,
                                          points_device,
@@ -245,7 +243,8 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
                                          num_blocks);
 
         // Tree Builder
-        tsnecuda::bh::BuildTree(err_device,
+        tsnecuda::bh::BuildTree(gpu_opt,
+                                err_device,
                                 children_device,
                                 cell_starts_device,
                                 cell_mass_device,
@@ -255,7 +254,8 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
                                 num_blocks);
 
         // Tree Summarization
-        tsnecuda::bh::SummarizeTree(cell_counts_device,
+        tsnecuda::bh::SummarizeTree(gpu_opt,
+                                    cell_counts_device,
                                     children_device,
                                     cell_mass_device,
                                     points_device,
@@ -264,7 +264,8 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
                                     num_blocks);
 
         // Sort By Morton Code
-        tsnecuda::bh::SortCells(cell_sorted_device,
+        tsnecuda::bh::SortCells(gpu_opt,
+                                cell_sorted_device,
                                 cell_starts_device,
                                 children_device,
                                 cell_counts_device,
@@ -273,7 +274,8 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
                                 num_blocks);
 
         // Calculate Repulsive Forces
-        tsnecuda::bh::ComputeRepulsiveForces(err_device,
+        tsnecuda::bh::ComputeRepulsiveForces(gpu_opt,
+                                             err_device,
                                              repulsive_forces_device,
                                              normalization_vec_device,
                                              cell_sorted_device,
@@ -292,7 +294,8 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
                                         thrust::plus<float>());
 
         // Calculate Attractive Forces
-        tsnecuda::bh::ComputeAttractiveForces(sparse_handle,
+        tsnecuda::bh::ComputeAttractiveForces(gpu_opt,
+                                              sparse_handle,
                                               sparse_matrix_descriptor,
                                               attractive_forces_device,
                                               pij_x_qij_device,
@@ -307,7 +310,8 @@ void tsnecuda::bh::RunTsne(cublasHandle_t &dense_handle,
                                               num_nonzero);
 
         // Apply Forces
-        tsnecuda::bh::ApplyForces(points_device,
+        tsnecuda::bh::ApplyForces(gpu_opt,
+                                  points_device,
                                   attractive_forces_device,
                                   repulsive_forces_device,
                                   gains_device,

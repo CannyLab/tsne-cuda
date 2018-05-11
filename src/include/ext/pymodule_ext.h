@@ -4,6 +4,7 @@
 
     #include <sys/types.h>
     #include "common.h"
+    #include "include/options.h"
     #include "util/distance_utils.h"
     #include "naive_tsne.h"
     #include "bh_tsne.h"

@@ -9,7 +9,6 @@
 /******************************************************************************/
 
 __global__
-__launch_bounds__(1024, 1)
 void tsnecuda::bh::ClearKernel1(volatile int * __restrict__ children, const int num_nodes, const int num_points)
 {
     register int k, inc, top, bottom;
@@ -17,7 +16,7 @@ void tsnecuda::bh::ClearKernel1(volatile int * __restrict__ children, const int 
     top = 4 * num_nodes;
     bottom = 4 * num_points;
     inc = blockDim.x * gridDim.x;
-    k = (bottom & (-WARPSIZE)) + threadIdx.x + blockIdx.x * blockDim.x;  // align to warp size
+    k = (bottom & (-32)) + threadIdx.x + blockIdx.x * blockDim.x;  // align to warp size
     if (k < bottom) k += inc;
 
     // iterate over all cells assigned to thread
@@ -29,7 +28,6 @@ void tsnecuda::bh::ClearKernel1(volatile int * __restrict__ children, const int 
 
 
 __global__
-__launch_bounds__(TREE_THREADS, TREE_BLOCKS)
 void tsnecuda::bh::TreeBuildingKernel(volatile int * __restrict__ errd, 
                                         volatile int * __restrict__ children, 
                                         volatile float * __restrict__ x_pos_device, 
@@ -148,14 +146,13 @@ void tsnecuda::bh::TreeBuildingKernel(volatile int * __restrict__ errd,
 
 
 __global__
-__launch_bounds__(1024, 1)
 void tsnecuda::bh::ClearKernel2(volatile int * __restrict__ cell_starts, volatile float * __restrict__ cell_mass, const int num_nodes)
 {
     register int k, inc, bottom;
 
     bottom = bottomd;
     inc = blockDim.x * gridDim.x;
-    k = (bottom & (-WARPSIZE)) + threadIdx.x + blockIdx.x * blockDim.x;  // align to warp size
+    k = (bottom & (-32)) + threadIdx.x + blockIdx.x * blockDim.x;  // align to warp size
     if (k < bottom) k += inc;
 
     // iterate over all cells assigned to thread
@@ -166,7 +163,8 @@ void tsnecuda::bh::ClearKernel2(volatile int * __restrict__ cell_starts, volatil
     }
 }
 
-void tsnecuda::bh::BuildTree(thrust::device_vector<int> &errd,
+void tsnecuda::bh::BuildTree(tsnecuda::GpuOptions &gpu_opt,
+                               thrust::device_vector<int> &errd,
                                thrust::device_vector<int> &children,
                                thrust::device_vector<int> &cell_starts,
                                thrust::device_vector<float> &cell_mass,
@@ -177,7 +175,8 @@ void tsnecuda::bh::BuildTree(thrust::device_vector<int> &errd,
 {
     tsnecuda::bh::ClearKernel1<<<num_blocks, 1024>>>(thrust::raw_pointer_cast(children.data()),
                                                        num_nodes, num_points);
-    tsnecuda::bh::TreeBuildingKernel<<<num_blocks * TREE_BLOCKS, TREE_THREADS>>>(
+    tsnecuda::bh::TreeBuildingKernel<<<num_blocks * gpu_opt.tree_kernel_factor,
+                                       gpu_opt.tree_kernel_threads>>>(
                                                                   thrust::raw_pointer_cast(errd.data()),
                                                                   thrust::raw_pointer_cast(children.data()),
                                                                   thrust::raw_pointer_cast(points.data()),

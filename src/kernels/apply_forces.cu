@@ -11,7 +11,6 @@
 /******************************************************************************/
 // Edited to add momentum, repulsive, attr forces, etc.
 __global__
-__launch_bounds__(INTEGRATION_THREADS, INTEGRATION_BLOCKS)
 void tsnecuda::bh::IntegrationKernel(
                                  volatile float * __restrict__ points,
                                  volatile float * __restrict__ attr_forces,
@@ -61,7 +60,6 @@ void tsnecuda::bh::IntegrationKernel(
 }
 
 __global__
-__launch_bounds__(INTEGRATION_THREADS, INTEGRATION_BLOCKS)
 void tsnecuda::naive::IntegrationKernel(
                                  volatile float * __restrict__ points,
                                  volatile float * __restrict__ forces,
@@ -102,20 +100,22 @@ void tsnecuda::naive::IntegrationKernel(
    }
 }
 
-void tsnecuda::bh::ApplyForces(thrust::device_vector<float> &points,
-                               thrust::device_vector<float> &attr_forces,
-                               thrust::device_vector<float> &rep_forces,
-                               thrust::device_vector<float> &gains, 
-                               thrust::device_vector<float> &old_forces,
-                               const float eta,
-                               const float normalization,
-                               const float momentum,
-                               const float exaggeration,
-                               const int num_nodes,
-                               const int num_points,
-                               const int num_blocks)
+void tsnecuda::bh::ApplyForces(tsnecuda::GpuOptions &gpu_opt,
+                                thrust::device_vector<float> &points,
+                                thrust::device_vector<float> &attr_forces,
+                                thrust::device_vector<float> &rep_forces,
+                                thrust::device_vector<float> &gains, 
+                                thrust::device_vector<float> &old_forces,
+                                const float eta,
+                                const float normalization,
+                                const float momentum,
+                                const float exaggeration,
+                                const int num_nodes,
+                                const int num_points,
+                                const int num_blocks)
 {
-    tsnecuda::bh::IntegrationKernel<<<num_blocks * INTEGRATION_BLOCKS, INTEGRATION_THREADS>>>(
+    tsnecuda::bh::IntegrationKernel<<<num_blocks * gpu_opt.integration_kernel_factor,
+                                      gpu_opt.integration_kernel_threads>>>(
                     thrust::raw_pointer_cast(points.data()),
                     thrust::raw_pointer_cast(attr_forces.data()),
                     thrust::raw_pointer_cast(rep_forces.data()),
@@ -135,7 +135,7 @@ void tsnecuda::naive::ApplyForces(thrust::device_vector<float> &points,
                                   const int num_points,
                                   const int num_blocks)
 {
-    tsnecuda::naive::IntegrationKernel<<<num_blocks * INTEGRATION_BLOCKS, INTEGRATION_THREADS>>>(
+    tsnecuda::naive::IntegrationKernel<<<num_blocks * 3, 512>>>(
                     thrust::raw_pointer_cast(points.data()),
                     thrust::raw_pointer_cast(forces.data()),
                     thrust::raw_pointer_cast(gains.data()),

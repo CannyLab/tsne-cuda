@@ -20,7 +20,7 @@ __global__ void tsnecuda::bh::InitializationKernel(int * __restrict errd)
     blkcntd = 0;
 }
 
-void tsnecuda::bh::Initialize(thrust::device_vector<int> &errd) 
+void tsnecuda::bh::Initialize(tsnecuda::GpuOptions &gpu_opt, thrust::device_vector<int> &errd) 
 {
     cudaFuncSetCacheConfig(tsnecuda::bh::BoundingBoxKernel, cudaFuncCachePreferShared);
     cudaFuncSetCacheConfig(tsnecuda::bh::TreeBuildingKernel, cudaFuncCachePreferL1);

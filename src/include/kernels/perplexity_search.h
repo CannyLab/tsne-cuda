@@ -10,6 +10,7 @@
 #define SRC_INCLUDE_KERNELS_PERPLEXITY_SEARCH_H_
 
 #include "include/common.h"
+#include "include/options.h"
 #include "include/util/cuda_utils.h"
 #include "include/util/reduce_utils.h"
 #include "include/util/matrix_broadcast_utils.h"
@@ -36,13 +37,14 @@ void ComputePijKernel(
                       const unsigned int num_points,
                       const unsigned int num_near_neighbors);
 
-void SearchPerplexity(cublasHandle_t &handle,
-                                     thrust::device_vector<float> &pij,
-                                     thrust::device_vector<float> &squared_dist,
-                                     const float perplexity_target,
-                                     const float epsilon,
-                                     const int num_points,
-                                     const int num_near_neighbors);
+void SearchPerplexity(tsnecuda::GpuOptions &gpu_opt,
+                            cublasHandle_t &handle,
+                            thrust::device_vector<float> &pij,
+                            thrust::device_vector<float> &squared_dist,
+                            const float perplexity_target,
+                            const float epsilon,
+                            const int num_points,
+                            const int num_near_neighbors);
 }
 
 namespace naive {

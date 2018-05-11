@@ -10,21 +10,13 @@
 #define SRC_INCLUDE_KERNELS_TREE_SORT_H_
 
 #include "include/common.h"
+#include "include/options.h"
 #include "include/tsne_vars.h"
 #include "include/util/cuda_utils.h"
-
-#ifdef __KEPLER__
-#define SORT_THREADS 128
-#define SORT_BLOCKS 4
-#else
-#define SORT_THREADS 64
-#define SORT_BLOCKS 6
-#endif
 
 namespace tsnecuda {
 namespace bh {
 __global__
-__launch_bounds__(SORT_THREADS, SORT_BLOCKS)
 void SortKernel(int * __restrict__ cell_sorted, 
                               volatile int * __restrict__ cell_starts, 
                               int * __restrict__ children,
@@ -32,13 +24,14 @@ void SortKernel(int * __restrict__ cell_sorted,
                               const int num_nodes,
                               const int num_points);
 
-void SortCells(thrust::device_vector<int> &cell_sorted,
-                             thrust::device_vector<int> &cell_starts,
-                             thrust::device_vector<int> &children,
-                             thrust::device_vector<int> &cell_counts,
-                             const int num_nodes,
-                             const int num_points,
-                             const int num_blocks);
+void SortCells(tsnecuda::GpuOptions &gpu_opt,
+                thrust::device_vector<int> &cell_sorted,
+                thrust::device_vector<int> &cell_starts,
+                thrust::device_vector<int> &children,
+                thrust::device_vector<int> &cell_counts,
+                const int num_nodes,
+                const int num_points,
+                const int num_blocks);
 }
 }
 

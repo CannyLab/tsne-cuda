@@ -9,7 +9,6 @@
 /******************************************************************************/
 
 __global__
-__launch_bounds__(SORT_THREADS, SORT_BLOCKS)
 void tsnecuda::bh::SortKernel(int * __restrict__ cell_sorted, 
                               volatile int * __restrict__ cell_starts, 
                               int * __restrict__ children,
@@ -53,7 +52,8 @@ void tsnecuda::bh::SortKernel(int * __restrict__ cell_sorted,
     }
 }
 
-void tsnecuda::bh::SortCells(thrust::device_vector<int> &cell_sorted,
+void tsnecuda::bh::SortCells(tsnecuda::GpuOptions &gpu_opt,
+                             thrust::device_vector<int> &cell_sorted,
                              thrust::device_vector<int> &cell_starts,
                              thrust::device_vector<int> &children,
                              thrust::device_vector<int> &cell_counts,
@@ -61,7 +61,8 @@ void tsnecuda::bh::SortCells(thrust::device_vector<int> &cell_sorted,
                              const int num_points,
                              const int num_blocks)
 {
-    tsnecuda::bh::SortKernel<<<num_blocks * SORT_BLOCKS, SORT_THREADS>>>(
+    tsnecuda::bh::SortKernel<<<num_blocks * gpu_opt.sort_kernel_factor,
+                               gpu_opt.sort_kernel_threads>>>(
                                 thrust::raw_pointer_cast(cell_sorted.data()),
                                 thrust::raw_pointer_cast(cell_starts.data()),
                                 thrust::raw_pointer_cast(children.data()),

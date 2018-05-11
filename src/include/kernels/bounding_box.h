@@ -10,21 +10,13 @@
 #define SRC_INCLUDE_KERNELS_BOUNDING_BOX_H_
 
 #include "include/common.h"
+#include "include/options.h"
 #include "include/tsne_vars.h"
 #include "include/util/cuda_utils.h"
-
- #ifdef __KEPLER__
-#define BOUNDING_BOX_THREADS 1024
-#define BOUNDING_BOX_BLOCKS 2
-#else
-#define BOUNDING_BOX_THREADS 512
-#define BOUNDING_BOX_BLOCKS 3
-#endif
 
 namespace tsnecuda {
 namespace bh {
 __global__
-__launch_bounds__(BOUNDING_BOX_THREADS, BOUNDING_BOX_BLOCKS)
 void BoundingBoxKernel(
                        volatile int * __restrict__ cell_starts, 
                        volatile int * __restrict__ children, 
@@ -36,19 +28,21 @@ void BoundingBoxKernel(
                        volatile float * __restrict__ x_min_device, 
                        volatile float * __restrict__ y_min_device,
                        const int num_nodes,
-                       const int num_points);
+                       const int num_points,
+                       const int bounding_box_threads);
 
-void ComputeBoundingBox(thrust::device_vector<int> &cell_starts,
-                                      thrust::device_vector<int> &children,
-                                      thrust::device_vector<float> &cell_mass,
-                                      thrust::device_vector<float> &points,
-                                      thrust::device_vector<float> &x_max_device,
-                                      thrust::device_vector<float> &y_max_device,
-                                      thrust::device_vector<float> &x_min_device,
-                                      thrust::device_vector<float> &y_min_device,
-                                      const int num_nodes,
-                                      const int num_points,
-                                      const int num_blocks);
+void ComputeBoundingBox(tsnecuda::GpuOptions &gpu_opt,
+                                thrust::device_vector<int> &cell_starts,
+                                thrust::device_vector<int> &children,
+                                thrust::device_vector<float> &cell_mass,
+                                thrust::device_vector<float> &points,
+                                thrust::device_vector<float> &x_max_device,
+                                thrust::device_vector<float> &y_max_device,
+                                thrust::device_vector<float> &x_min_device,
+                                thrust::device_vector<float> &y_min_device,
+                                const int num_nodes,
+                                const int num_points,
+                                const int num_blocks);
 }
 }
 
