@@ -28,3 +28,5 @@ build/*
 
 # Ignore animation
 visualization/animation.gif
+
+.DS_Store
