@@ -30,7 +30,7 @@ class TSNE(object):
                  pre_momentum=0.5,
                  post_momentum=0.8,
                  theta=0.5,
-                 eqssq=0.0025,
+                 epssq=0.0025,
                  n_iter=1000,
                  n_iter_without_progress=1000,
                  min_grad_norm=1e-7,
@@ -48,6 +48,7 @@ class TSNE(object):
                  dump_file="dump.txt",
                  dump_interval=1,
                  print_interval=10,
+                 device=0,
             ):
         """Initialization method for barnes hut T-SNE class.
         """
@@ -96,9 +97,9 @@ class TSNE(object):
         # Return style
         if return_style not in ['once','snapshots']:
             raise ValueError('Invalid return style...')
-        else if return_style == 'once':
+        elif return_style == 'once':
             self.return_style = 0
-        else if return_style == 'snapshots'
+        elif return_style == 'snapshots':
             self.return_style = 1
         self.num_snapshots = int(num_snapshots)
 
@@ -154,12 +155,12 @@ class TSNE(object):
         # Setup points/embedding requirements
         self.points = N.require(X, N.float32, ['CONTIGUOUS', 'ALIGNED'])
         self.embedding = N.zeros(shape=(X.shape[0],self.n_components))
-        self.embedding = N.require(self.embedding_ , N.float32, ['F_CONTIGUOUS', 'ALIGNED', 'WRITEABLE'])
+        self.embedding = N.require(self.embedding , N.float32, ['F_CONTIGUOUS', 'ALIGNED', 'WRITEABLE'])
 
         # Handle Initialization
         if y is None:
             self.initialization_type = 1
-            self.init_data = None
+            self.init_data = N.require(N.zeros((1,1)),N.float32,['CONTIGUOUS','ALIGNED'])
         else:
             self.initialization_type = 3
             self.init_data = N.require(y, N.float32, ['F_CONTIGUOUS', 'ALIGNED'])

@@ -49,13 +49,37 @@
                                     float min_g_norm);
 
 
-        void pymodule_bh_tsne(float *points, float *result, ssize_t *dimsm, 
-                                int proj_dim, float perplexity, float early_ex, 
-                                float learning_rate, int n_iter, int n_iter_np,
-                                float min_g_norm);
+	void pymodule_bh_tsne(float *result,
+                      float* points,
+                      ssize_t *dims,
+                      float perplexity, 
+                      float learning_rate, 
+                      float magnitude_factor,
+                      int num_neighbors,
+                      int iterations,
+                      int iterations_no_progress,
+                      int force_magnify_iters,
+                      float perplexity_search_epsilon,
+                      float pre_exaggeration_momentum,
+                      float post_exaggeration_momentum,
+                      float theta,
+                      float epssq,
+                      float min_gradient_norm,
+                      int initialization_type,
+                      float* preinit_data,
+                      bool dump_points,
+                      char* dump_file,
+                      int dump_interval,
+                      bool use_interactive,
+                      char* viz_server,
+                      int viz_timeout,
+                      int verbosity,
+                      int print_interval,
+                      int gpu_device,
+                      int return_style,
+                      int num_snapshots
+                 );
 
-        void pymodule_bhsnapshot(float *points, float *result, ssize_t *dims, int proj_dim, float perplexity, float early_ex, 
-                float learning_rate, int n_iter,  int n_iter_np, float min_g_norm, float* preinit_data, int num_snapshots);
     }
 
 #endif
