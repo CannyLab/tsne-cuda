@@ -14,45 +14,42 @@ import ctypes
 import os
 import pkg_resources
 
+def ord_string(s):
+    b = bytearray()
+    arr = b.extend(map(ord, s))
+    return N.array([x for x in b] + [0]).astype(N.uint8)
+
 class TSNE(object):
-    def __init__(self, n_components=2, perplexity=50.0, early_exaggeration=2.0, 
-                    learning_rate=200.0, n_iter=1000, n_iter_without_progress=1000,
-                    min_grad_norm=1e-7, metric='euclidean',init='random',verbose=0,
-                    random_seed=None):
+    def __init__(self,
+                 n_components=2,
+                 perplexity=50.0,
+                 early_exaggeration=2.0,
+                 learning_rate=200.0,
+                 num_neighbors=1023,
+                 force_magnify_iters=250,
+                 pre_momentum=0.5,
+                 post_momentum=0.8,
+                 theta=0.5,
+                 eqssq=0.0025,
+                 n_iter=1000,
+                 n_iter_without_progress=1000,
+                 min_grad_norm=1e-7,
+                 perplexity_epsilon=1e-3,
+                 metric='euclidean',
+                 init='random',
+                 return_style='once',
+                 num_snapshots=5,
+                 verbose=0,
+                 random_seed=None,
+                 use_interactive=False,
+                 viz_timeout=10000,
+                 viz_server="tcp://localhost:5556",
+                 dump_points=False,
+                 dump_file="dump.txt",
+                 dump_interval=1,
+                 print_interval=10,
+            ):
         """Initialization method for barnes hut T-SNE class.
-        
-        Keyword Arguments:
-            n_components {int} -- Dimension of the embedded space. (default: {2})
-            perplexity {int} -- The perplexity is related to the number of nearest neighbors that is
-                                    used in other manifold learning algorithms. Larger datasets usually 
-                                    require a larger perplexity. Consider selecting a value between 5 and 
-                                    50. The choice is not extremely critical since t-SNE is quite insensitive 
-                                    to this parameter. (default: {30})
-            early_exaggeration {float} -- Controls how tight natural clusters in the original space are in
-                                                the embedded space and how much space will be between them. 
-                                                For larger values, the space between natural clusters will 
-                                                be larger in the embedded space. Again, the choice of this 
-                                                parameter is not very critical. If the cost function increases 
-                                                during initial optimization, the early exaggeration factor or
-                                                the learning rate might be too high. (default: {12.0})
-            learning_rate {float} -- The learning rate for t-SNE is usually in the range [10.0, 1000.0]. If the
-                                        learning rate is too high, the data may look like a ‘ball’ with any point
-                                        approximately equidistant from its nearest neighbours. If the learning 
-                                        rate is too low, most points may look compressed in a dense cloud with 
-                                        few outliers. If the cost function gets stuck in a bad local minimum 
-                                        increasing the learning rate may help. (default: {1.0})
-            n_iter {int} -- Maximum number of iterations for the optimization. Should be at least 250. (default: {1000})
-            n_iter_without_progress {int} -- Maximum number of iterations without progress before we abort the 
-                                                optimization, used after 250 initial iterations with early 
-                                                exaggeration. Note that progress is only checked every 50 
-                                                iterations so this value is rounded to the next multiple of 50. (default: {300})
-            min_grad_norm {float} -- If the gradient norm is below this threshold, the optimization will be stopped. (default: {1e-7})
-            metric {str} -- TODO: Implement this feature. Currently only the euclidean metric (L2) is supported. (default: {'euclidean'})
-            init {str} -- TODO: Initialization of embedding. Possible options are ‘random’, ‘pca’, and a numpy array of shape 
-                                (n_samples, n_components). PCA initialization cannot be used with precomputed distances
-                                 and is usually more globally stable than random initialization. (default: {'random'})
-            verbose {int} -- TODO: Verbosity level. (default: {0})
-            random_seed {int} -- TODO: [The seed used by the random number generator. (default: {None})
         """
 
         # Initialize the variables
@@ -72,12 +69,38 @@ class TSNE(object):
         if init not in ['random']:
             raise ValueError('Non-Random initialization is not currently supported. Please use init=\'random\' for now.')
         else:
-            self.metric = metric
+            self.init = init
         self.verbose = int(verbose)
-        # if random_seed is not None:
-        #     self.random_seed = int(random_seed)
-        # else:
-        #     self.random_seed = float(os.urandom(4))
+
+        # Initialize non-sklearn variables
+        self.num_neighbors = int(num_neighbors)
+        self.force_magnify_iters = int(force_magnify_iters)
+        self.perplexity_epsilon = float(perplexity_epsilon)
+        self.pre_momentum = float(pre_momentum)
+        self.post_momentum = float(post_momentum)
+        self.theta = float(theta)
+        self.epssq =float(epssq)
+        self.device = int(device)
+        self.print_interval = int(print_interval)
+
+        # Point dumpoing
+        self.dump_file = str(dump_file)
+        self.dump_points = bool(dump_points)
+        self.dump_interval = int(dump_interval)
+
+        # Viz
+        self.use_interactive = bool(use_interactive)
+        self.viz_server = str(viz_server)
+        self.viz_timeout = int(viz_timeout)
+
+        # Return style
+        if return_style not in ['once','snapshots']:
+            raise ValueError('Invalid return style...')
+        else if return_style == 'once':
+            self.return_style = 0
+        else if return_style == 'snapshots'
+            self.return_style = 1
+        self.num_snapshots = int(num_snapshots)
 
         # Build the hooks for the BH T-SNE library
         self._path = pkg_resources.resource_filename('tsnecuda','') # Load from current location
@@ -87,22 +110,36 @@ class TSNE(object):
 
         # Hook the BH T-SNE function
         self._lib.pymodule_bh_tsne.restype = None
-        self._lib.pymodule_bh_tsne.argtypes = [ N.ctypeslib.ndpointer(N.float32, ndim=2, flags='ALIGNED, CONTIGUOUS'), # Input Points
-                                  N.ctypeslib.ndpointer(N.float32, ndim=2, flags='ALIGNED, F_CONTIGUOUS, WRITEABLE'), # Output points
-                                  ctypes.POINTER(N.ctypeslib.c_intp), # Input points dimension
-                                  ctypes.c_int, # Projected Dimension
-                                  ctypes.c_float, # Perplexity
-                                  ctypes.c_float, # Early exagg
-                                  ctypes.c_float, # Learning Rate
-                                  ctypes.c_int, # n_iter
-                                  ctypes.c_int, # n_iter w/o progress
-                                  ctypes.c_float # min_norm
-                                ]
-
-        # Set up the attributed
-        self.embedding_ = None
-        self.kl_divergence_ = None
-        self.n_iter_ = None
+        self._lib.pymodule_bh_tsne.argtypes = [ 
+                N.ctypeslib.ndpointer(N.float32, ndim=2, flags='ALIGNED, F_CONTIGUOUS, WRITEABLE'), # result
+                N.ctypeslib.ndpointer(N.float32, ndim=2, flags='ALIGNED, CONTIGUOUS'), # points
+                ctypes.POINTER(N.ctypeslib.c_intp), # dims
+                ctypes.c_float, # Perplexity
+                ctypes.c_float, # Learning Rate
+                ctypes.c_float, # Magnitude Factor
+                ctypes.c_int, # Num Neighbors
+                ctypes.c_int, # Iterations
+                ctypes.c_int, # Iterations no progress
+                ctypes.c_int, # Force Magnify iterations
+                ctypes.c_float, # Perplexity search epsilon
+                ctypes.c_float, # pre-exaggeration momentum
+                ctypes.c_float, # post-exaggeration momentum
+                ctypes.c_float, # Theta
+                ctypes.c_float, # epssq
+                ctypes.c_float, # Minimum gradient norm
+                ctypes.c_int, # Initialization types
+                N.ctypeslib.ndpointer(N.float32, ndim=2, flags='ALIGNED, F_CONTIGUOUS'), # Initialization Data
+                ctypes.c_bool, # Dump points
+                N.ctypeslib.ndpointer(N.uint8, flags='ALIGNED, CONTIGUOUS'), # Dump File
+                ctypes.c_int, # Dump interval
+                ctypes.c_bool, # Use interactive
+                N.ctypeslib.ndpointer(N.uint8, flags='ALIGNED, CONTIGUOUS'), # Viz Server
+                ctypes.c_int, # Viz timeout
+                ctypes.c_int, # Verbosity
+                ctypes.c_int, # Print interval
+                ctypes.c_int, # GPU Device
+                ctypes.c_int, # Return style
+                ctypes.c_int ] # Number of snapshots
 
     def fit_transform(self, X, y=None):
         """Fit X into an embedded space and return that transformed output.
@@ -113,18 +150,57 @@ class TSNE(object):
         Keyword Arguments:
             y {None} -- Ignored (default: {None})
         """
-        X = N.require(X, N.float32, ['CONTIGUOUS', 'ALIGNED'])
-        self.embedding_ = N.zeros(shape=(X.shape[0],self.n_components))
-        self.embedding_ = N.require(self.embedding_ , N.float32, ['F_CONTIGUOUS', 'ALIGNED', 'WRITEABLE'])
-        self._lib.pymodule_bh_tsne(X, self.embedding_, X.ctypes.shape, 
-                                        ctypes.c_int(self.n_components), 
-                                        ctypes.c_float(self.perplexity), 
-                                        ctypes.c_float(self.early_exaggeration),
-                                        ctypes.c_float(self.learning_rate), 
-                                        ctypes.c_int(self.n_iter),
-                                        ctypes.c_int(self.n_iter_without_progress),
-                                        ctypes.c_float(self.min_grad_norm))
-        return self.embedding_
+
+        # Setup points/embedding requirements
+        self.points = N.require(X, N.float32, ['CONTIGUOUS', 'ALIGNED'])
+        self.embedding = N.zeros(shape=(X.shape[0],self.n_components))
+        self.embedding = N.require(self.embedding_ , N.float32, ['F_CONTIGUOUS', 'ALIGNED', 'WRITEABLE'])
+
+        # Handle Initialization
+        if y is None:
+            self.initialization_type = 1
+            self.init_data = None
+        else:
+            self.initialization_type = 3
+            self.init_data = N.require(y, N.float32, ['F_CONTIGUOUS', 'ALIGNED'])
+
+        # Handle dumping and viz strings
+        self.dump_file_ = N.require(ord_string(self.dump_file), N.uint8, ['CONTIGUOUS', 'ALIGNED'])
+        self.viz_server_ = N.require(ord_string(self.viz_server), N.uint8, ['CONTIGUOUS', 'ALIGNED'])
+
+
+        self._lib.pymodule_bh_tsne(
+                self.embedding, # result
+                self.points, # points
+                self.points.ctypes.shape, # dims
+                ctypes.c_float(self.perplexity), # Perplexity
+                ctypes.c_float(self.learning_rate), # Learning Rate
+                ctypes.c_float(self.early_exaggeration), # Magnitude Factor
+                ctypes.c_int(self.num_neighbors), # Num Neighbors
+                ctypes.c_int(self.n_iter), # Iterations
+                ctypes.c_int(self.n_iter_without_progress), # Iterations no progress
+                ctypes.c_int(self.force_magnify_iters), # Force Magnify iterations
+                ctypes.c_float(self.perplexity_epsilon), # Perplexity search epsilon
+                ctypes.c_float(self.pre_momentum), # pre-exaggeration momentum
+                ctypes.c_float(self.post_momentum), # post-exaggeration momentum
+                ctypes.c_float(self.theta), # Theta
+                ctypes.c_float(self.epssq), # epssq
+                ctypes.c_float(self.min_grad_norm), # Minimum gradient norm
+                ctypes.c_int(self.initialization_type), # Initialization types
+                self.init_data, # Initialization Data
+                ctypes.c_bool(self.dump_points), # Dump points
+                self.dump_file_, # Dump File
+                ctypes.c_int(self.dump_interval), # Dump interval
+                ctypes.c_bool(self.use_interactive), # Use interactive
+                self.viz_server_, # Viz Server
+                ctypes.c_int(self.viz_timeout), # Viz timeout
+                ctypes.c_int(self.verbose), # Verbosity
+                ctypes.c_int(self.print_interval), # Print interval
+                ctypes.c_int(self.device), # GPU Device
+                ctypes.c_int(self.return_style), # Return style
+                ctypes.c_int(self.num_snapshots) ) # Number of snapshots
+
+        return self.embedding
 
 
 
