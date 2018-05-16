@@ -242,7 +242,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
                                         const unsigned int NDIMS,
                                         const unsigned int PROJDIM) {
     tsnecuda::util::MaxNormalizeDeviceVector(points);
-    std::default_random_engine generator;
+    std::default_random_engine generator(time(NULL));
 
     // Choose the right sigmas
     std::cout << "Selecting sigmas to match perplexity..." << std::endl;
@@ -347,6 +347,9 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
     
     // Compute a max-norm on the points
     tsnecuda::util::MaxNormalizeDeviceVector(d_points);
+    
+    // Setup a random generator
+    std::default_random_engine generator(time(NULL));
 
     // Choose the right sigmas
     std::cout << "Selecting sigmas to match perplexity..." << std::endl;

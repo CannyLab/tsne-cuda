@@ -10,7 +10,7 @@
 #define SRC_INCLUDE_OPTIONS_H_
 
 #include <random>
-#include <time>
+#include <time.h>
 
 namespace tsnecuda {
     enum TSNE_INIT {
