@@ -7,7 +7,7 @@
  */
 
 void test_pairwise_distance(int N, int NDIM) {
-    srand (time(NULL));
+    //srand (time(NULL));
 
     // Create some random points in 2 dimensions
     float points[N * NDIM];

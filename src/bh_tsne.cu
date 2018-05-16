@@ -136,7 +136,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<float> points_device((num_nodes + 1) * 2);
     thrust::device_vector<float> random_vector_device(points_device.size());
 
-    std::default_random_engine generator;
+    std::default_random_engine generator(opt.random_seed);
     std::normal_distribution<double> distribution1(0.0, 1.0);
     thrust::host_vector<float> h_points_device((num_nodes+ 1) * 2);
 
@@ -146,7 +146,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
     // TODO: this will only work with gaussian init
     if (opt.initialization == tsnecuda::TSNE_INIT::UNIFORM) { // Random uniform initialization
-        points_device = tsnecuda::util::RandomDeviceVectorInRange((num_nodes+1)*2, -5, 5);
+        points_device = tsnecuda::util::RandomDeviceVectorInRange(generator, (num_nodes+1)*2, -5, 5);
     } else if (opt.initialization == tsnecuda::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
         // Generate some Gaussian noise for the points
         for (int i = 0; i < (num_nodes+ 1) * 2; i++) h_points_device[i] = 0.0001 * distribution1(generator);

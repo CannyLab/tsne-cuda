@@ -9,6 +9,9 @@
 #ifndef SRC_INCLUDE_OPTIONS_H_
 #define SRC_INCLUDE_OPTIONS_H_
 
+#include <random>
+#include <time>
+
 namespace tsnecuda {
     enum TSNE_INIT {
         UNIFORM, GAUSSIAN, RESUME, VECTOR
@@ -73,11 +76,15 @@ namespace tsnecuda {
             float trained_norm = -1.0;
             bool trained = false;
 
+            // Random information
+            int random_seed = 0;
+
+
             // Various Constructors
             Options() {}
             Options(float* return_data, float* points, int num_points, int num_dims) : 
                 return_data(return_data), points(points), num_points(num_points),
-                        num_dims(num_dims) {}
+                        num_dims(num_dims) {this->random_seed = time(NULL);}
             Options(float* points, int num_points, int num_dims, 
                     float perplexity, float learning_rate, float magnitude_factor, int num_neighbors,
                     int iterations, int iterations_no_progress, int force_magnify_iters, float perplexity_search_epsilon, float pre_exaggeration_momentum, float post_exaggeration_momentum, float theta, float epssq, float min_gradient_norm,
@@ -114,7 +121,7 @@ namespace tsnecuda {
                     viz_server(viz_server),
                     verbosity(verbosity),
                     print_interval(print_interval)
-                    {}
+                    {this->random_seed = time(NULL);}
 
             bool enable_dump(std::string filename, int interval = 1) {
                 this->dump_points = true;

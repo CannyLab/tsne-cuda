@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
     tsnecuda::GpuOptions gpu_opt(IOPT(device));
 
     // Common initialization
-    srand (time(NULL));
+    // srand (time(NULL));
 
     tsnecuda::TSNE_INIT init_type = tsnecuda::TSNE_INIT::UNIFORM;
     if (SOPT(init).compare("unif") == 0) {

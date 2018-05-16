@@ -242,6 +242,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
                                         const unsigned int NDIMS,
                                         const unsigned int PROJDIM) {
     tsnecuda::util::MaxNormalizeDeviceVector(points);
+    std::default_random_engine generator;
 
     // Choose the right sigmas
     std::cout << "Selecting sigmas to match perplexity..." << std::endl;
@@ -260,7 +261,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
     //printarray(pij, N, N);
     
     thrust::device_vector<float> forces(N * PROJDIM);
-    thrust::device_vector<float> ys = tsnecuda::util::RandomDeviceUniformZeroOneVector(N * PROJDIM);
+    thrust::device_vector<float> ys = tsnecuda::util::RandomDeviceUniformZeroOneVector(generator, N * PROJDIM);
     
     // Momentum variables
     thrust::device_vector<float> yt_1(N * PROJDIM);
@@ -357,7 +358,7 @@ thrust::device_vector<float> NaiveTSNE::tsne(cublasHandle_t &handle,
 
     // Allocate some memory for the foces and such
     thrust::device_vector<float> forces(N_POINTS * PROJDIM);
-    thrust::device_vector<float> ys = tsnecuda::util::RandomDeviceUniformZeroOneVector(N_POINTS * PROJDIM);
+    thrust::device_vector<float> ys = tsnecuda::util::RandomDeviceUniformZeroOneVector(generator, N_POINTS * PROJDIM);
     
     // Momentum variables
     thrust::device_vector<float> yt_1(N_POINTS * PROJDIM);
