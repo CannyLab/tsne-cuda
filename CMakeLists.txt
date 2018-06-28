@@ -166,7 +166,6 @@ if(BUILD_PYTHON)
         src/python/setup.py
         src/python/tsnecuda/__init__.py
         src/python/tsnecuda/NaiveTSNE.py
-        src/python/tsnecuda/TSNE_UTILS.py
         src/python/tsnecuda/TSNE.py
         src/python/tsnecuda/test/__init__.py
         src/python/docs/FAQ.txt
