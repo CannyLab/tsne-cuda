@@ -56,7 +56,7 @@ For more information on running the library, or using it as a C++ library, see t
 
 # Known Bugs
 
-- Tests seg-fault when run with not enough stack space. Use 'ulimit -s unlimited' as a temporary workaround.
+- Odd bug with some datasets that causes a hang/gpu memory error. 
 
 # Citation
 
