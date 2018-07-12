@@ -31,7 +31,7 @@ Left: MULTICORE-4 (501s), Middle: BH-TSNE (1156s), Right: t-SNE-CUDA (Ours, 6.98
 
 # Installation
 
-To install our library, follow the instructions in the [installation section](https://github.com/rmrao/tsne-cuda/wiki/Installation) of the wiki.
+To install our library, follow the instructions in the [installation section](https://github.com/CannyLab/tsne-cuda/wiki/Installation) of the wiki.
 
 ### Run
 
@@ -46,7 +46,7 @@ X_embedded = TSNE(n_components=2, perplexity=15, learning_rate=10).fit_transform
 
 It's worth noting that if n_components is >= 3, then the program uses the naive O(n^2) method by default. If the number of components is 2, then you can use the heavily optimized Barnes-Hut implementation.
 
-For more information on running the library, or using it as a C++ library, see the [Python usage](https://github.com/rmrao/tsne-cuda/wiki/Basic-Usage:-Python) or [C++ Usage](https://github.com/rmrao/tsne-cuda/wiki/Basic-Usage:-Cxx) sections of the wiki.
+For more information on running the library, or using it as a C++ library, see the [Python usage](https://github.com/CannyLab/tsne-cuda/wiki/Basic-Usage:-Python) or [C++ Usage](https://github.com/CannyLab/tsne-cuda/wiki/Basic-Usage:-Cxx) sections of the wiki.
 
 # Future work
 
@@ -69,7 +69,7 @@ Please cite this repository if it was useful for your research:
   year = {2018},
   publisher = {GitHub},
   journal = {GitHub repository},
-  howpublished = {\url{https://github.com/rmrao/tsne-cuda.git}},
+  howpublished = {\url{https://github.com/CannyLab/tsne-cuda.git}},
 }
 ```
 
