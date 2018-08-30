@@ -1,0 +1,55 @@
+{% set name = "tsnecuda" %}
+{% set version = "0.1.1" %}
+{% set file_ext = "tar.gz" %}
+{% set hash_type = "sha256" %}
+{% set hash_value = "75cd4587cb5378ff5760c9ef86392998424a13b0f93c5030a0c6e46c23be618e" %}
+
+package:
+  name: '{{ name|lower }}'
+  version: '{{ version }}'
+
+source:
+  fn: '{{ name }}-{{ version }}.{{ file_ext }}'
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.{{ file_ext }}
+  '{{ hash_type }}': '{{ hash_value }}'
+
+build:
+  number: 0
+  script: python setup.py install --single-version-externally-managed --record=record.txt
+
+requirements:
+  host:
+    - python
+    - openblas
+    - setuptools
+    - cudatoolkit==9.0
+    - faiss-cpu
+    - faiss-gpu
+    - numpy >=1.14.1
+  run:
+    - python
+    - openblas
+    - cudatoolkit==9.0
+    - faiss-cpu
+    - faiss-gpu
+    - numpy >=1.14.1
+
+test:
+  imports:
+    - tsnecuda
+    - tsnecuda.test
+
+about:
+  home: https://github.com/CannyLab/tsne-cuda
+  license: LICENSE.txt
+  license_family: BSD
+  license_file: ''
+  summary: CUDA Implementation of T-SNE with Python bindings
+  description: "===========\ntsnecuda\n===========\n\ntsnecuda provides an optimized CUDA implementation of the T-SNE algorithm by L Van der Maaten. tsnecuda is able to compute the T-SNE of large numbers\
+    \ of points up to 1200 times faster than other leading libraries, and provides simple python bindings with a SKLearn style interface::\n\n    #!/usr/bin/env python\n\n    from tsnecuda import TSNE\n\
+    \    embeddedX = TSNE(n_components=2).fit_transform(X)\n\nFor more information, check out the repository at https://github.com/rmrao/tsne-cuda. \n\n\n"
+  doc_url: ''
+  dev_url: ''
+
+extra:
+  recipe-maintainers: ''
