@@ -1,43 +1,36 @@
 {% set name = "tsnecuda" %}
 {% set version = "0.1.1" %}
-{% set file_ext = "tar.gz" %}
-{% set hash_type = "sha256" %}
-{% set hash_value = "75cd4587cb5378ff5760c9ef86392998424a13b0f93c5030a0c6e46c23be618e" %}
 
 package:
   name: '{{ name|lower }}'
   version: '{{ version }}'
 
 source:
-  fn: '{{ name }}-{{ version }}.{{ file_ext }}'
-  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.{{ file_ext }}
-  '{{ hash_type }}': '{{ hash_value }}'
-
+  git_url: https://github.com/CannyLab/tsne-cuda.git
+  git_rev: HEAD
+  
 build:
-  number: 0
-  script: python setup.py install --single-version-externally-managed --record=record.txt
+  script: ./build.sh
 
 requirements:
+  build:
+    - python
+    - {{ compiler('c') }}
+    - {{ compiler('C++') }}
+    - cudatoolkit >= 8.0
+    - setuptools
+    - openblas
   host:
     - python
     - openblas
     - setuptools
-    - faiss-cpu
-    - faiss-gpu
-    - cudatoolkit==9.0
+    - cudatoolkit >= 8.0
     - numpy >=1.14.1
   run:
     - python
     - openblas
-    - faiss-cpu
-    - faiss-gpu
-    - cudatoolkit==9.0
+    - cudatoolkit >= 8.0
     - numpy >=1.14.1
-
-test:
-  imports:
-    - tsnecuda
-    - tsnecuda.test
 
 about:
   home: https://github.com/CannyLab/tsne-cuda
