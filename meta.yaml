@@ -22,11 +22,15 @@ requirements:
     - python
     - openblas
     - setuptools
+    - faiss-cpu
+    - faiss-gpu
     - cudatoolkit==9.0
     - numpy >=1.14.1
   run:
     - python
     - openblas
+    - faiss-cpu
+    - faiss-gpu
     - cudatoolkit==9.0
     - numpy >=1.14.1
 
