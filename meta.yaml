@@ -17,17 +17,20 @@ requirements:
     - cudatoolkit >=8.0
     - setuptools
     - openblas
+    - libgfortran
   host:
     - python
     - openblas
     - setuptools
     - cudatoolkit >=8.0
     - numpy >=1.14.1
+    - libgfortran
   run:
     - python
     - openblas
     - cudatoolkit >=8.0
     - numpy >=1.14.1
+    - libgfortran
 
 about:
   home: https://github.com/CannyLab/tsne-cuda
