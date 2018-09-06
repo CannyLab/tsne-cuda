@@ -14,7 +14,7 @@ requirements:
     - python
     - gcc_49
     - cmake
-    - cudatoolkit >=8.0
+    - cudatoolkit ==9.0
     - setuptools
     - openblas
     - libgfortran
@@ -22,13 +22,13 @@ requirements:
     - python
     - openblas
     - setuptools
-    - cudatoolkit >=8.0
+    - cudatoolkit ==9.0
     - numpy >=1.14.1
     - libgfortran
   run:
     - python
     - openblas
-    - cudatoolkit >=8.0
+    - cudatoolkit ==9.0
     - numpy >=1.14.1
     - libgfortran
 
