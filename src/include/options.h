@@ -201,22 +201,23 @@ namespace tsnecuda {
             this->sm_count = device_properties.multiProcessorCount;
 
             // Set some per-architecture structures
-            if (device_properties.major >= 6) {  // PASCAL/VOLTA
+            // if (device_properties.major >= 6) {  // PASCAL/VOLTA
 
-                this->integration_kernel_threads    = 1024;
-                this->integration_kernel_factor     = 2;
-                this->repulsive_kernel_threads      = 1024;
-                this->repulsive_kernel_factor       = 2;
-                this->bounding_kernel_threads       = 512;
-                this->bounding_kernel_factor        = 3;
-                this->tree_kernel_threads           = 512;
-                this->tree_kernel_factor            = 3;
-                this->sort_kernel_threads           = 128;
-                this->sort_kernel_factor            = 4;
-                this->summary_kernel_threads        = 768;
-                this->summary_kernel_factor         = 1;
+            //     this->integration_kernel_threads    = 1024;
+            //     this->integration_kernel_factor     = 2;
+            //     this->repulsive_kernel_threads      = 1024;
+            //     this->repulsive_kernel_factor       = 2;
+            //     this->bounding_kernel_threads       = 512;
+            //     this->bounding_kernel_factor        = 3;
+            //     this->tree_kernel_threads           = 1024;
+            //     this->tree_kernel_factor            = 2;
+            //     this->sort_kernel_threads           = 128;
+            //     this->sort_kernel_factor            = 4;
+            //     this->summary_kernel_threads        = 768;
+            //     this->summary_kernel_factor         = 1;
 
-            } else if (device_properties.major == 5) {  // MAXWELL
+            // } else 
+            if (device_properties.major >= 5) {  // MAXWELL
 
                 this->integration_kernel_threads    = 1024;
                 this->integration_kernel_factor     = 1;
@@ -224,14 +225,14 @@ namespace tsnecuda {
                 this->repulsive_kernel_factor       = 5;
                 this->bounding_kernel_threads       = 512;
                 this->bounding_kernel_factor        = 3;
-                this->tree_kernel_threads           = 512;
-                this->tree_kernel_factor            = 3;
+                this->tree_kernel_threads           = 1024;
+                this->tree_kernel_factor            = 2;
                 this->sort_kernel_threads           = 64;
                 this->sort_kernel_factor            = 6;
                 this->summary_kernel_threads        = 128;
                 this->summary_kernel_factor         = 6;
 
-            } else if (device_properties.major == 3) {  // KEPLER
+            } else if (device_properties.major >= 3) {  // KEPLER
 
                 this->integration_kernel_threads    = 1024;
                 this->integration_kernel_factor     = 2;
