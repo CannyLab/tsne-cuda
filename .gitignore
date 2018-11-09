@@ -30,3 +30,5 @@ build/*
 visualization/animation.gif
 
 .DS_Store
+.mypy_cache/
+.vscode/
