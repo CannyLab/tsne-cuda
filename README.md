@@ -1,6 +1,6 @@
 # TSNE-CUDA
 
-***WARNING: This code is still in active development. While the core code is tested and working, some additional features need aditional testing.***
+***WARNING: This code is still in active development. While the core code is tested and working, some features need aditional testing.***
 
 This repo is an optimized CUDA version of [Barnes-Hut t-SNE](https://github.com/lvdmaaten/bhtsne) by L. Van der Maaten with associated python modules. We find that our implementation of t-SNE can be up to 1200x faster than Sklearn, or up to 50x faster than Multicore-TSNE when used with the right GPU. The paper describing our approach, as well as the results below, is available at [https://arxiv.org/abs/1807.11824](https://arxiv.org/abs/1807.11824).
 
@@ -63,13 +63,11 @@ For more information on running the library, or using it as a C++ library, see t
 Please cite this repository if it was useful for your research:
 
 ```
-@misc{cudatsne2018,
-  author = {Chan, D. and Rao, R. and Huang, Z.},
-  title = {TSNE-CUDA},
-  year = {2018},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/CannyLab/tsne-cuda.git}},
+@article{chan2018t,
+  title={t-SNE-CUDA: GPU-Accelerated t-SNE and its Applications to Modern Data},
+  author={Chan, David M and Rao, Roshan and Huang, Forrest and Canny, John F},
+  journal={arXiv preprint arXiv:1807.11824},
+  year={2018}
 }
 ```
 
