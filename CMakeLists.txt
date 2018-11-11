@@ -1,7 +1,9 @@
-cmake_minimum_required (VERSION 2.8)
-project(cuda-tsne)
-set (cuda-tsne_VERSION_MAJOR 1)
-set (cuda-tsne_VERSION_MINOR 0)
+cmake_minimum_required (VERSION 3.0)
+project(tsnecuda)
+set (CMAKE_PROJECT_VERSION 1)
+set (CMAKE_PROJECT_VERSION_MAJOR 1)
+set (CMAKE_PROJECT_VERSION_MINOR 0)
+set (CMAKE_PROJECT_VERSION_PATH 0)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
@@ -27,7 +29,7 @@ endif()
 # Build Number Generation
 #-------------------------------------------------------------------------------
 SET(BUILD_NUMBER 0)
-SET(VERSION_STRING "${cuda-tsne_VERSION_MAJOR}.${cuda-tsne_VERSION_MINOR}")
+SET(VERSION_STRING "${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}")
 find_package(Git)
 if(GIT_FOUND)
     execute_process(
@@ -39,7 +41,6 @@ endif()
 ADD_DEFINITIONS(-DBUILD_NUMBER=${BUILD_NUMBER})
 ADD_DEFINITIONS(-DVERSION_STRING=${VERSION_STRING})
 #-------------------------------------------------------------------------------
-
 
 
 # CXX Configuration
@@ -92,6 +93,11 @@ else()
     include_directories(${OpenBLAS_INCLUDE_DIR})
     set(BLAS_LIB ${OpenBLAS_LIB})
 endif()
+#-------------------------------------------------------------------------------
+
+# GTEST Configuration
+#-------------------------------------------------------------------------------
+add_subdirectory(third_party/glog)
 #-------------------------------------------------------------------------------
 
 # GTEST Configuration
@@ -181,8 +187,8 @@ if(BUILD_PYTHON)
     set_target_properties(tsnecuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
     if(WITH_ZMQ)
         target_link_libraries(tsnecuda
-            faiss
             gtest
+            faiss
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
@@ -192,12 +198,13 @@ if(BUILD_PYTHON)
             pthread
             zmq
             ${BLAS_LIB}
+            glog
             -Wl,--allow-multiple-definition
         )
     else()
         target_link_libraries(tsnecuda
-            faiss
             gtest
+            faiss
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
@@ -206,7 +213,9 @@ if(BUILD_PYTHON)
             ${CUDA_cudadevrt_LIBRARY}
             pthread
             ${BLAS_LIB}
+            glog
             -Wl,--allow-multiple-definition
+            -Wl,-shared
         )
     endif()
 
@@ -242,9 +251,9 @@ if(BUILD_TEST)
     add_dependencies(tsne_test gtest faiss)
     if(WITH_ZMQ)
         target_link_libraries(tsne_test
-            faiss
             gtest
             gtest_main
+            faiss
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
@@ -254,13 +263,14 @@ if(BUILD_TEST)
             pthread
             zmq
             ${BLAS_LIB}
+            glog
             -Wl,--allow-multiple-definition
         )
     else()
         target_link_libraries(tsne_test
-            faiss
             gtest
             gtest_main
+            faiss
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
@@ -269,6 +279,7 @@ if(BUILD_TEST)
             ${CUDA_cudadevrt_LIBRARY}
             pthread
             ${BLAS_LIB}
+            glog
             -Wl,--allow-multiple-definition
         )
 endif()
@@ -293,8 +304,8 @@ cuda_add_executable(tsne
 add_dependencies(tsne gtest faiss)
 if(WITH_ZMQ)
     target_link_libraries(tsne
-        faiss
         gtest
+        faiss
         ${CUDA_LIBRARIES}
         ${OpenMP_CXX_FLAGS}
         ${CUDA_CUBLAS_LIBRARIES}
@@ -304,12 +315,13 @@ if(WITH_ZMQ)
         pthread
         zmq
         ${BLAS_LIB}
+        glog
         -Wl,--allow-multiple-definition
     )
 else()
     target_link_libraries(tsne
-        faiss
         gtest
+        faiss
         ${CUDA_LIBRARIES}
         ${OpenMP_CXX_FLAGS}
         ${CUDA_CUBLAS_LIBRARIES}
@@ -318,6 +330,7 @@ else()
         ${CUDA_cudadevrt_LIBRARY}
         pthread
         ${BLAS_LIB}
+        glog
         -Wl,--allow-multiple-definition
     )
 endif()

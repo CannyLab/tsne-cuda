@@ -7,3 +7,6 @@
 [submodule "faiss"]
 	path = third_party/faiss
 	url = https://github.com/DavidMChan/faiss.git
+[submodule "glog"]
+	path = third_party/glog
+	url = https://github.com/google/glog.git
