@@ -11,8 +11,12 @@
 
 #include "include/common.h"
 #include "include/options.h"
-#include "include/tsne_vars.h"
 #include "include/util/cuda_utils.h"
+
+// TSNE-Vars
+extern __device__ volatile int stepd, bottomd, maxdepthd;
+extern __device__ unsigned int blkcntd;
+extern __device__ volatile float radiusd;
 
 namespace tsnecuda {
 namespace bh {

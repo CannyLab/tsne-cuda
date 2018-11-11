@@ -2,7 +2,7 @@
 Kernel to initialize the global variables
 */
 
-#define INITIALIZATION_VARS
+// #define INITIALIZATION_VARS
 #include "include/kernels/initialization.h"
 
 __device__ volatile int stepd, bottomd, maxdepthd;
