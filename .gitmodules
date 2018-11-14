@@ -10,3 +10,6 @@
 [submodule "glog"]
 	path = third_party/glog
 	url = https://github.com/google/glog.git
+[submodule "fitsne"]
+	path = third_party/FIt-SNE
+	url = https://github.com/DavidMChan/FIt-SNE.git
