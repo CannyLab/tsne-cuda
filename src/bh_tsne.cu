@@ -3,6 +3,11 @@
 */
 
 #include "bh_tsne.h"
+#include "FIt-SNE/src/nbodyfft.h"
+
+double squared_cauchy_2d(double x1, double x2, double y1, double y2) {
+    return pow(1.0 + pow(x1 - y1, 2) + pow(x2 - y2, 2), -2);
+}
 
 void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
                             tsnecuda::GpuOptions &gpu_opt)
@@ -273,25 +278,144 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
                                 num_points,
                                 num_blocks);
 
+
+
+        // Copy data back from GPU to CPU
+        thrust::copy(points_device.begin(), points_device.end(), h_points_device.begin());
+
+        // Hyperparameters
+        int n_interpolation_points = 3;
+        double intervals_per_integer = 1;
+        int min_num_intervals = 50;
+        
+        // Compute repulsive forces
+
+         // Zero out the gradient
+        auto N = num_points;
+        auto D = 2;
+
+        // For convenience, split the x and y coordinate values
+        double* xs = new double[N];
+        double* ys = new double[N];
+
+        double min_coord = INFINITY;
+        double max_coord = -INFINITY;
+        // Find the min/max values of the x and y coordinates
+        for (unsigned long i = 0; i < N; i++) {
+            xs[i] = h_points_device[i];
+            ys[i] = h_points_device[i + num_nodes + 1];
+            if (xs[i] > max_coord) max_coord = xs[i];
+            else if (xs[i] < min_coord) min_coord = xs[i];
+            if (ys[i] > max_coord) max_coord = ys[i];
+            else if (ys[i] < min_coord) min_coord = ys[i];
+        }
+
+        // The number of "charges" or s+2 sums i.e. number of kernel sums
+        int n_terms = 4;
+        auto *chargesQij = new double[N * n_terms];
+        auto *potentialsQij = new double[N * n_terms]();
+
+        // Prepare the terms that we'll use to compute the sum i.e. the repulsive forces
+        for (unsigned long j = 0; j < N; j++) {
+            chargesQij[j * n_terms + 0] = 1;
+            chargesQij[j * n_terms + 1] = xs[j];
+            chargesQij[j * n_terms + 2] = ys[j];
+            chargesQij[j * n_terms + 3] = xs[j] * xs[j] + ys[j] * ys[j];
+        }
+
+        // Compute the number of boxes in a single dimension and the total number of boxes in 2d
+        auto n_boxes_per_dim = static_cast<int>(fmax(min_num_intervals, (max_coord - min_coord) / intervals_per_integer));
+
+
+        // FFTW works faster on numbers that can be written as  2^a 3^b 5^c 7^d
+        // 11^e 13^f, where e+f is either 0 or 1, and the other exponents are
+        // arbitrary
+        int allowed_n_boxes_per_dim[20] = {25,36, 50, 55, 60, 65, 70, 75, 80, 85, 90, 96, 100, 110, 120, 130, 140,150, 175, 200};
+        if ( n_boxes_per_dim < allowed_n_boxes_per_dim[19] ) {
+            //Round up to nearest grid point
+            int chosen_i;
+            for (chosen_i =0; allowed_n_boxes_per_dim[chosen_i]< n_boxes_per_dim; chosen_i++);
+            n_boxes_per_dim = allowed_n_boxes_per_dim[chosen_i];
+        }
+
+        int n_boxes = n_boxes_per_dim * n_boxes_per_dim;
+
+        auto *box_lower_bounds = new double[2 * n_boxes];
+        auto *box_upper_bounds = new double[2 * n_boxes];
+        auto *y_tilde_spacings = new double[n_interpolation_points];
+        int n_interpolation_points_1d = n_interpolation_points * n_boxes_per_dim;
+        auto *x_tilde = new double[n_interpolation_points_1d]();
+        auto *y_tilde = new double[n_interpolation_points_1d]();
+        auto *fft_kernel_tilde = new complex<double>[2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d];
+
+        precompute_2d(max_coord, min_coord, max_coord, min_coord, n_boxes_per_dim, n_interpolation_points,
+                    &squared_cauchy_2d,
+                    box_lower_bounds, box_upper_bounds, y_tilde_spacings, x_tilde, y_tilde, fft_kernel_tilde);
+        n_body_fft_2d(N, n_terms, xs, ys, chargesQij, n_boxes_per_dim, n_interpolation_points, box_lower_bounds,
+                    box_upper_bounds, y_tilde_spacings, fft_kernel_tilde, potentialsQij,12);
+
+        // Compute the normalization constant Z or sum of q_{ij}. This expression is different from the one in the original
+        // paper, but equivalent. This is done so we need only use a single kernel (K_2 in the paper) instead of two
+        // different ones. We subtract N at the end because the following sums over all i, j, whereas Z contains i \neq j
+        double sum_Q = 0;
+        for (unsigned long i = 0; i < N; i++) {
+            double phi1 = potentialsQij[i * n_terms + 0];
+            double phi2 = potentialsQij[i * n_terms + 1];
+            double phi3 = potentialsQij[i * n_terms + 2];
+            double phi4 = potentialsQij[i * n_terms + 3];
+
+            sum_Q += (1 + xs[i] * xs[i] + ys[i] * ys[i]) * phi1 - 2 * (xs[i] * phi2 + ys[i] * phi3) + phi4;
+        }
+        sum_Q -= N;
+
+        normalization = sum_Q;
+
+        // Make the negative term, or F_rep in the equation 3 of the paper
+        double *neg_f = new double[N * 2];
+        for (unsigned int i = 0; i < N; i++) {
+            h_points_device[i] = (xs[i] * potentialsQij[i * n_terms] - potentialsQij[i * n_terms + 1]);
+            h_points_device[i + num_nodes + 1] = (ys[i] * potentialsQij[i * n_terms] - potentialsQij[i * n_terms + 2]);
+        }
+
+        thrust::copy(h_points_device.begin(), h_points_device.end(), repulsive_forces_device.begin());
+
+        // Copy data back to the GPU
+
+        delete[] neg_f;
+        delete[] potentialsQij;
+        delete[] chargesQij;
+        delete[] xs;
+        delete[] ys;
+        delete[] box_lower_bounds;
+        delete[] box_upper_bounds;
+        delete[] y_tilde_spacings;
+        delete[] y_tilde;
+        delete[] x_tilde;
+        delete[] fft_kernel_tilde;
+        
+        
+
+
+
         // Calculate Repulsive Forces
-        tsnecuda::bh::ComputeRepulsiveForces(gpu_opt,
-                                             err_device,
-                                             repulsive_forces_device,
-                                             normalization_vec_device,
-                                             cell_sorted_device,
-                                             children_device,
-                                             cell_mass_device,
-                                             points_device,
-                                             theta, 
-                                             epsilon_squared,
-                                             num_nodes,
-                                             num_points,
-                                             num_blocks);
+        // tsnecuda::bh::ComputeRepulsiveForces(gpu_opt,
+        //                                      err_device,
+        //                                      repulsive_forces_device,
+        //                                      normalization_vec_device,
+        //                                      cell_sorted_device,
+        //                                      children_device,
+        //                                      cell_mass_device,
+        //                                      points_device,
+        //                                      theta, 
+        //                                      epsilon_squared,
+        //                                      num_nodes,
+        //                                      num_points,
+        //                                      num_blocks);
         // Compute normalization
-        normalization = thrust::reduce(normalization_vec_device.begin(),
-                                        normalization_vec_device.end(),
-                                        0.0f,
-                                        thrust::plus<float>());
+        // normalization = thrust::reduce(normalization_vec_device.begin(),
+        //                                 normalization_vec_device.end(),
+        //                                 0.0f,
+        //                                 thrust::plus<float>());
 
         // Calculate Attractive Forces
         tsnecuda::bh::ComputeAttractiveForces(gpu_opt,
