@@ -8,6 +8,7 @@
  */
 
 #include "include/util/matrix_broadcast_utils.h"
+#include <thrust/complex.h>
 
 // Performs the operation matrix[i, :] = binary_op(matrix[i, :],
 // alpha * vector) for each row i in the matrix
@@ -91,3 +92,11 @@ template void tsnecuda::util::BroadcastMatrixVector<thrust::minus<float>, float>
         thrust::minus<float> binary_operation,
         const int axis,
         const float alpha);
+template void tsnecuda::util::BroadcastMatrixVector<thrust::multiplies<thrust::complex<float>>, thrust::complex<float>>(
+        thrust::device_vector<thrust::complex<float>> &d_matrix,
+        const thrust::device_vector<thrust::complex<float>> &d_vector,
+        const int N,
+        const int M,
+        thrust::multiplies<thrust::complex<float>> binary_operation,
+        const int axis,
+        const thrust::complex<float> alpha);

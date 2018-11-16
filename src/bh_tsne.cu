@@ -5,7 +5,7 @@
 #include "bh_tsne.h"
 #include "FIt-SNE/src/nbodyfft.h"
 
-double squared_cauchy_2d(double x1, double x2, double y1, double y2) {
+float squared_cauchy_2d(float x1, float x2, float y1, float y2) {
     return pow(1.0 + pow(x1 - y1, 2) + pow(x2 - y2, 2), -2);
 }
 
@@ -142,7 +142,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<float> random_vector_device(points_device.size());
 
     std::default_random_engine generator(opt.random_seed);
-    std::normal_distribution<double> distribution1(0.0, 1.0);
+    std::normal_distribution<float> distribution1(0.0, 1.0);
     thrust::host_vector<float> h_points_device((num_nodes+ 1) * 2);
 
     // Initialize random noise vector
@@ -285,7 +285,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
         // Hyperparameters
         int n_interpolation_points = 3;
-        double intervals_per_integer = 1;
+        float intervals_per_integer = 1;
         int min_num_intervals = 50;
         
         // Compute repulsive forces
@@ -295,11 +295,11 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         auto D = 2;
 
         // For convenience, split the x and y coordinate values
-        double* xs = new double[N];
-        double* ys = new double[N];
+        float* xs = new float[N];
+        float* ys = new float[N];
 
-        double min_coord = INFINITY;
-        double max_coord = -INFINITY;
+        float min_coord = INFINITY;
+        float max_coord = -INFINITY;
         // Find the min/max values of the x and y coordinates
         for (unsigned long i = 0; i < N; i++) {
             xs[i] = h_points_device[i];
@@ -312,8 +312,9 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
         // The number of "charges" or s+2 sums i.e. number of kernel sums
         int n_terms = 4;
-        auto *chargesQij = new double[N * n_terms];
-        auto *potentialsQij = new double[N * n_terms]();
+        auto *chargesQij = new float[N * n_terms];
+        auto *potentialsQij = new float[N * n_terms]();
+        // thrust::device_vector<float> potentialsQij(N * n_terms);
 
         // Prepare the terms that we'll use to compute the sum i.e. the repulsive forces
         for (unsigned long j = 0; j < N; j++) {
@@ -340,13 +341,13 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
         int n_boxes = n_boxes_per_dim * n_boxes_per_dim;
 
-        auto *box_lower_bounds = new double[2 * n_boxes];
-        auto *box_upper_bounds = new double[2 * n_boxes];
-        auto *y_tilde_spacings = new double[n_interpolation_points];
+        auto *box_lower_bounds = new float[2 * n_boxes];
+        auto *box_upper_bounds = new float[2 * n_boxes];
+        auto *y_tilde_spacings = new float[n_interpolation_points];
         int n_interpolation_points_1d = n_interpolation_points * n_boxes_per_dim;
-        auto *x_tilde = new double[n_interpolation_points_1d]();
-        auto *y_tilde = new double[n_interpolation_points_1d]();
-        auto *fft_kernel_tilde = new complex<double>[2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d];
+        auto *x_tilde = new float[n_interpolation_points_1d]();
+        auto *y_tilde = new float[n_interpolation_points_1d]();
+        auto *fft_kernel_tilde = new complex<float>[2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d];
 
         precompute_2d(max_coord, min_coord, max_coord, min_coord, n_boxes_per_dim, n_interpolation_points,
                     &squared_cauchy_2d,
@@ -357,12 +358,12 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         // Compute the normalization constant Z or sum of q_{ij}. This expression is different from the one in the original
         // paper, but equivalent. This is done so we need only use a single kernel (K_2 in the paper) instead of two
         // different ones. We subtract N at the end because the following sums over all i, j, whereas Z contains i \neq j
-        double sum_Q = 0;
+        float sum_Q = 0;
         for (unsigned long i = 0; i < N; i++) {
-            double phi1 = potentialsQij[i * n_terms + 0];
-            double phi2 = potentialsQij[i * n_terms + 1];
-            double phi3 = potentialsQij[i * n_terms + 2];
-            double phi4 = potentialsQij[i * n_terms + 3];
+            float phi1 = potentialsQij[i * n_terms + 0];
+            float phi2 = potentialsQij[i * n_terms + 1];
+            float phi3 = potentialsQij[i * n_terms + 2];
+            float phi4 = potentialsQij[i * n_terms + 3];
 
             sum_Q += (1 + xs[i] * xs[i] + ys[i] * ys[i]) * phi1 - 2 * (xs[i] * phi2 + ys[i] * phi3) + phi4;
         }
@@ -371,7 +372,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         normalization = sum_Q;
 
         // Make the negative term, or F_rep in the equation 3 of the paper
-        double *neg_f = new double[N * 2];
+        float *neg_f = new float[N * 2];
         for (unsigned int i = 0; i < N; i++) {
             h_points_device[i] = (xs[i] * potentialsQij[i * n_terms] - potentialsQij[i * n_terms + 1]);
             h_points_device[i + num_nodes + 1] = (ys[i] * potentialsQij[i * n_terms] - potentialsQij[i * n_terms + 2]);

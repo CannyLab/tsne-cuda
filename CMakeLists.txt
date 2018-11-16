@@ -142,6 +142,7 @@ link_directories(
 )
 
 file(GLOB_RECURSE FIT_SNE_SOURCES third_party/FIt-SNE/src/*.cpp)
+file(GLOB_RECURSE FIT_SNE_CUDA_SOURCES third_party/FIt-SNE/src/*.cu)
 set(SOURCES
     # Utils
     src/util/data_utils.cu
@@ -172,6 +173,8 @@ set(SOURCES
 
     # FIT-SNE
     ${FIT_SNE_SOURCES}
+    ${FIT_SNE_CUDA_SOURCES}
+    
 )
 
 
@@ -206,6 +209,7 @@ if(BUILD_PYTHON)
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_CUFFT_LIBRARIES}
             ${CUDA_cusparse_LIBRARY}
             #/usr/local/cuda-8.0/lib64/libcudaevrt.a
             ${CUDA_cudadevrt_LIBRARY}
@@ -223,6 +227,7 @@ if(BUILD_PYTHON)
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_CUFFT_LIBRARIES}
             ${CUDA_cusparse_LIBRARY}
             #/usr/local/cuda-8.0/lib64/libcudaevrt.a
             ${CUDA_cudadevrt_LIBRARY}
@@ -273,6 +278,7 @@ if(BUILD_TEST)
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_CUFFT_LIBRARIES}
             ${CUDA_cusparse_LIBRARY}
             #/usr/local/cuda-8.0/lib64/libcudaevrt.a
             ${CUDA_cudadevrt_LIBRARY}
@@ -291,6 +297,7 @@ if(BUILD_TEST)
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
+            ${CUDA_CUFFT_LIBRARIES}
             ${CUDA_cusparse_LIBRARY}
             #/usr/local/cuda-8.0/lib64/libcudaevrt.a
             ${CUDA_cudadevrt_LIBRARY}
@@ -327,6 +334,7 @@ if(WITH_ZMQ)
         ${CUDA_LIBRARIES}
         ${OpenMP_CXX_FLAGS}
         ${CUDA_CUBLAS_LIBRARIES}
+        ${CUDA_CUFFT_LIBRARIES}
         ${CUDA_cusparse_LIBRARY}
         #/usr/local/cuda-8.0/lib64/libcudaevrt.a
         ${CUDA_cudadevrt_LIBRARY}
@@ -345,6 +353,7 @@ else()
         ${CUDA_LIBRARIES}
         ${OpenMP_CXX_FLAGS}
         ${CUDA_CUBLAS_LIBRARIES}
+        ${CUDA_CUFFT_LIBRARIES}
         ${CUDA_cusparse_LIBRARY}
         #/usr/local/cuda-8.0/lib64/libcudaevrt.a
         ${CUDA_cudadevrt_LIBRARY}
