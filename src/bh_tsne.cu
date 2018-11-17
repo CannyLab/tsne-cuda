@@ -352,8 +352,17 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         precompute_2d(max_coord, min_coord, max_coord, min_coord, n_boxes_per_dim, n_interpolation_points,
                     &squared_cauchy_2d,
                     box_lower_bounds, box_upper_bounds, y_tilde_spacings, x_tilde, y_tilde, fft_kernel_tilde);
+        float denominator[n_interpolation_points];
+        for (int i = 0; i < n_interpolation_points; i++) {
+            denominator[i] = 1;
+            for (int j = 0; j < n_interpolation_points; j++) {
+                if (i != j) {
+                    denominator[i] *= y_tilde_spacings[i] - y_tilde_spacings[j];
+                }
+            }
+        }
         n_body_fft_2d(N, n_terms, xs, ys, chargesQij, n_boxes_per_dim, n_interpolation_points, box_lower_bounds,
-                    box_upper_bounds, y_tilde_spacings, fft_kernel_tilde, potentialsQij,12);
+                    box_upper_bounds, y_tilde_spacings, fft_kernel_tilde, potentialsQij, denominator, 12);
 
         // Compute the normalization constant Z or sum of q_{ij}. This expression is different from the one in the original
         // paper, but equivalent. This is done so we need only use a single kernel (K_2 in the paper) instead of two
