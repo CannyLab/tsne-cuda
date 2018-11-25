@@ -8,6 +8,144 @@
 float squared_cauchy_2d(float x1, float x2, float y1, float y2) {
     return pow(1.0 + pow(x1 - y1, 2) + pow(x2 - y2, 2), -2);
 }
+// compute minimum and maximum values in a single reduction
+
+// minmax_pair stores the minimum and maximum 
+// values that have been encountered so far
+template <typename T>
+struct minmax_pair
+{
+  T min_val;
+  T max_val;
+};
+
+// minmax_unary_op is a functor that takes in a value x and
+// returns a minmax_pair whose minimum and maximum values
+// are initialized to x.
+template <typename T>
+struct minmax_unary_op
+  : public thrust::unary_function< T, minmax_pair<T> >
+{
+  __host__ __device__
+  minmax_pair<T> operator()(const T& x) const
+  {
+    minmax_pair<T> result;
+    result.min_val = x;
+    result.max_val = x;
+    return result;
+  }
+};
+
+// minmax_binary_op is a functor that accepts two minmax_pair 
+// structs and returns a new minmax_pair whose minimum and 
+// maximum values are the min() and max() respectively of 
+// the minimums and maximums of the input pairs
+template <typename T>
+struct minmax_binary_op
+  : public thrust::binary_function< minmax_pair<T>, minmax_pair<T>, minmax_pair<T> >
+{
+  __host__ __device__
+  minmax_pair<T> operator()(const minmax_pair<T>& x, const minmax_pair<T>& y) const
+  {
+    minmax_pair<T> result;
+    result.min_val = thrust::min(x.min_val, y.min_val);
+    result.max_val = thrust::max(x.max_val, y.max_val);
+    return result;
+  }
+};
+
+__global__ void compute_repulsive_forces_kernel(
+    volatile float * __restrict__ repulsive_forces_device,
+    volatile float * __restrict__ normalization_vec_device,
+    const float * const xs,
+    const float * const ys,
+    const float * const potentialsQij,
+    const int num_points,
+    const int num_nodes,
+    const int n_terms)
+{
+    register int TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID >= num_points)
+        return;
+
+    register float phi1, phi2, phi3, phi4, x_pt, y_pt;
+
+    phi1 = potentialsQij[TID * n_terms + 0];
+    phi2 = potentialsQij[TID * n_terms + 1];
+    phi3 = potentialsQij[TID * n_terms + 2];
+    phi4 = potentialsQij[TID * n_terms + 3];
+
+    x_pt = xs[TID];
+    y_pt = ys[TID];
+
+    normalization_vec_device[TID] = 
+        (1 + x_pt * x_pt + y_pt * y_pt) * phi1 - 2 * (x_pt * phi2 + y_pt * phi3) + phi4;
+
+    repulsive_forces_device[TID] = x_pt * phi1 - phi2;
+    repulsive_forces_device[TID + num_nodes + 1] = y_pt * phi1 - phi3;
+}
+
+float compute_repulsive_forces(
+    thrust::device_vector<float> &repulsive_forces_device,
+    thrust::device_vector<float> &normalization_vec_device,
+    thrust::device_vector<float> &xs_device,
+    thrust::device_vector<float> &ys_device,
+    thrust::device_vector<float> &potentialsQij,
+    const int num_points,
+    const int num_nodes,
+    const int n_terms)
+{
+    const int num_threads = 1024;
+    const int num_blocks = (num_points + num_threads - 1) / num_threads;
+    compute_repulsive_forces_kernel<<<num_blocks, num_threads>>>(
+        thrust::raw_pointer_cast(repulsive_forces_device.data()),
+        thrust::raw_pointer_cast(normalization_vec_device.data()),
+        thrust::raw_pointer_cast(xs_device.data()),
+        thrust::raw_pointer_cast(ys_device.data()),
+        thrust::raw_pointer_cast(potentialsQij.data()),
+        num_points, num_nodes, n_terms);
+    float sumQ = thrust::reduce(
+        normalization_vec_device.begin(), normalization_vec_device.end(), 0, 
+        thrust::plus<float>());
+    return sumQ - num_points;
+}
+
+__global__ void compute_chargesQij_kernel(
+    volatile float * __restrict__ chargesQij,
+    const float * const xs,
+    const float * const ys,
+    const int num_points,
+    const int n_terms)
+{
+    register int TID = threadIdx.x + blockIdx.x * blockDim.x;
+    if (TID >= num_points)
+        return;
+
+    register float x_pt, y_pt;
+    x_pt = xs[TID];
+    y_pt = ys[TID];
+
+    chargesQij[TID * n_terms + 0] = 1;
+    chargesQij[TID * n_terms + 1] = x_pt;
+    chargesQij[TID * n_terms + 2] = y_pt;
+    chargesQij[TID * n_terms + 3] = x_pt * x_pt + y_pt * y_pt;
+}
+
+void compute_chargesQij(
+    thrust::device_vector<float> &chargesQij,
+    thrust::device_vector<float> &xs_device,
+    thrust::device_vector<float> &ys_device,
+    const int num_points,
+    const int n_terms)
+{
+    const int num_threads = 1024;
+    const int num_blocks = (num_points + num_threads - 1) / num_threads;
+    compute_chargesQij_kernel<<<num_blocks, num_threads>>>(
+        thrust::raw_pointer_cast(chargesQij.data()),
+        thrust::raw_pointer_cast(xs_device.data()),
+        thrust::raw_pointer_cast(ys_device.data()),
+        num_points, n_terms);
+}
 
 void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
                             tsnecuda::GpuOptions &gpu_opt)
@@ -126,7 +264,8 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<float> cell_mass_device(num_nodes + 1, 1.0); // TODO: probably don't need massl
     thrust::device_vector<int> cell_counts_device(num_nodes + 1);
     thrust::device_vector<int> cell_sorted_device(num_nodes + 1);
-    thrust::device_vector<float> normalization_vec_device(num_nodes + 1);
+    // thrust::device_vector<float> normalization_vec_device(num_nodes + 1);
+    thrust::device_vector<float> normalization_vec_device(opt.num_points);
     thrust::device_vector<float> x_max_device(num_blocks * gpu_opt.bounding_kernel_factor);
     thrust::device_vector<float> y_max_device(num_blocks * gpu_opt.bounding_kernel_factor);
     thrust::device_vector<float> x_min_device(num_blocks * gpu_opt.bounding_kernel_factor);
@@ -178,6 +317,51 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         exit(1);
     }
     
+    // FIT-TNSE Parameters
+    int n_interpolation_points = 3;
+    float intervals_per_integer = 1;
+    int min_num_intervals = 50;
+    int N = num_points;
+    int D = 2;
+    // The number of "charges" or s+2 sums i.e. number of kernel sums
+    int n_terms = 4;
+    int n_boxes_per_dim = min_num_intervals;
+    
+    // FFTW works faster on numbers that can be written as  2^a 3^b 5^c 7^d
+    // 11^e 13^f, where e+f is either 0 or 1, and the other exponents are
+    // arbitrary
+    int allowed_n_boxes_per_dim[20] = {25,36, 50, 55, 60, 65, 70, 75, 80, 85, 90, 96, 100, 110, 120, 130, 140,150, 175, 200};
+    if ( n_boxes_per_dim < allowed_n_boxes_per_dim[19] ) {
+        //Round up to nearest grid point
+        int chosen_i;
+        for (chosen_i =0; allowed_n_boxes_per_dim[chosen_i]< n_boxes_per_dim; chosen_i++);
+        n_boxes_per_dim = allowed_n_boxes_per_dim[chosen_i];
+    }
+
+    int n_total_boxes = n_boxes_per_dim * n_boxes_per_dim;
+    int total_interpolation_points = n_total_boxes * n_interpolation_points * n_interpolation_points;
+    int n_fft_coeffs_half = n_interpolation_points * n_boxes_per_dim;
+    int n_fft_coeffs = 2 * n_interpolation_points * n_boxes_per_dim;
+
+    // FIT-TSNE Device Vectors
+    thrust::device_vector<int> point_box_idx_device(N);
+    thrust::device_vector<float> x_in_box_device(N);
+    thrust::device_vector<float> y_in_box_device(N);
+    thrust::device_vector<float> y_tilde_values(total_interpolation_points * n_terms);
+    thrust::device_vector<float> x_interpolated_values_device(N * n_interpolation_points);
+    thrust::device_vector<float> y_interpolated_values_device(N * n_interpolation_points);
+    thrust::device_vector<float> potentialsQij_device(N * n_terms);
+    thrust::device_vector<float> w_coefficients_device(total_interpolation_points * n_terms);
+    thrust::device_vector<float> all_interpolated_values_device(
+        n_terms * n_interpolation_points * n_interpolation_points * N);
+    thrust::device_vector<float> output_values(
+        n_terms * n_interpolation_points * n_interpolation_points * N);
+    thrust::device_vector<int> all_interpolated_indices(
+        n_terms * n_interpolation_points * n_interpolation_points * N);
+    thrust::device_vector<int> output_indices(
+        n_terms * n_interpolation_points * n_interpolation_points * N);
+    thrust::device_vector<float> chargesQij_device(N * n_terms);
+        
     // Dump file
     float *host_ys = nullptr;
     std::ofstream dump_file;
@@ -226,132 +410,49 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
     // Support for infinite iteration
     for (size_t step = 0; step != opt.iterations; step++) {
-
+        float fill_value = 0; 
+        thrust::fill(w_coefficients_device.begin(), w_coefficients_device.end(), fill_value);
         // Setup learning rate schedule
         if (step == opt.force_magnify_iters) {
             momentum = opt.post_exaggeration_momentum;
             attr_exaggeration = 1.0f;
         }
 
-        // // Compute Bounding Box
-        // tsnecuda::bh::ComputeBoundingBox(gpu_opt,
-        //                                  cell_starts_device,
-        //                                  children_device,
-        //                                  cell_mass_device,
-        //                                  points_device,
-        //                                  x_max_device,
-        //                                  y_max_device,
-        //                                  x_min_device,
-        //                                  y_min_device,
-        //                                  num_nodes, 
-        //                                  num_points, 
-        //                                  num_blocks);
-
-        // // Tree Builder
-        // tsnecuda::bh::BuildTree(gpu_opt,
-        //                         err_device,
-        //                         children_device,
-        //                         cell_starts_device,
-        //                         cell_mass_device,
-        //                         points_device,
-        //                         num_nodes,
-        //                         num_points,
-        //                         num_blocks);
-
-        // // Tree Summarization
-        // tsnecuda::bh::SummarizeTree(gpu_opt,
-        //                             cell_counts_device,
-        //                             children_device,
-        //                             cell_mass_device,
-        //                             points_device,
-        //                             num_nodes,
-        //                             num_points,
-        //                             num_blocks);
-
-        // // Sort By Morton Code
-        // tsnecuda::bh::SortCells(gpu_opt,
-        //                         cell_sorted_device,
-        //                         cell_starts_device,
-        //                         children_device,
-        //                         cell_counts_device,
-        //                         num_nodes,
-        //                         num_points,
-        //                         num_blocks);
-
-
-
         // Copy data back from GPU to CPU
         thrust::copy(points_device.begin(), points_device.end(), h_points_device.begin());
 
-        // Hyperparameters
-        int n_interpolation_points = 3;
-        float intervals_per_integer = 1;
-        int min_num_intervals = 50;
-        
-        // Compute repulsive forces
+        thrust::device_vector<float> xs_device(points_device.begin(), points_device.begin() + num_points);
+        thrust::device_vector<float> ys_device(points_device.begin() + num_nodes + 1, points_device.begin() + num_nodes + 1 + num_points);
+        minmax_unary_op<float>  unary_op;
+        minmax_binary_op<float> binary_op;
 
-         // Zero out the gradient
-        auto N = num_points;
-        auto D = 2;
+        auto xs_minmax = thrust::transform_reduce(
+            xs_device.begin(), xs_device.end(), unary_op, unary_op(xs_device[0]), binary_op);
+        auto ys_minmax = thrust::transform_reduce(
+            ys_device.begin(), ys_device.end(), unary_op, unary_op(ys_device[0]), binary_op);
+        float min_coord = fmin(xs_minmax.min_val, ys_minmax.min_val);
+        float max_coord = fmax(xs_minmax.max_val, ys_minmax.max_val);
 
-        // For convenience, split the x and y coordinate values
-        float* xs = new float[N];
-        float* ys = new float[N];
-
-        float min_coord = INFINITY;
-        float max_coord = -INFINITY;
-        // Find the min/max values of the x and y coordinates
-        for (unsigned long i = 0; i < N; i++) {
-            xs[i] = h_points_device[i];
-            ys[i] = h_points_device[i + num_nodes + 1];
-            if (xs[i] > max_coord) max_coord = xs[i];
-            else if (xs[i] < min_coord) min_coord = xs[i];
-            if (ys[i] > max_coord) max_coord = ys[i];
-            else if (ys[i] < min_coord) min_coord = ys[i];
-        }
-
-        // The number of "charges" or s+2 sums i.e. number of kernel sums
-        int n_terms = 4;
-        auto *chargesQij = new float[N * n_terms];
-        auto *potentialsQij = new float[N * n_terms]();
-        // thrust::device_vector<float> potentialsQij(N * n_terms);
 
         // Prepare the terms that we'll use to compute the sum i.e. the repulsive forces
-        for (unsigned long j = 0; j < N; j++) {
-            chargesQij[j * n_terms + 0] = 1;
-            chargesQij[j * n_terms + 1] = xs[j];
-            chargesQij[j * n_terms + 2] = ys[j];
-            chargesQij[j * n_terms + 3] = xs[j] * xs[j] + ys[j] * ys[j];
-        }
+        compute_chargesQij(chargesQij_device, xs_device, ys_device, num_points, n_terms);
 
         // Compute the number of boxes in a single dimension and the total number of boxes in 2d
-        auto n_boxes_per_dim = static_cast<int>(fmax(min_num_intervals, (max_coord - min_coord) / intervals_per_integer));
+        // auto n_boxes_per_dim = static_cast<int>(fmax(min_num_intervals, (max_coord - min_coord) / intervals_per_integer));
 
-
-        // FFTW works faster on numbers that can be written as  2^a 3^b 5^c 7^d
-        // 11^e 13^f, where e+f is either 0 or 1, and the other exponents are
-        // arbitrary
-        int allowed_n_boxes_per_dim[20] = {25,36, 50, 55, 60, 65, 70, 75, 80, 85, 90, 96, 100, 110, 120, 130, 140,150, 175, 200};
-        if ( n_boxes_per_dim < allowed_n_boxes_per_dim[19] ) {
-            //Round up to nearest grid point
-            int chosen_i;
-            for (chosen_i =0; allowed_n_boxes_per_dim[chosen_i]< n_boxes_per_dim; chosen_i++);
-            n_boxes_per_dim = allowed_n_boxes_per_dim[chosen_i];
-        }
-
-        int n_boxes = n_boxes_per_dim * n_boxes_per_dim;
-
-        auto *box_lower_bounds = new float[2 * n_boxes];
-        auto *box_upper_bounds = new float[2 * n_boxes];
+        auto *box_lower_bounds = new float[2 * n_total_boxes];
+        auto *box_upper_bounds = new float[2 * n_total_boxes];
         auto *y_tilde_spacings = new float[n_interpolation_points];
         int n_interpolation_points_1d = n_interpolation_points * n_boxes_per_dim;
         auto *x_tilde = new float[n_interpolation_points_1d]();
         auto *y_tilde = new float[n_interpolation_points_1d]();
         auto *fft_kernel_tilde = new complex<float>[2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d];
 
-        precompute_2d(max_coord, min_coord, max_coord, min_coord, n_boxes_per_dim, n_interpolation_points,
-                    &squared_cauchy_2d,
-                    box_lower_bounds, box_upper_bounds, y_tilde_spacings, x_tilde, y_tilde, fft_kernel_tilde);
+        precompute_2d(
+            max_coord, min_coord, max_coord, min_coord, n_boxes_per_dim, n_interpolation_points,
+            &squared_cauchy_2d, box_lower_bounds, box_upper_bounds, y_tilde_spacings, x_tilde, 
+            y_tilde, fft_kernel_tilde);
+
         float denominator[n_interpolation_points];
         for (int i = 0; i < n_interpolation_points; i++) {
             denominator[i] = 1;
@@ -361,41 +462,40 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
                 }
             }
         }
-        n_body_fft_2d(N, n_terms, xs, ys, chargesQij, n_boxes_per_dim, n_interpolation_points, box_lower_bounds,
-                    box_upper_bounds, y_tilde_spacings, fft_kernel_tilde, potentialsQij, denominator, 12);
+        float coord_min = box_lower_bounds[0];
+        float box_width = box_upper_bounds[0] - box_lower_bounds[0];
+        
+
+        thrust::device_vector<float> box_lower_bounds_device(
+            box_lower_bounds, box_lower_bounds + 2 * n_total_boxes);
+        thrust::device_vector<float> y_tilde_spacings_device(
+            y_tilde_spacings, y_tilde_spacings + n_interpolation_points);
+        thrust::device_vector<float> denominator_device(
+            denominator, denominator + n_interpolation_points);
+        // thrust::device_vector<float> chargesQij_device(
+            // chargesQij, chargesQij + N * n_terms);
+
+        n_body_fft_2d(
+            N, n_terms, n_boxes_per_dim, n_interpolation_points, 
+            fft_kernel_tilde, denominator, n_total_boxes, 
+            total_interpolation_points, coord_min, box_width, n_fft_coeffs_half, n_fft_coeffs, 
+            point_box_idx_device, x_in_box_device, y_in_box_device, xs_device, ys_device, 
+            box_lower_bounds_device, y_tilde_spacings_device, denominator_device, y_tilde_values,
+            all_interpolated_values_device, output_values, all_interpolated_indices,
+            output_indices, w_coefficients_device, chargesQij_device, x_interpolated_values_device,
+            y_interpolated_values_device, potentialsQij_device);
 
         // Compute the normalization constant Z or sum of q_{ij}. This expression is different from the one in the original
         // paper, but equivalent. This is done so we need only use a single kernel (K_2 in the paper) instead of two
         // different ones. We subtract N at the end because the following sums over all i, j, whereas Z contains i \neq j
-        float sum_Q = 0;
-        for (unsigned long i = 0; i < N; i++) {
-            float phi1 = potentialsQij[i * n_terms + 0];
-            float phi2 = potentialsQij[i * n_terms + 1];
-            float phi3 = potentialsQij[i * n_terms + 2];
-            float phi4 = potentialsQij[i * n_terms + 3];
-
-            sum_Q += (1 + xs[i] * xs[i] + ys[i] * ys[i]) * phi1 - 2 * (xs[i] * phi2 + ys[i] * phi3) + phi4;
-        }
-        sum_Q -= N;
-
-        normalization = sum_Q;
-
+        
         // Make the negative term, or F_rep in the equation 3 of the paper
-        float *neg_f = new float[N * 2];
-        for (unsigned int i = 0; i < N; i++) {
-            h_points_device[i] = (xs[i] * potentialsQij[i * n_terms] - potentialsQij[i * n_terms + 1]);
-            h_points_device[i + num_nodes + 1] = (ys[i] * potentialsQij[i * n_terms] - potentialsQij[i * n_terms + 2]);
-        }
-
-        thrust::copy(h_points_device.begin(), h_points_device.end(), repulsive_forces_device.begin());
+        normalization = compute_repulsive_forces(
+            repulsive_forces_device, normalization_vec_device, xs_device, ys_device, 
+            potentialsQij_device, num_points, num_nodes, n_terms);
 
         // Copy data back to the GPU
 
-        delete[] neg_f;
-        delete[] potentialsQij;
-        delete[] chargesQij;
-        delete[] xs;
-        delete[] ys;
         delete[] box_lower_bounds;
         delete[] box_upper_bounds;
         delete[] y_tilde_spacings;
@@ -403,30 +503,6 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         delete[] x_tilde;
         delete[] fft_kernel_tilde;
         
-        
-
-
-
-        // Calculate Repulsive Forces
-        // tsnecuda::bh::ComputeRepulsiveForces(gpu_opt,
-        //                                      err_device,
-        //                                      repulsive_forces_device,
-        //                                      normalization_vec_device,
-        //                                      cell_sorted_device,
-        //                                      children_device,
-        //                                      cell_mass_device,
-        //                                      points_device,
-        //                                      theta, 
-        //                                      epsilon_squared,
-        //                                      num_nodes,
-        //                                      num_points,
-        //                                      num_blocks);
-        // Compute normalization
-        // normalization = thrust::reduce(normalization_vec_device.begin(),
-        //                                 normalization_vec_device.end(),
-        //                                 0.0f,
-        //                                 thrust::plus<float>());
-
         // Calculate Attractive Forces
         tsnecuda::bh::ComputeAttractiveForces(gpu_opt,
                                               sparse_handle,
@@ -467,8 +543,9 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
                           attractive_forces_device.begin()+num_points, attractive_forces_device.begin(), 
                           thrust::plus<float>());
         tsnecuda::util::SqrtDeviceVector(attractive_forces_device, attractive_forces_device);
-        float grad_norm = thrust::reduce(attractive_forces_device.begin(), attractive_forces_device.begin()+num_points, 
-                                         0.0f, thrust::plus<float>()) / num_points;
+        float grad_norm = thrust::reduce(
+            attractive_forces_device.begin(), attractive_forces_device.begin() + num_points, 
+            0.0f, thrust::plus<float>()) / num_points;
         thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
 
         if (grad_norm < opt.min_gradient_norm) {
