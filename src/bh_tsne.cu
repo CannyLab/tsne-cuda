@@ -233,50 +233,50 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
             attr_exaggeration = 1.0f;
         }
 
-        // Compute Bounding Box
-        tsnecuda::bh::ComputeBoundingBox(gpu_opt,
-                                         cell_starts_device,
-                                         children_device,
-                                         cell_mass_device,
-                                         points_device,
-                                         x_max_device,
-                                         y_max_device,
-                                         x_min_device,
-                                         y_min_device,
-                                         num_nodes, 
-                                         num_points, 
-                                         num_blocks);
+        // // Compute Bounding Box
+        // tsnecuda::bh::ComputeBoundingBox(gpu_opt,
+        //                                  cell_starts_device,
+        //                                  children_device,
+        //                                  cell_mass_device,
+        //                                  points_device,
+        //                                  x_max_device,
+        //                                  y_max_device,
+        //                                  x_min_device,
+        //                                  y_min_device,
+        //                                  num_nodes, 
+        //                                  num_points, 
+        //                                  num_blocks);
 
-        // Tree Builder
-        tsnecuda::bh::BuildTree(gpu_opt,
-                                err_device,
-                                children_device,
-                                cell_starts_device,
-                                cell_mass_device,
-                                points_device,
-                                num_nodes,
-                                num_points,
-                                num_blocks);
+        // // Tree Builder
+        // tsnecuda::bh::BuildTree(gpu_opt,
+        //                         err_device,
+        //                         children_device,
+        //                         cell_starts_device,
+        //                         cell_mass_device,
+        //                         points_device,
+        //                         num_nodes,
+        //                         num_points,
+        //                         num_blocks);
 
-        // Tree Summarization
-        tsnecuda::bh::SummarizeTree(gpu_opt,
-                                    cell_counts_device,
-                                    children_device,
-                                    cell_mass_device,
-                                    points_device,
-                                    num_nodes,
-                                    num_points,
-                                    num_blocks);
+        // // Tree Summarization
+        // tsnecuda::bh::SummarizeTree(gpu_opt,
+        //                             cell_counts_device,
+        //                             children_device,
+        //                             cell_mass_device,
+        //                             points_device,
+        //                             num_nodes,
+        //                             num_points,
+        //                             num_blocks);
 
-        // Sort By Morton Code
-        tsnecuda::bh::SortCells(gpu_opt,
-                                cell_sorted_device,
-                                cell_starts_device,
-                                children_device,
-                                cell_counts_device,
-                                num_nodes,
-                                num_points,
-                                num_blocks);
+        // // Sort By Morton Code
+        // tsnecuda::bh::SortCells(gpu_opt,
+        //                         cell_sorted_device,
+        //                         cell_starts_device,
+        //                         children_device,
+        //                         cell_counts_device,
+        //                         num_nodes,
+        //                         num_points,
+        //                         num_blocks);
 
 
 
