@@ -408,6 +408,16 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
             std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
     #endif
 
+    float _time_allocate_memory = 0.0f;
+    float _time_precompute_2d = 0.0f;
+    float _time_nbodyfft = 0.0f;
+    float _time_compute_charges = 0.0f;
+    float _time_other = 0.0f;
+    float _time_norm = 0.0f;
+    clock_t _clock = clock();
+
+    #define time(x) x += ( (float) clock() - _clock ) / CLOCKS_PER_SEC; _clock = clock();
+
     // Support for infinite iteration
     for (size_t step = 0; step != opt.iterations; step++) {
         float fill_value = 0; 
@@ -419,8 +429,8 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         }
 
         // Copy data back from GPU to CPU
-        thrust::copy(points_device.begin(), points_device.end(), h_points_device.begin());
-
+        time(_time_other)
+	thrust::copy(points_device.begin(), points_device.end(), h_points_device.begin());
         thrust::device_vector<float> xs_device(points_device.begin(), points_device.begin() + num_points);
         thrust::device_vector<float> ys_device(points_device.begin() + num_nodes + 1, points_device.begin() + num_nodes + 1 + num_points);
         minmax_unary_op<float>  unary_op;
@@ -433,10 +443,12 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         float min_coord = fmin(xs_minmax.min_val, ys_minmax.min_val);
         float max_coord = fmax(xs_minmax.max_val, ys_minmax.max_val);
 
+	time(_time_allocate_memory)
 
         // Prepare the terms that we'll use to compute the sum i.e. the repulsive forces
         compute_chargesQij(chargesQij_device, xs_device, ys_device, num_points, n_terms);
 
+	time(_time_compute_charges)
         // Compute the number of boxes in a single dimension and the total number of boxes in 2d
         // auto n_boxes_per_dim = static_cast<int>(fmax(min_num_intervals, (max_coord - min_coord) / intervals_per_integer));
 
@@ -448,6 +460,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         auto *y_tilde = new float[n_interpolation_points_1d]();
         auto *fft_kernel_tilde = new complex<float>[2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d];
 
+	time(_time_allocate_memory)
         precompute_2d(
             max_coord, min_coord, max_coord, min_coord, n_boxes_per_dim, n_interpolation_points,
             &squared_cauchy_2d, box_lower_bounds, box_upper_bounds, y_tilde_spacings, x_tilde, 
@@ -474,6 +487,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
             denominator, denominator + n_interpolation_points);
         // thrust::device_vector<float> chargesQij_device(
             // chargesQij, chargesQij + N * n_terms);
+	time(_time_precompute_2d)
 
         n_body_fft_2d(
             N, n_terms, n_boxes_per_dim, n_interpolation_points, 
@@ -485,6 +499,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
             output_indices, w_coefficients_device, chargesQij_device, x_interpolated_values_device,
             y_interpolated_values_device, potentialsQij_device);
 
+	time(_time_nbodyfft)
         // Compute the normalization constant Z or sum of q_{ij}. This expression is different from the one in the original
         // paper, but equivalent. This is done so we need only use a single kernel (K_2 in the paper) instead of two
         // different ones. We subtract N at the end because the following sums over all i, j, whereas Z contains i \neq j
@@ -494,6 +509,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
             repulsive_forces_device, normalization_vec_device, xs_device, ys_device, 
             potentialsQij_device, num_points, num_nodes, n_terms);
 
+	time(_time_norm)
         // Copy data back to the GPU
 
         delete[] box_lower_bounds;
@@ -593,6 +609,25 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         }
 
     }
+
+    float* nt = get_ntime();
+
+    std::cout << "Time Compute Attractive Forces & Integrate: " << _time_other << "s" << std::endl;
+    std::cout << "Time N-Body FFT: " << _time_nbodyfft << "s" << std::endl;
+    std::cout << "\t Allocate: " << nt[1] << "s" << std::endl;
+    std::cout << "\t Point Box IDX: " << nt[2] << "s" << std::endl;
+    std::cout << "\t Interpolate: " << nt[3] << "s" << std::endl;
+    std::cout << "\t Reduce: " << nt[4] << "s" << std::endl;
+    std::cout << "\t FFT - Init: " << nt[8] << "s" << std::endl;
+    std::cout << "\t FFT - Copy To: " << nt[7] << "s" << std::endl;
+    std::cout << "\t FFT - Execute: " << nt[9] << "s" << std::endl;
+    std::cout << "\t FFT - Copy Back: " << nt[5] << "s" << std::endl;
+    std::cout << "\t Potentials: " << nt[6] << "s" << std::endl;
+    std::cout << "Time Precompute 2D: " << _time_precompute_2d << "s" << std::endl;
+    std::cout << "Time Allocate Memory: " << _time_allocate_memory << "s" << std::endl;
+    std::cout << "Time Norm: " << _time_norm << "s" << std::endl;
+    std::cout << "Time Compute Charges: " << _time_compute_charges << "s" << std::endl;
+    std::cout << "Total Time: " << _time_other + _time_precompute_2d + _time_nbodyfft + _time_norm + _time_precompute_2d + _time_compute_charges << "s" << std::endl;
 
     // Clean up the dump file if we are dumping points
     if (opt.get_dump_points()){
