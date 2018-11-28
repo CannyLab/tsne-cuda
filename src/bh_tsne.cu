@@ -342,6 +342,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     int total_interpolation_points = n_total_boxes * n_interpolation_points * n_interpolation_points;
     int n_fft_coeffs_half = n_interpolation_points * n_boxes_per_dim;
     int n_fft_coeffs = 2 * n_interpolation_points * n_boxes_per_dim;
+    int n_interpolation_points_1d = n_interpolation_points * n_boxes_per_dim;
 
     // FIT-TSNE Device Vectors
     thrust::device_vector<int> point_box_idx_device(N);
@@ -361,7 +362,29 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<int> output_indices(
         n_terms * n_interpolation_points * n_interpolation_points * N);
     thrust::device_vector<float> chargesQij_device(N * n_terms);
-        
+    thrust::device_vector<float> box_lower_bounds_device(2 * n_total_boxes);
+    thrust::device_vector<float> box_upper_bounds_device(2 * n_total_boxes);
+    thrust::device_vector<thrust::complex<float>> fft_kernel_tilde_device(2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d);
+       
+    // Easier to compute denominator on CPU, so we should just calculate y_tilde_spacing on CPU also
+    float h = 1 / (float) n_interpolation_points;
+    float y_tilde_spacings[n_interpolation_points];
+    y_tilde_spacings[0] = h / 2;
+    for (int i = 1; i < n_interpolation_points; i++) {
+        y_tilde_spacings[i] = y_tilde_spacings[i - 1] + h;
+    }
+    float denominator[n_interpolation_points];
+    for (int i = 0; i < n_interpolation_points; i++) {
+        denominator[i] = 1;
+        for (int j = 0; j < n_interpolation_points; j++) {
+            if (i != j) {
+                denominator[i] *= y_tilde_spacings[i] - y_tilde_spacings[j];
+            }
+        }
+    }
+    thrust::device_vector<float> y_tilde_spacings_device(y_tilde_spacings, y_tilde_spacings + n_interpolation_points);
+    thrust::device_vector<float> denominator_device(denominator, denominator + n_interpolation_points);
+    
     // Dump file
     float *host_ys = nullptr;
     std::ofstream dump_file;
@@ -452,47 +475,21 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         // Compute the number of boxes in a single dimension and the total number of boxes in 2d
         // auto n_boxes_per_dim = static_cast<int>(fmax(min_num_intervals, (max_coord - min_coord) / intervals_per_integer));
 
-        auto *box_lower_bounds = new float[2 * n_total_boxes];
-        auto *box_upper_bounds = new float[2 * n_total_boxes];
-        auto *y_tilde_spacings = new float[n_interpolation_points];
-        int n_interpolation_points_1d = n_interpolation_points * n_boxes_per_dim;
-        auto *x_tilde = new float[n_interpolation_points_1d]();
-        auto *y_tilde = new float[n_interpolation_points_1d]();
-        auto *fft_kernel_tilde = new complex<float>[2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d];
 
 	time(_time_allocate_memory)
         precompute_2d(
             max_coord, min_coord, max_coord, min_coord, n_boxes_per_dim, n_interpolation_points,
-            &squared_cauchy_2d, box_lower_bounds, box_upper_bounds, y_tilde_spacings, x_tilde, 
-            y_tilde, fft_kernel_tilde);
+            &squared_cauchy_2d, box_lower_bounds_device, box_upper_bounds_device, 
+            fft_kernel_tilde_device);
 
-        float denominator[n_interpolation_points];
-        for (int i = 0; i < n_interpolation_points; i++) {
-            denominator[i] = 1;
-            for (int j = 0; j < n_interpolation_points; j++) {
-                if (i != j) {
-                    denominator[i] *= y_tilde_spacings[i] - y_tilde_spacings[j];
-                }
-            }
-        }
-        float coord_min = box_lower_bounds[0];
-        float box_width = box_upper_bounds[0] - box_lower_bounds[0];
-        
+        float box_width = ((max_coord - min_coord) / (float) n_boxes_per_dim);
 
-        thrust::device_vector<float> box_lower_bounds_device(
-            box_lower_bounds, box_lower_bounds + 2 * n_total_boxes);
-        thrust::device_vector<float> y_tilde_spacings_device(
-            y_tilde_spacings, y_tilde_spacings + n_interpolation_points);
-        thrust::device_vector<float> denominator_device(
-            denominator, denominator + n_interpolation_points);
-        // thrust::device_vector<float> chargesQij_device(
-            // chargesQij, chargesQij + N * n_terms);
 	time(_time_precompute_2d)
 
         n_body_fft_2d(
             N, n_terms, n_boxes_per_dim, n_interpolation_points, 
-            fft_kernel_tilde, denominator, n_total_boxes, 
-            total_interpolation_points, coord_min, box_width, n_fft_coeffs_half, n_fft_coeffs, 
+            fft_kernel_tilde_device, n_total_boxes, 
+            total_interpolation_points, min_coord, box_width, n_fft_coeffs_half, n_fft_coeffs, 
             point_box_idx_device, x_in_box_device, y_in_box_device, xs_device, ys_device, 
             box_lower_bounds_device, y_tilde_spacings_device, denominator_device, y_tilde_values,
             all_interpolated_values_device, output_values, all_interpolated_indices,
@@ -510,14 +507,6 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
             potentialsQij_device, num_points, num_nodes, n_terms);
 
 	time(_time_norm)
-        // Copy data back to the GPU
-
-        delete[] box_lower_bounds;
-        delete[] box_upper_bounds;
-        delete[] y_tilde_spacings;
-        delete[] y_tilde;
-        delete[] x_tilde;
-        delete[] fft_kernel_tilde;
         
         // Calculate Attractive Forces
         tsnecuda::bh::ComputeAttractiveForces(gpu_opt,
