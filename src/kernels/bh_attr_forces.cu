@@ -23,8 +23,8 @@ void tsnecuda::bh::ComputePijxQijKernel(
     if (TID >= num_nonzero) return;
     i = coo_indices[2*TID];
     j = coo_indices[2*TID+1];
-    if (i >= num_nodes || i < 0 || j >= num_nodes || j < 0)
-        printf("%d, %d\n", i, j);
+    // if (i >= num_nodes || i < 0 || j >= num_nodes || j < 0)
+    //     printf("%d, %d\n", i, j);
     ix = points[i]; iy = points[num_nodes + 1 + i];
     jx = points[j]; jy = points[num_nodes + 1 + j];
     dx = ix - jx;
@@ -73,8 +73,9 @@ void tsnecuda::bh::ComputeAttractiveForces(
                             num_points, &beta, thrust::raw_pointer_cast(attr_forces.data()),
                             num_points));
     GpuErrorCheck(cudaDeviceSynchronize());
-    thrust::transform(attr_forces.begin(), attr_forces.begin() + num_points, points.begin(), attr_forces.begin(), thrust::multiplies<float>());
-    thrust::transform(attr_forces.begin() + num_points, attr_forces.end(), points.begin() + num_nodes + 1, attr_forces.begin() + num_points, thrust::multiplies<float>());
+    // thrust::transform(attr_forces.begin(), attr_forces.begin() + num_points, points.begin(), attr_forces.begin(), thrust::multiplies<float>());
+    // thrust::transform(attr_forces.begin() + num_points, attr_forces.end(), points.begin() + num_nodes + 1, attr_forces.begin() + num_points, thrust::multiplies<float>());
+    thrust::transform(attr_forces.begin(), attr_forces.end(), points.begin(), attr_forces.begin(), thrust::multiplies<float>());
 
     // compute forces_i = forces_i - sum_j pij*qij*normalization*yj
     alpha = -1.0f;

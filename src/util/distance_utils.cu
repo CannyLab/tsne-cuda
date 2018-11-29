@@ -8,6 +8,7 @@
  */
 
 #include "include/util/distance_utils.h"
+#include <chrono>
 
 // This really does a simultaneous row/col matrix vector broadcast
 // to compute ||x^2|| + ||y^2|| - 2 x^Ty.
@@ -75,11 +76,44 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
         int64_t* indices, float* distances,
         const float* const points, const int num_dims,
         const int num_points, const int num_near_neighbors) {
-    const int32_t kNumCells = static_cast<int32_t>(
+    const int32_t kNumCells = 4 * static_cast<int32_t>(
             std::sqrt(static_cast<float>(num_points)));
     const int32_t kNumCellsToProbe = 20;
 
-    if (num_near_neighbors < 1024) {
+    if (true) {
+        const int32_t kSubQuant = 2;
+        const int32_t kBPC = 8;
+        faiss::gpu::StandardGpuResources faiss_resources;
+        // faiss_resources.noTempMemory();
+
+        // Construct the GPU configuration object
+        faiss::gpu::GpuIndexIVFPQConfig faiss_config;
+
+        // // TODO(David): Allow for dynamic device placement
+        faiss_config.device = 0;
+
+        faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
+        faiss_config.useFloat16LookupTables = true;
+        faiss_config.usePrecomputedTables = true;
+        // faiss_config.useFloat16IVFStorage = false;
+
+        faiss::gpu::GpuIndexIVFPQ search_index(&faiss_resources, num_dims, kNumCells, kSubQuant, kBPC, faiss::METRIC_L2, faiss_config);
+        search_index.setNumProbes(kNumCellsToProbe);
+
+        // // Add the points to the index
+        std::cout << "Train NN calculation..." << std::endl;
+        search_index.train(num_points, points);
+        std::cout << "Add NN calculation..." << std::endl;
+        search_index.add(num_points, points);
+        std::cout << "Search NN calculation..." << std::endl;
+
+        // // Perform the KNN query
+        search_index.search(num_points, points, num_near_neighbors,
+                                distances, indices);
+
+    }
+    else if (num_near_neighbors < 1024) {
+        std::cout << "Starting NN calculation..." << std::endl;
         // Construct the GPU resources necessary
         faiss::gpu::StandardGpuResources faiss_resources;
         // res.noTempMemory();
@@ -97,6 +131,8 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
         faiss::gpu::GpuIndexIVFFlat search_index(&faiss_resources,
                 num_dims, kNumCells, faiss::METRIC_L2, faiss_config);
         search_index.setNumProbes(kNumCellsToProbe);
+
+        
         search_index.train(num_points, points);
         search_index.add(num_points, points);
 
@@ -118,6 +154,43 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
                      distances, indices);
     }
 }
+
+// // Construct the GPU resources necessary
+// faiss::gpu::StandardGpuResources faiss_resources;
+// faiss_resources.noTempMemory();
+
+// // Construct the GPU configuration object
+// faiss::gpu::GpuIndexIVFPQConfig faiss_config;
+
+// // // TODO(David): Allow for dynamic device placement
+// faiss_config.device = 0;
+
+// faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
+// faiss_config.flatConfig.useFloat16 = false;
+// faiss_config.usePrecomputedTables = true;
+// // faiss_config.useFloat16IVFStorage = false;
+
+// faiss::gpu::GpuIndexIVFPQ search_index(&faiss_resources, num_dims, kNumCells, kSubQuant, kBPC, faiss::METRIC_L2, faiss_config);
+// search_index.setNumProbes(kNumCellsToProbe);
+
+// // Add the points to the index
+// search_index.train(num_points, points);
+// search_index.add(num_points, points);
+
+// // Perform the KNN query
+// search_index.search(num_points, points, num_near_neighbors,
+//                         distances, indices);
+
+
+// // faiss::gpu::GpuIndexIVFFlat search_index(&faiss_resources,
+// //         num_dims, kNumCells, faiss::METRIC_L2, faiss_config);
+// // search_index.setNumProbes(kNumCellsToProbe);
+// // search_index.train(num_points, points);
+// // search_index.add(num_points, points);
+
+// // // Perform the KNN query
+// // search_index.search(num_points, points, num_near_neighbors,
+// //                     distances, indices);
 
 // TODO: Add -1 notification here... and how to deal with it if it happens
 // TODO: Maybe think about getting FAISS to return integers (long-term todo)
