@@ -25,7 +25,7 @@ class TSNE(object):
                  perplexity=50.0,
                  early_exaggeration=2.0,
                  learning_rate=200.0,
-                 num_neighbors=1023,
+                 num_neighbors=32,
                  force_magnify_iters=250,
                  pre_momentum=0.5,
                  post_momentum=0.8,

@@ -17,7 +17,7 @@ namespace tsnecuda {
 namespace bh {
  __global__
 void ComputePijxQijKernel(
-                            volatile float * __restrict__ pij_x_qij,
+                            float * __restrict__ attr_forces,
                             const float * __restrict__ pij,
                             const float * __restrict__ points,
                             const int * __restrict__ coo_indices,
@@ -29,7 +29,6 @@ void ComputeAttractiveForces(
                     cusparseHandle_t &handle,
                     cusparseMatDescr_t &descr,
                     thrust::device_vector<float> &attr_forces,
-                    thrust::device_vector<float> &pij_x_qij,
                     thrust::device_vector<float> &sparse_pij,
                     thrust::device_vector<int> &pij_row_ptr,
                     thrust::device_vector<int> &pij_col_ind,

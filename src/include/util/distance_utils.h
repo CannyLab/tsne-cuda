@@ -17,6 +17,7 @@
 #include <faiss/gpu/GpuIndexFlat.h>
 #include <faiss/gpu/GpuIndexIVFFlat.h>
 #include <faiss/gpu/GpuIndexIVFPQ.h>
+#include <faiss/gpu/IndexProxy.h>
 #include <faiss/gpu/StandardGpuResources.h>
 
 // CXX Includes

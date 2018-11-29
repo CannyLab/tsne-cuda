@@ -9,6 +9,7 @@
 
 #include "include/util/distance_utils.h"
 #include <chrono>
+#include <future>
 
 // This really does a simultaneous row/col matrix vector broadcast
 // to compute ||x^2|| + ||y^2|| - 2 x^Ty.
@@ -84,33 +85,76 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
         const int32_t kSubQuant = 2;
         const int32_t kBPC = 8;
         faiss::gpu::StandardGpuResources faiss_resources;
-        // faiss_resources.noTempMemory();
+        faiss::gpu::StandardGpuResources faiss_resources_2;
+        faiss_resources.noTempMemory();
+        faiss_resources_2.noTempMemory();
 
         // Construct the GPU configuration object
         faiss::gpu::GpuIndexIVFPQConfig faiss_config;
+        faiss::gpu::GpuIndexIVFPQConfig faiss_config_2;
+        // faiss::gpu::GpuIndexIVFFlatConfig faiss_config;
+        // faiss::gpu::GpuIndexIVFFlatConfig faiss_config_2;
+        
 
         // // TODO(David): Allow for dynamic device placement
         faiss_config.device = 0;
+        faiss_config_2.device = 1;
+
+        // faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
+        // faiss_config.flatConfig.useFloat16 = false;
+        // faiss_config.useFloat16IVFStorage = false;
+
+        // faiss_config_2.indicesOptions = faiss::gpu::INDICES_32_BIT;
+        // faiss_config_2.flatConfig.useFloat16 = false;
+        // faiss_config_2.useFloat16IVFStorage = false;
+        
 
         faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
         faiss_config.useFloat16LookupTables = true;
         faiss_config.usePrecomputedTables = true;
+
+        faiss_config_2.indicesOptions = faiss::gpu::INDICES_32_BIT;
+        faiss_config_2.useFloat16LookupTables = true;
+        faiss_config_2.usePrecomputedTables = true;
+
         // faiss_config.useFloat16IVFStorage = false;
+        // faiss::gpu::GpuIndexIVFFlat search_index(&faiss_resources, num_dims, kNumCells, faiss::METRIC_L2, faiss_config);
+        // faiss::gpu::GpuIndexIVFFlat search_index_2(&faiss_resources_2, num_dims, kNumCells,faiss::METRIC_L2, faiss_config_2);
 
         faiss::gpu::GpuIndexIVFPQ search_index(&faiss_resources, num_dims, kNumCells, kSubQuant, kBPC, faiss::METRIC_L2, faiss_config);
+        faiss::gpu::GpuIndexIVFPQ search_index_2(&faiss_resources, num_dims, kNumCells, kSubQuant, kBPC, faiss::METRIC_L2, faiss_config_2);
         search_index.setNumProbes(kNumCellsToProbe);
+        search_index_2.setNumProbes(kNumCellsToProbe);
 
-        // // Add the points to the index
-        std::cout << "Train NN calculation..." << std::endl;
-        search_index.train(num_points, points);
-        std::cout << "Add NN calculation..." << std::endl;
-        search_index.add(num_points, points);
-        std::cout << "Search NN calculation..." << std::endl;
+        faiss::gpu::IndexProxy search_proxy;
+        search_proxy.addIndex(&search_index);
+        search_proxy.addIndex(&search_index_2);
 
-        // // Perform the KNN query
-        search_index.search(num_points, points, num_near_neighbors,
-                                distances, indices);
+        // Add the points to the index
+        // search_index.train(num_points, points);
+        // search_index_2.train(num_points, points);
+        // auto h1 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::train, &search_index, num_points, points);
+        // auto h2 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::train, &search_index_2, num_points, points);
+        search_proxy.train(num_points, points);
+        // h1.get();
+        // h2.get();
+        // search_index.add(num_points, points);
+        // search_index_2.add(num_points, points);
+        // search_proxy.add(num_points, points);
+        // h1 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::add, &search_index, num_points, points);
+        // h2 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::add, &search_index_2, num_points, points);
+        search_proxy.add(num_points, points);
+        // h1.get();
+        // h2.get();
 
+        // Perform the KNN query
+        auto h1 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::search, &search_index, num_points/2, points, num_near_neighbors, distances, indices);
+        auto h2 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::search, &search_index_2, num_points - num_points/2, points + num_dims*(num_points/2), num_near_neighbors, distances + num_near_neighbors*(num_points/2), indices + num_near_neighbors*(num_points/2));
+        // search_index_2.search(num_points - num_points/2, points + num_dims*(num_points/2), num_near_neighbors, distances + num_near_neighbors*(num_points/2), indices*(num_points/2));
+
+        h1.get();
+        h2.get();
+        // search_proxy.search(num_points, points, num_near_neighbors, distances, indices);
     }
     else if (num_near_neighbors < 1024) {
         std::cout << "Starting NN calculation..." << std::endl;
