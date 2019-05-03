@@ -3,7 +3,7 @@
 */
 
 #include "bh_tsne.h"
-#include "FIt-SNE/src/nbodyfft.h"
+#include "nbodyfft.h"
 #include <chrono>
 
 #define cufftSafeCall(err)  __cufftSafeCall(err, __FILE__, __LINE__)
