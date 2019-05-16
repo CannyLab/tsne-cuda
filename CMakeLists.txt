@@ -9,9 +9,9 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 # Options
 #-------------------------------------------------------------------------------
-option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" ON)
+option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" OFF)
 option(BUILD_TEST "Build tests if ON" OFF)
-option(BUILD_PYTHON "Build python if ON" OFF)
+option(BUILD_PYTHON "Build python if ON" ON)
 option(WITH_ZMQ "Build with interactive viz if ON" OFF)
 option(WITH_FAISS_GPU_STANDALONE "Build standalone gpufaiss library ON" OFF)
 
@@ -20,7 +20,7 @@ if(NOT WITH_ZMQ)
     message("-- Not building with ZMQ. Interactive visualization disabled. To build with ZMQ use -DWITH_ZMQ=ON")
 endif()
 
-# Do we want to build FAISS as a standalone library as well. 
+# Do we want to build FAISS as a standalone library as well.
 if(NOT WITH_FAISS_GPU_STANDALONE)
     message("-- Not building standalone gpufaiss lib. To build gpufaiss standalone use -DWITH_FAISS_GPU_STANDALONE=ON")
 endif()
@@ -54,13 +54,13 @@ SET(CUDA_SEPARABLE_COMPILATION ON)
 find_package(CUDA REQUIRED)
 SET(CUDA_HOST_COMPILER ${CXX})
 SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; 
-                    -O3 
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
+                    -O3
                     -Xptxas -dlcm=cg
                     # -gencode=arch=compute_30,code=sm_30
                     # -gencode=arch=compute_35,code=sm_35
-                     -gencode=arch=compute_50,code=sm_50
-                     -gencode=arch=compute_52,code=sm_52
+                    # -gencode=arch=compute_50,code=sm_50
+                    # -gencode=arch=compute_52,code=sm_52
 		             -gencode=arch=compute_60,code=sm_60
 		             -gencode=arch=compute_61,code=sm_61
                     # -gencode=arch=compute_70,code=sm_70
@@ -72,7 +72,7 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -Xcompiler '-m64'
                     -Xcompiler '-mpopcnt'
                     -Xcompiler '-g'
-                    
+
                     )
 get_filename_component(CUDA_LIB_PATH ${CUDA_CUDART_LIBRARY} DIRECTORY)
 find_library(CUDA_cudadevrt_LIBRARY cudadevrt PATHS ${CUDA_LIB_PATH})
@@ -146,7 +146,7 @@ set(SOURCES
     src/util/matrix_broadcast_utils.cu
     src/util/random_utils.cu
     src/util/reduce_utils.cu
-    
+
     # Kernels
     src/kernels/apply_forces.cu
     src/kernels/bh_attr_forces.cu
@@ -157,7 +157,7 @@ set(SOURCES
     src/kernels/tree_builder.cu
     src/kernels/tree_sort.cu
     src/kernels/tree_summary.cu
-    
+
     # Method files
     src/ext/pymodule_ext.cu
     src/bh_tsne.cu
@@ -240,7 +240,7 @@ if(BUILD_PYTHON)
     # Write the version string
     add_dependencies(write_version_string_to_python python_source_files)
     add_custom_command(TARGET write_version_string_to_python POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -DVERSION_STRING=${VERSION_STRING} -DBUILD_NUMBER=${BUILD_NUMBER} -P 
+        COMMAND ${CMAKE_COMMAND} -DVERSION_STRING=${VERSION_STRING} -DBUILD_NUMBER=${BUILD_NUMBER} -P
         ${CMAKE_CURRENT_BINARY_DIR}/../cmake/write_python_version_string.cmake)
 else()
     message("-- Not building python libraries. To build python libraries use -DBUILD_PYTHON=ON")
