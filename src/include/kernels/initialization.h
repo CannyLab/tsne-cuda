@@ -15,18 +15,7 @@
 
 #include "include/kernels/apply_forces.h"
 #include "include/kernels/bh_attr_forces.h"
-#include "include/kernels/bh_rep_forces.h"
-#include "include/kernels/bounding_box.h"
 #include "include/kernels/perplexity_search.h"
-#include "include/kernels/tree_builder.h"
-#include "include/kernels/tree_sort.h"
-#include "include/kernels/tree_summary.h"
-
-//TSNE-Vars
-extern __device__ volatile int stepd, bottomd, maxdepthd;
-extern __device__ unsigned int blkcntd;
-extern __device__ volatile float radiusd;
-
 
 namespace tsnecuda {
 namespace bh {

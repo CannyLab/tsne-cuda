@@ -3,39 +3,11 @@
 
 #include "include/ext/pymodule_ext.h"
 
-void pymodule_naive_tsne(float *points, float *result, ssize_t *dims, int proj_dim, float perplexity, float early_ex, 
-                            float learning_rate, int n_iter,  int n_iter_np, float min_g_norm) {
-    
-    // Extract the dimensions of the points array
-    ssize_t N_POINTS = dims[0];
-    ssize_t N_DIMS = dims[1];
-
-    // Construct device arrays
-    thrust::device_vector<float> d_points(N_POINTS*N_DIMS);
-
-    // Copy the points to the GPU using thrust
-    thrust::copy(points, points+N_DIMS*N_POINTS, d_points.begin());
-
-    // Construct the sigmas
-    thrust::device_vector<float> sigmas(N_POINTS, 1.0f);
-
-    // Create the CUBLAS handle
-    cublasHandle_t handle;
-    CublasSafeCall(cublasCreate(&handle));
-
-    // Do the T-SNE
-    auto tsne_result = NaiveTSNE::tsne(handle, d_points, N_POINTS, N_DIMS, proj_dim, perplexity, 
-                                            early_ex, learning_rate, n_iter, n_iter_np, min_g_norm);
-
-    // Copy the data back to the CPU
-    thrust::copy(tsne_result.begin(), tsne_result.end(), result);
-}
-
 void pymodule_bh_tsne(float *result,
                       float* points,
                       ssize_t *dims,
-                      float perplexity, 
-                      float learning_rate, 
+                      float perplexity,
+                      float learning_rate,
                       float magnitude_factor,
                       int num_neighbors,
                       int iterations,
@@ -60,7 +32,7 @@ void pymodule_bh_tsne(float *result,
                       int gpu_device,
                       int return_style,
                       int num_snapshots
-                      
+
                     ) {
 
     // Extract the dimensions of the points array
@@ -89,7 +61,7 @@ void pymodule_bh_tsne(float *result,
     opt.min_gradient_norm = min_gradient_norm;
     opt.verbosity = verbosity;
     opt.print_interval = print_interval;
-    
+
     // Initialization
     switch (initialization_type) {
         case 0:
@@ -120,7 +92,7 @@ void pymodule_bh_tsne(float *result,
     if (use_interactive) {
         opt.enable_viz(std::string(viz_server), viz_timeout);
     }
-    
+
     // Return data setup
     switch(return_style) {
         case 0:

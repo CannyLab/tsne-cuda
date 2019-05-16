@@ -57,13 +57,13 @@ SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -O3
                     -Xptxas -dlcm=cg
-                    # -gencode=arch=compute_30,code=sm_30
-                    # -gencode=arch=compute_35,code=sm_35
-                    # -gencode=arch=compute_50,code=sm_50
-                    # -gencode=arch=compute_52,code=sm_52
+                     -gencode=arch=compute_30,code=sm_30
+                     -gencode=arch=compute_35,code=sm_35
+                     -gencode=arch=compute_50,code=sm_50
+                     -gencode=arch=compute_52,code=sm_52
 		             -gencode=arch=compute_60,code=sm_60
 		             -gencode=arch=compute_61,code=sm_61
-                    # -gencode=arch=compute_70,code=sm_70
+                     -gencode=arch=compute_70,code=sm_70
                     -std=c++11
                     -Xcompiler '-O3'
                     -Xcompiler '-fPIC'
@@ -150,19 +150,14 @@ set(SOURCES
     # Kernels
     src/kernels/apply_forces.cu
     src/kernels/bh_attr_forces.cu
-    src/kernels/bh_rep_forces.cu
-    src/kernels/bounding_box.cu
-    src/kernels/initialization.cu
     src/kernels/perplexity_search.cu
-    src/kernels/tree_builder.cu
-    src/kernels/tree_sort.cu
-    src/kernels/tree_summary.cu
+    src/kernels/initialization.cu
 
     # Method files
     src/ext/pymodule_ext.cu
     src/bh_tsne.cu
-    src/naive_tsne.cu
     src/nbodyfft.cu
+    # src/naive_tsne.cu
 )
 
 

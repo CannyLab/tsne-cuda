@@ -8,6 +8,10 @@
 
 #define cufftSafeCall(err)  __cufftSafeCall(err, __FILE__, __LINE__)
 
+#define START_IL_TIMER() start = std::chrono::high_resolution_clock::now();
+#define END_IL_TIMER(x) stop = std::chrono::high_resolution_clock::now(); duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); x += duration; total_time += duration;
+#define PRINT_IL_TIMER(x) std::cout << #x << ": " << ((float) x.count()) / 1000000.0 << "s" << std::endl
+
 static const char *_cudaGetErrorEnum(cufftResult error)
 {
     switch (error)
@@ -60,7 +64,7 @@ float squared_cauchy_2d(float x1, float x2, float y1, float y2) {
 }
 // compute minimum and maximum values in a single reduction
 
-// minmax_pair stores the minimum and maximum 
+// minmax_pair stores the minimum and maximum
 // values that have been encountered so far
 template <typename T>
 struct minmax_pair
@@ -86,9 +90,9 @@ struct minmax_unary_op
   }
 };
 
-// minmax_binary_op is a functor that accepts two minmax_pair 
-// structs and returns a new minmax_pair whose minimum and 
-// maximum values are the min() and max() respectively of 
+// minmax_binary_op is a functor that accepts two minmax_pair
+// structs and returns a new minmax_pair whose minimum and
+// maximum values are the min() and max() respectively of
 // the minimums and maximums of the input pairs
 template <typename T>
 struct minmax_binary_op
@@ -128,7 +132,7 @@ __global__ void compute_repulsive_forces_kernel(
     x_pt = xs[TID];
     y_pt = ys[TID];
 
-    normalization_vec_device[TID] = 
+    normalization_vec_device[TID] =
         (1 + x_pt * x_pt + y_pt * y_pt) * phi1 - 2 * (x_pt * phi2 + y_pt * phi3) + phi4;
 
     repulsive_forces_device[TID] = x_pt * phi1 - phi2;
@@ -154,7 +158,7 @@ float compute_repulsive_forces(
         thrust::raw_pointer_cast(potentialsQij.data()),
         num_points, num_nodes, n_terms);
     float sumQ = thrust::reduce(
-        normalization_vec_device.begin(), normalization_vec_device.end(), 0, 
+        normalization_vec_device.begin(), normalization_vec_device.end(), 0,
         thrust::plus<float>());
     return sumQ - num_points;
 }
@@ -202,7 +206,13 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     auto start = std::chrono::high_resolution_clock::now();
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+
     auto total_time = duration;
+    auto _time_initialization = duration;
+    auto _time_knn = duration;
+    auto _time_symmetry = duration;
+    auto _time_init_low_dim = duration;
+    auto _time_init_fft = duration;
     auto _time_precompute_2d = duration;
     auto _time_nbodyfft = duration;
     auto _time_compute_charges = duration;
@@ -211,16 +221,13 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     auto _time_attr = duration;
     auto _time_apply_forces = duration;
 
-    #define START_TIMER() start = std::chrono::high_resolution_clock::now()
-    #define END_TIMER(x) stop = std::chrono::high_resolution_clock::now(); duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); total_time += duration; std::cout << x << ": " << ((float) duration.count()) / 1000000.0 << "s" << std::endl
-
     // Check the validity of the options file
     if (!opt.validate()) {
         std::cout << "E: Invalid options file. Terminating." << std::endl;
         return;
     }
 
-    START_TIMER();
+    START_IL_TIMER();
 
     // Construct the handles
     cublasHandle_t dense_handle;
@@ -230,13 +237,13 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
     // Set CUDA device properties
     const int num_blocks = gpu_opt.sm_count;
-    
+
     // Construct sparse matrix descriptor
     cusparseMatDescr_t sparse_matrix_descriptor;
     cusparseCreateMatDescr(&sparse_matrix_descriptor);
     cusparseSetMatType(sparse_matrix_descriptor, CUSPARSE_MATRIX_TYPE_GENERAL);
     cusparseSetMatIndexBase(sparse_matrix_descriptor,CUSPARSE_INDEX_BASE_ZERO);
-    
+
     // Setup some return information if we're working on snapshots
     int snap_interval;
     int snap_num = 0;
@@ -256,10 +263,6 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     float attr_exaggeration = opt.early_exaggeration;
     float normalization;
 
-    // Theta governs tolerance for Barnes-Hut recursion
-    const float theta = opt.theta;
-    const float epsilon_squared = opt.epssq;
-
     // Figure out number of nodes needed for BH tree
     int nnodes = num_points * 2;
     if (nnodes < 1024 * num_blocks) nnodes = 1024 * num_blocks;
@@ -268,7 +271,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     nnodes--;
     const int num_nodes = nnodes;
     opt.num_nodes = num_nodes;
-    
+
     // Allocate host memory
     float *knn_squared_distances = new float[num_points * num_neighbors];
     memset(knn_squared_distances, 0, num_points * num_neighbors * sizeof(float));
@@ -278,27 +281,27 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<int> err_device(1);
     tsnecuda::bh::Initialize(gpu_opt, err_device);
 
-    END_TIMER("_time_initialization");
-    START_TIMER();
+    END_IL_TIMER(_time_initialization);
+    START_IL_TIMER();
 
     // Compute approximate K Nearest Neighbors and squared distances
     tsnecuda::util::KNearestNeighbors(gpu_opt, knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
     thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
     thrust::device_vector<int> knn_indices_device(num_points * num_neighbors);
-    tsnecuda::util::PostprocessNeighborIndices(gpu_opt, knn_indices_device, knn_indices_long_device, 
+    tsnecuda::util::PostprocessNeighborIndices(gpu_opt, knn_indices_device, knn_indices_long_device,
                                                         num_points, num_neighbors);
-    
+
     // Max-norm the distances to avoid exponentiating by large numbers
-    thrust::device_vector<float> knn_squared_distances_device(knn_squared_distances, 
+    thrust::device_vector<float> knn_squared_distances_device(knn_squared_distances,
                                             knn_squared_distances + (num_points * num_neighbors));
     tsnecuda::util::MaxNormalizeDeviceVector(knn_squared_distances_device);
 
-    END_TIMER("_time_knn");
-    START_TIMER();
+    END_IL_TIMER(_time_knn);
+    START_IL_TIMER();
 
     // Search Perplexity
     thrust::device_vector<float> pij_non_symmetric_device(num_points * num_neighbors);
-    tsnecuda::bh::SearchPerplexity(gpu_opt, dense_handle, pij_non_symmetric_device, knn_squared_distances_device, 
+    tsnecuda::bh::SearchPerplexity(gpu_opt, dense_handle, pij_non_symmetric_device, knn_squared_distances_device,
                                     perplexity, perplexity_search_epsilon, num_points, num_neighbors);
 
     // Clean up memory
@@ -330,36 +333,24 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<float> attractive_forces_device(opt.num_points * 2, 0);
     thrust::device_vector<float> gains_device(opt.num_points * 2, 1);
     thrust::device_vector<float> old_forces_device(opt.num_points * 2, 0); // for momentum
-    // thrust::device_vector<int> cell_starts_device(num_nodes + 1);
-    // thrust::device_vector<int> children_device((num_nodes + 1) * 4);
-    // thrust::device_vector<float> cell_mass_device(num_nodes + 1, 1.0); // TODO: probably don't need massl
-    // thrust::device_vector<int> cell_counts_device(num_nodes + 1);
-    // thrust::device_vector<int> cell_sorted_device(num_nodes + 1);
-    // thrust::device_vector<float> normalization_vec_device(num_nodes + 1);
     thrust::device_vector<float> normalization_vec_device(opt.num_points);
-    // thrust::device_vector<float> x_max_device(num_blocks * gpu_opt.bounding_kernel_factor);
-    // thrust::device_vector<float> y_max_device(num_blocks * gpu_opt.bounding_kernel_factor);
-    // thrust::device_vector<float> x_min_device(num_blocks * gpu_opt.bounding_kernel_factor);
-    // thrust::device_vector<float> y_min_device(num_blocks * gpu_opt.bounding_kernel_factor);
     thrust::device_vector<float> ones_device(opt.num_points * 2, 1); // This is for reduce summing, etc.
     thrust::device_vector<int> coo_indices_device(sparse_pij_device.size()*2);
 
     tsnecuda::util::Csr2Coo(gpu_opt, coo_indices_device, pij_row_ptr_device,
                             pij_col_ind_device, num_points, num_nonzero);
 
-    END_TIMER("_time_symmetry");
-    START_TIMER();
+    END_IL_TIMER(_time_symmetry);
+    START_IL_TIMER();
 
     // Initialize Low-Dim Points
-    // thrust::device_vector<float> points_device((num_nodes + 1) * 2);
     thrust::device_vector<float> points_device(num_points * 2);
     thrust::device_vector<float> random_vector_device(points_device.size());
 
     std::default_random_engine generator(opt.random_seed);
     std::normal_distribution<float> distribution1(0.0, 1.0);
-    // thrust::host_vector<float> h_points_device((num_nodes+ 1) * 2);
     thrust::host_vector<float> h_points_device(num_points * 2);
-    
+
 
     // Initialize random noise vector
     for (int i = 0; i < h_points_device.size(); i++) h_points_device[i] = 0.001 * distribution1(generator);
@@ -393,19 +384,19 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         exit(1);
     }
 
-    END_TIMER("_time_init_low_dim");
-    START_TIMER();
-    
+    END_IL_TIMER(_time_init_low_dim);
+    START_IL_TIMER();
+
     // FIT-TNSE Parameters
     int n_interpolation_points = 3;
-    float intervals_per_integer = 1;
+    // float intervals_per_integer = 1;
     int min_num_intervals = 50;
     int N = num_points;
-    int D = 2;
+    // int D = 2;
     // The number of "charges" or s+2 sums i.e. number of kernel sums
     int n_terms = 4;
     int n_boxes_per_dim = min_num_intervals;
-    
+
     // FFTW works faster on numbers that can be written as  2^a 3^b 5^c 7^d
     // 11^e 13^f, where e+f is either 0 or 1, and the other exponents are
     // arbitrary
@@ -448,7 +439,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<float> fft_input(n_terms * n_fft_coeffs * n_fft_coeffs);
     thrust::device_vector<thrust::complex<float>> fft_w_coefficients(n_terms * n_fft_coeffs * (n_fft_coeffs / 2 + 1));
     thrust::device_vector<float> fft_output(n_terms * n_fft_coeffs * n_fft_coeffs);
-       
+
     // Easier to compute denominator on CPU, so we should just calculate y_tilde_spacing on CPU also
     float h = 1 / (float) n_interpolation_points;
     float y_tilde_spacings[n_interpolation_points];
@@ -467,7 +458,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     }
     thrust::device_vector<float> y_tilde_spacings_device(y_tilde_spacings, y_tilde_spacings + n_interpolation_points);
     thrust::device_vector<float> denominator_device(denominator, denominator + n_interpolation_points);
-    
+
     // Create the FFT Handles
     cufftHandle plan_kernel_tilde, plan_dft, plan_idft;;
     cufftSafeCall(cufftCreate(&plan_kernel_tilde));
@@ -477,16 +468,16 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     size_t work_size, work_size_dft, work_size_idft;
     int fft_dimensions[2] = {n_fft_coeffs, n_fft_coeffs};
     cufftSafeCall(cufftMakePlan2d(plan_kernel_tilde, fft_dimensions[0], fft_dimensions[1], CUFFT_R2C, &work_size));
-    cufftSafeCall(cufftMakePlanMany(plan_dft, 2, fft_dimensions, 
+    cufftSafeCall(cufftMakePlanMany(plan_dft, 2, fft_dimensions,
                                     NULL, 1, n_fft_coeffs * n_fft_coeffs,
                                     NULL, 1, n_fft_coeffs * (n_fft_coeffs / 2 + 1),
                                     CUFFT_R2C, n_terms, &work_size_dft));
-    cufftSafeCall(cufftMakePlanMany(plan_idft, 2, fft_dimensions, 
+    cufftSafeCall(cufftMakePlanMany(plan_idft, 2, fft_dimensions,
                                     NULL, 1, n_fft_coeffs * (n_fft_coeffs / 2 + 1),
                                     NULL, 1, n_fft_coeffs * n_fft_coeffs,
                                     CUFFT_C2R, n_terms, &work_size_idft));
 
-    
+
 
     // Dump file
     float *host_ys = nullptr;
@@ -497,7 +488,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         dump_file << num_points << " " << 2 << std::endl;
     }
 
-    #ifndef NO_ZMQ 
+    #ifndef NO_ZMQ
         bool send_zmq = opt.get_use_interactive();
         zmq::context_t context(1);
         zmq::socket_t publisher(context, ZMQ_REQ);
@@ -519,7 +510,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
             // Wait for server reply
             zmq::message_t request;
             send_zmq = publisher.recv (&request);
-            
+
             // If there's a time-out, don't bother.
             if (send_zmq) {
                 if (opt.verbosity >= 1)
@@ -530,26 +521,20 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
             }
         }
     #else
-        if (opt.get_use_interactive()) 
+        if (opt.get_use_interactive())
             std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
     #endif
 
-    auto start_il = std::chrono::high_resolution_clock::now();
-    auto stop_il = std::chrono::high_resolution_clock::now();
-    auto duration_il = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 
-    #define START_IL_TIMER() start_il = std::chrono::high_resolution_clock::now();
-    #define END_IL_TIMER(x) stop_il = std::chrono::high_resolution_clock::now(); duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_il - start_il); x += duration; total_time += duration;
-    #define PRINT_IL_TIMER(x) std::cout << #x << ": " << ((float) x.count()) / 1000000.0 << "s" << std::endl
 
-    END_TIMER("_time_init_fft");
+    END_IL_TIMER(_time_init_fft);
 
 
     // Support for infinite iteration
     for (size_t step = 0; step != opt.iterations; step++) {
 
         START_IL_TIMER();
-        float fill_value = 0; 
+        float fill_value = 0;
         thrust::fill(w_coefficients_device.begin(), w_coefficients_device.end(), fill_value);
         thrust::fill(potentialsQij_device.begin(), potentialsQij_device.end(), fill_value);
         // Setup learning rate schedule
@@ -588,11 +573,11 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
         n_body_fft_2d(
             plan_dft, plan_idft,
-            N, n_terms, n_boxes_per_dim, n_interpolation_points, 
-            fft_kernel_tilde_device, n_total_boxes, 
+            N, n_terms, n_boxes_per_dim, n_interpolation_points,
+            fft_kernel_tilde_device, n_total_boxes,
             total_interpolation_points, min_coord, box_width, n_fft_coeffs_half, n_fft_coeffs, num_points - 1,
             fft_input, fft_w_coefficients, fft_output,
-            point_box_idx_device, x_in_box_device, y_in_box_device, points_device, 
+            point_box_idx_device, x_in_box_device, y_in_box_device, points_device,
             box_lower_bounds_device, y_tilde_spacings_device, denominator_device, y_tilde_values,
             all_interpolated_values_device, output_values, all_interpolated_indices,
             output_indices, w_coefficients_device, chargesQij_device, x_interpolated_values_device,
@@ -604,16 +589,16 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         // Compute the normalization constant Z or sum of q_{ij}. This expression is different from the one in the original
         // paper, but equivalent. This is done so we need only use a single kernel (K_2 in the paper) instead of two
         // different ones. We subtract N at the end because the following sums over all i, j, whereas Z contains i \neq j
-        
+
         // Make the negative term, or F_rep in the equation 3 of the paper
         normalization = compute_repulsive_forces(
-            repulsive_forces_device, normalization_vec_device, points_device, 
+            repulsive_forces_device, normalization_vec_device, points_device,
             potentialsQij_device, num_points, num_points - 1, n_terms);
 
         END_IL_TIMER(_time_norm);
         START_IL_TIMER();
 
-        
+
         // Calculate Attractive Forces
         tsnecuda::bh::ComputeAttractiveForces(gpu_opt,
                                               sparse_handle,
@@ -628,9 +613,9 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
                                               num_points - 1,
                                               num_points,
                                               num_nonzero);
-        
+
         END_IL_TIMER(_time_attr);
-        START_IL_TIMER();                                   
+        START_IL_TIMER();
 
         // Apply Forces
         tsnecuda::bh::ApplyForces(gpu_opt,
@@ -652,12 +637,12 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
         // // Compute the gradient norm
         // tsnecuda::util::SquareDeviceVector(attractive_forces_device, old_forces_device);
-        // thrust::transform(attractive_forces_device.begin(), attractive_forces_device.begin()+num_points, 
-        //                   attractive_forces_device.begin()+num_points, attractive_forces_device.begin(), 
+        // thrust::transform(attractive_forces_device.begin(), attractive_forces_device.begin()+num_points,
+        //                   attractive_forces_device.begin()+num_points, attractive_forces_device.begin(),
         //                   thrust::plus<float>());
         // tsnecuda::util::SqrtDeviceVector(attractive_forces_device, attractive_forces_device);
         // float grad_norm = thrust::reduce(
-        //     attractive_forces_device.begin(), attractive_forces_device.begin() + num_points, 
+        //     attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
         //     0.0f, thrust::plus<float>()) / num_points;
         // thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
 
@@ -671,8 +656,8 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         // }
 
         END_IL_TIMER(_time_apply_forces);
-            
-        
+
+
         #ifndef NO_ZMQ
             if (send_zmq) {
             zmq::message_t message(sizeof(float)*opt.num_points*2);
@@ -698,7 +683,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         // // Handle snapshoting
         // if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && step % snap_interval == 0 && opt.return_data != nullptr) {
         //   thrust::copy(points_device.begin(),
-        //                points_device.end(), 
+        //                points_device.end(),
         //                snap_num*opt.num_points*2 + opt.return_data);
         //   snap_num += 1;
         // }
@@ -709,15 +694,24 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
     cufftSafeCall(cufftDestroy(plan_dft));
     cufftSafeCall(cufftDestroy(plan_idft));
 
-    PRINT_IL_TIMER(_time_other);
-    PRINT_IL_TIMER(_time_compute_charges);
-    PRINT_IL_TIMER(_time_precompute_2d);
-    PRINT_IL_TIMER(_time_nbodyfft);
-    PRINT_IL_TIMER(_time_norm);
-    PRINT_IL_TIMER(_time_attr);
-    PRINT_IL_TIMER(_time_apply_forces);
+    if (opt.verbosity > 0) {
+        PRINT_IL_TIMER(_time_initialization);
+        PRINT_IL_TIMER(_time_knn);
+        PRINT_IL_TIMER(_time_symmetry);
+        PRINT_IL_TIMER(_time_init_low_dim);
+        PRINT_IL_TIMER(_time_init_fft);
+        PRINT_IL_TIMER(_time_compute_charges);
+        PRINT_IL_TIMER(_time_precompute_2d);
+        PRINT_IL_TIMER(_time_nbodyfft);
+        PRINT_IL_TIMER(_time_norm);
+        PRINT_IL_TIMER(_time_attr);
+        PRINT_IL_TIMER(_time_apply_forces);
+        PRINT_IL_TIMER(_time_other);
+        PRINT_IL_TIMER(total_time);
 
-    std::cout << "Total Time: " << ((float) total_time.count()) / 1000000.0  << std::endl;
+        // std::cout << "Total Time: " << ((float) total_time.count()) / 1000000.0  << std::endl;
+    }
+
 
     // Clean up the dump file if we are dumping points
     if (opt.get_dump_points()){
@@ -741,4 +735,3 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
     return;
 }
-

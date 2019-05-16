@@ -1,6 +1,6 @@
 /**
  * @brief Barnes-Hut T-SNE implementation O(Nlog(N))
-  * 
+  *
  * @file bh_tsne.h
  * @author David Chan
  * @date 2018-04-15
@@ -22,15 +22,10 @@
 
 #include "include/kernels/apply_forces.h"
 #include "include/kernels/bh_attr_forces.h"
-#include "include/kernels/bh_rep_forces.h"
-#include "include/kernels/bounding_box.h"
-#include "include/kernels/initialization.h"
 #include "include/kernels/perplexity_search.h"
-#include "include/kernels/tree_builder.h"
-#include "include/kernels/tree_sort.h"
-#include "include/kernels/tree_summary.h"
+#include "include/kernels/initialization.h"
 
-namespace tsnecuda {      
+namespace tsnecuda {
 namespace bh {
 void RunTsne(tsnecuda::Options &opt, tsnecuda::GpuOptions &gpu_opt);
 }

@@ -1,6 +1,6 @@
 /**
  * @brief Implementation of different distances
- * 
+ *
  * @file distance_utils.cu
  * @author David Chan
  * @date 2018-04-04
@@ -82,8 +82,8 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
     const int32_t kNumCellsToProbe = 20;
 
     if (true) {
-        const int32_t kSubQuant = 2;
-        const int32_t kBPC = 8;
+        // const int32_t kSubQuant = 2;
+        // const int32_t kBPC = 8;
         faiss::gpu::StandardGpuResources faiss_resources;
         faiss::gpu::StandardGpuResources faiss_resources_2;
         // faiss_resources.noTempMemory();
@@ -94,7 +94,7 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
         // faiss::gpu::GpuIndexIVFPQConfig faiss_config_2;
         faiss::gpu::GpuIndexIVFFlatConfig faiss_config;
         faiss::gpu::GpuIndexIVFFlatConfig faiss_config_2;
-        
+
 
         // // TODO(David): Allow for dynamic device placement
         faiss_config.device = 0;
@@ -107,7 +107,7 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
         faiss_config_2.indicesOptions = faiss::gpu::INDICES_32_BIT;
         faiss_config_2.flatConfig.useFloat16 = false;
         faiss_config_2.useFloat16IVFStorage = false;
-        
+
 
         // faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
         // faiss_config.useFloat16LookupTables = true;
@@ -176,7 +176,7 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
                 num_dims, kNumCells, faiss::METRIC_L2, faiss_config);
         search_index.setNumProbes(kNumCellsToProbe);
 
-        
+
         search_index.train(num_points, points);
         search_index.add(num_points, points);
 
@@ -238,12 +238,12 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
 
 // TODO: Add -1 notification here... and how to deal with it if it happens
 // TODO: Maybe think about getting FAISS to return integers (long-term todo)
-__global__ 
+__global__
 void tsnecuda::util::PostprocessNeighborIndicesKernel(
                                     volatile int * __restrict__ indices,
                                     const long * __restrict__ long_indices,
                                     const int num_points,
-                                    const int num_neighbors) 
+                                    const int num_neighbors)
 {
     register int TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= num_points * num_neighbors) return;
