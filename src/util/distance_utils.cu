@@ -85,7 +85,7 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
         // const int32_t kSubQuant = 2;
         // const int32_t kBPC = 8;
         faiss::gpu::StandardGpuResources faiss_resources;
-        faiss::gpu::StandardGpuResources faiss_resources_2;
+        // faiss::gpu::StandardGpuResources faiss_resources_2;
         // faiss_resources.noTempMemory();
         // faiss_resources_2.noTempMemory();
 
@@ -93,20 +93,20 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
         // faiss::gpu::GpuIndexIVFPQConfig faiss_config;
         // faiss::gpu::GpuIndexIVFPQConfig faiss_config_2;
         faiss::gpu::GpuIndexIVFFlatConfig faiss_config;
-        faiss::gpu::GpuIndexIVFFlatConfig faiss_config_2;
+        // faiss::gpu::GpuIndexIVFFlatConfig faiss_config_2;
 
 
         // // TODO(David): Allow for dynamic device placement
-        faiss_config.device = 0;
-        faiss_config_2.device = 1;
+        faiss_config.device = gpu_opt.device;
+        // faiss_config_2.device = 1;
 
         faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
         faiss_config.flatConfig.useFloat16 = false;
         faiss_config.useFloat16IVFStorage = false;
 
-        faiss_config_2.indicesOptions = faiss::gpu::INDICES_32_BIT;
-        faiss_config_2.flatConfig.useFloat16 = false;
-        faiss_config_2.useFloat16IVFStorage = false;
+        // faiss_config_2.indicesOptions = faiss::gpu::INDICES_32_BIT;
+        // faiss_config_2.flatConfig.useFloat16 = false;
+        // faiss_config_2.useFloat16IVFStorage = false;
 
 
         // faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
@@ -119,12 +119,12 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
 
         // faiss_config.useFloat16IVFStorage = false;
         faiss::gpu::GpuIndexIVFFlat search_index(&faiss_resources, num_dims, kNumCells, faiss::METRIC_L2, faiss_config);
-        faiss::gpu::GpuIndexIVFFlat search_index_2(&faiss_resources_2, num_dims, kNumCells,faiss::METRIC_L2, faiss_config_2);
+        // faiss::gpu::GpuIndexIVFFlat search_index_2(&faiss_resources_2, num_dims, kNumCells,faiss::METRIC_L2, faiss_config_2);
 
         // faiss::gpu::GpuIndexIVFPQ search_index(&faiss_resources, num_dims, kNumCells, kSubQuant, kBPC, faiss::METRIC_L2, faiss_config);
         // faiss::gpu::GpuIndexIVFPQ search_index_2(&faiss_resources, num_dims, kNumCells, kSubQuant, kBPC, faiss::METRIC_L2, faiss_config_2);
         search_index.setNumProbes(kNumCellsToProbe);
-        search_index_2.setNumProbes(kNumCellsToProbe);
+        // search_index_2.setNumProbes(kNumCellsToProbe);
 
         faiss::gpu::IndexProxy search_proxy;
         search_proxy.addIndex(&search_index);
