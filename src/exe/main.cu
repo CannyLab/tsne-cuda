@@ -1,16 +1,13 @@
-
-// This file exposes a main file which does most of the testing with command line 
+// This file exposes a main file which does most of the testing with command line
 // args, so we don't have to re-build to change options.
 
 // Detailed includes
-#include "common.h"
-#include "util/data_utils.h"
-#include "util/cuda_utils.h"
-#include "util/random_utils.h"
-#include "util/distance_utils.h"
-#include "naive_tsne.h"
-#include "naive_tsne_cpu.h"
-#include "bh_tsne.h"
+// #include "../include/common.h"
+#include "../include/util/data_utils.h"
+// #include "../include/util/cuda_utils.h"
+// #include "../include/util/random_utils.h"
+// #include "../include/util/distance_utils.h"
+#include "../include/fit_tsne.h"
 #include <time.h>
 #include <string>
 
@@ -45,7 +42,7 @@ int main(int argc, char** argv) {
         ("q,dim", "Point Dimensions", cxxopts::value<int>()->default_value("50"))
         ("j,device", "Device to run on", cxxopts::value<int>()->default_value("0"))
         ("h,help", "Print help");
-    
+
     // Parse command line options
     auto result = options.parse(argc, argv);
 
@@ -98,7 +95,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::RunTsne(opt, gpu_opt);
+        tsnecuda::RunTsne(opt, gpu_opt);
 
         // Clean up the data
         delete[] data;
@@ -134,7 +131,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::RunTsne(opt, gpu_opt);
+        tsnecuda::RunTsne(opt, gpu_opt);
 
         // Clean up the data
         delete[] data;
@@ -151,7 +148,7 @@ int main(int argc, char** argv) {
 
         // DO the T-SNE
         printf("Starting TSNE calculation with %u points.\n", num_images);
-        
+
         // Construct the options
         tsnecuda::Options opt(nullptr, data, num_images, num_columns*num_rows*num_channels);
         opt.perplexity = FOPT(perplexity);
@@ -171,8 +168,8 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::RunTsne(opt, gpu_opt);
-        
+        tsnecuda::RunTsne(opt, gpu_opt);
+
         // Clean up the data
         delete[] data;
 
@@ -194,7 +191,7 @@ int main(int argc, char** argv) {
 
         // Do the T-SNE
         printf("Starting TSNE calculation with %u points.\n", IOPT(num-points));
-        
+
         // Construct the options
         tsnecuda::Options opt(nullptr, thrust::raw_pointer_cast(h_X.data()), IOPT(num-points),  IOPT(dim));
         opt.perplexity = FOPT(perplexity);
@@ -214,7 +211,7 @@ int main(int argc, char** argv) {
         }
 
         // Do the t-SNE
-        tsnecuda::bh::RunTsne(opt, gpu_opt);
+        tsnecuda::RunTsne(opt, gpu_opt);
 
     } else {
         std::cout << "Dataset not recognized..." << std::endl;

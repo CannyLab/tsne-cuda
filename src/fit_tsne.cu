@@ -2,8 +2,8 @@
     Compute t-SNE via Barnes-Hut for NlogN time.
 */
 
-#include "bh_tsne.h"
-#include "nbodyfft.h"
+#include "include/fit_tsne.h"
+#include "include/nbodyfft.h"
 #include <chrono>
 
 #define cufftSafeCall(err)  __cufftSafeCall(err, __FILE__, __LINE__)
@@ -200,8 +200,8 @@ void compute_chargesQij(
         num_points, n_terms);
 }
 
-void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
-                            tsnecuda::GpuOptions &gpu_opt)
+void tsnecuda::RunTsne(tsnecuda::Options &opt,
+                       tsnecuda::GpuOptions &gpu_opt)
 {
     auto start = std::chrono::high_resolution_clock::now();
     auto stop = std::chrono::high_resolution_clock::now();
@@ -279,7 +279,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
     // Initialize global variables
     thrust::device_vector<int> err_device(1);
-    tsnecuda::bh::Initialize(gpu_opt, err_device);
+    // tsnecuda::Initialize(gpu_opt, err_device);
 
     END_IL_TIMER(_time_initialization);
     START_IL_TIMER();
@@ -301,7 +301,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
     // Search Perplexity
     thrust::device_vector<float> pij_non_symmetric_device(num_points * num_neighbors);
-    tsnecuda::bh::SearchPerplexity(gpu_opt, dense_handle, pij_non_symmetric_device, knn_squared_distances_device,
+    tsnecuda::SearchPerplexity(gpu_opt, dense_handle, pij_non_symmetric_device, knn_squared_distances_device,
                                     perplexity, perplexity_search_epsilon, num_points, num_neighbors);
 
     // Clean up memory
@@ -560,7 +560,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         // Compute the number of boxes in a single dimension and the total number of boxes in 2d
         // auto n_boxes_per_dim = static_cast<int>(fmax(min_num_intervals, (max_coord - min_coord) / intervals_per_integer));
 
-        precompute_2d(
+        tsnecuda::PrecomputeFFT2D(
             plan_kernel_tilde, max_coord, min_coord, max_coord, min_coord, n_boxes_per_dim, n_interpolation_points,
             box_lower_bounds_device, box_upper_bounds_device, kernel_tilde_device,
             fft_kernel_tilde_device);
@@ -571,7 +571,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         START_IL_TIMER();
 
 
-        n_body_fft_2d(
+        tsnecuda::NbodyFFT2D(
             plan_dft, plan_idft,
             N, n_terms, n_boxes_per_dim, n_interpolation_points,
             fft_kernel_tilde_device, n_total_boxes,
@@ -600,7 +600,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
 
 
         // Calculate Attractive Forces
-        tsnecuda::bh::ComputeAttractiveForces(gpu_opt,
+        tsnecuda::ComputeAttractiveForces(gpu_opt,
                                               sparse_handle,
                                               sparse_matrix_descriptor,
                                               attractive_forces_device,
@@ -618,7 +618,7 @@ void tsnecuda::bh::RunTsne(tsnecuda::Options &opt,
         START_IL_TIMER();
 
         // Apply Forces
-        tsnecuda::bh::ApplyForces(gpu_opt,
+        tsnecuda::ApplyForces(gpu_opt,
                                   points_device,
                                   attractive_forces_device,
                                   repulsive_forces_device,

@@ -6,10 +6,10 @@
     Attractive force is given by pij*qij.
 */
 
-#include "include/kernels/bh_attr_forces.h"
+#include "../include/kernels/attr_forces.h"
 
 __global__
-void tsnecuda::bh::ComputePijxQijKernel(
+void tsnecuda::ComputePijxQijKernel(
                             float * __restrict__ attr_forces,
                             const float * __restrict__ pij,
                             const float * __restrict__ points,
@@ -34,7 +34,7 @@ void tsnecuda::bh::ComputePijxQijKernel(
     atomicAdd(attr_forces + num_nodes + 1 + i, pijqij * dy);
 }
 
-void tsnecuda::bh::ComputeAttractiveForces(
+void tsnecuda::ComputeAttractiveForces(
                     tsnecuda::GpuOptions &gpu_opt,
                     cusparseHandle_t &handle,
                     cusparseMatDescr_t &descr,
@@ -53,7 +53,7 @@ void tsnecuda::bh::ComputeAttractiveForces(
     // TODO: this is bad style
     const int BLOCKSIZE = 1024;
     const int NBLOCKS = iDivUp(num_nonzero, BLOCKSIZE);
-    tsnecuda::bh::ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(
+    tsnecuda::ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(
                     thrust::raw_pointer_cast(attr_forces.data()),
                     thrust::raw_pointer_cast(sparse_pij.data()),
                     thrust::raw_pointer_cast(points.data()),

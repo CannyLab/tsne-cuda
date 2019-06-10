@@ -5,10 +5,10 @@
     Note that FAISS returns the first row as the same point, with distance = 0. pii is defined as zero.
 */
 
-#include "include/kernels/perplexity_search.h"
+#include "../include/kernels/perplexity_search.h"
 
 __global__
-void tsnecuda::bh::ComputePijKernel(
+void tsnecuda::ComputePijKernel(
                       volatile float * __restrict__ pij,
                       const float * __restrict__ squared_dist,
                       const float * __restrict__ betas,
@@ -29,31 +29,7 @@ void tsnecuda::bh::ComputePijKernel(
 
     // condition deals with evaluation of pii
     // FAISS neighbor zero is i so ignore it
-    pij[TID] = (j == 0 & dist == 0.0f) ? 0.0f : __expf(-beta * dist); 
-}
-
-__global__
-void tsnecuda::naive::ComputePijKernel(
-                        volatile float * __restrict__ pij,
-                        const float * __restrict__ squared_dist,
-                        const float * __restrict__ betas,
-                        const unsigned int num_points)
-{
-    register int TID, i, j;
-    register float dist, beta;
-
-    TID = threadIdx.x + blockIdx.x * blockDim.x;
-    if (TID >= num_points * num_points) return;
-
-    i = TID / num_points;
-    j = TID % num_points;
-    
-    beta = betas[i];
-    dist = squared_dist[TID];
-
-    // condition deals with evaluation of pii
-    // FAISS neighbor zero is i so ignore it
-    pij[TID] = (j == i & dist == 0.0f) ? 0.0f : __expf(-beta * dist); 
+    pij[TID] = (j == 0 & dist == 0.0f) ? 0.0f : __expf(-beta * dist);
 }
 
 __global__
@@ -98,7 +74,7 @@ void tsnecuda::PerplexitySearchKernel(
     found[i] = is_found;
 }
 
-void tsnecuda::bh::SearchPerplexity(tsnecuda::GpuOptions &gpu_opt,
+void tsnecuda::SearchPerplexity(tsnecuda::GpuOptions &gpu_opt,
                                      cublasHandle_t &handle,
                                      thrust::device_vector<float> &pij,
                                      thrust::device_vector<float> &squared_dist,
@@ -127,13 +103,13 @@ void tsnecuda::bh::SearchPerplexity(tsnecuda::GpuOptions &gpu_opt,
     thrust::device_vector<float> row_sum, neg_entropy;
     do {
         // compute Gaussian Kernel row
-        tsnecuda::bh::ComputePijKernel<<<NBLOCKS1, BLOCKSIZE1>>>(
+        tsnecuda::ComputePijKernel<<<NBLOCKS1, BLOCKSIZE1>>>(
                         thrust::raw_pointer_cast(pij.data()),
                         thrust::raw_pointer_cast(squared_dist.data()),
                         thrust::raw_pointer_cast(betas.data()),
                         num_points, num_near_neighbors);
         GpuErrorCheck(cudaDeviceSynchronize());
-        
+
         // compute entropy of current row
         row_sum = tsnecuda::util::ReduceSum(handle, pij, num_near_neighbors, num_points, 0);
         thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsnecuda::util::FunctionalEntropy());
@@ -157,64 +133,4 @@ void tsnecuda::bh::SearchPerplexity(tsnecuda::GpuOptions &gpu_opt,
     // TODO: Warn if iters == 200 because perplexity not found?
 
     tsnecuda::util::BroadcastMatrixVector(pij, row_sum, num_near_neighbors, num_points, thrust::divides<float>(), 1, 1.0f);
-}
-
-void tsnecuda::naive::SearchPerplexity(
-                                     cublasHandle_t &handle,
-                                     thrust::device_vector<float> &pij,
-                                     thrust::device_vector<float> &squared_dist,
-                                     const float perplexity_target,
-                                     const float epsilon,
-                                     const int num_points)
-{
-    // use beta instead of sigma (this matches the bhtsne code but not the paper)
-    // beta is just multiplicative instead of divisive (changes the way binary search works)
-    thrust::device_vector<float> betas(num_points, 1.0f);
-    thrust::device_vector<float> lower_bound_beta(num_points, -FLT_MAX);
-    thrust::device_vector<float> upper_bound_beta(num_points, FLT_MAX);
-    thrust::device_vector<float> entropy(num_points * num_points);
-    thrust::device_vector<int> found(num_points);
-
-    // TODO: this doesn't really fit with the style
-    const int BLOCKSIZE1 = 1024;
-    const int NBLOCKS1 = iDivUp(num_points * num_points, BLOCKSIZE1);
-
-    const int BLOCKSIZE2 = 128;
-    const int NBLOCKS2 = iDivUp(num_points, BLOCKSIZE2);
-
-    size_t iters = 0;
-    int all_found = 0;
-    thrust::device_vector<float> row_sum, neg_entropy;
-    do {
-        // compute Gaussian Kernel row
-        tsnecuda::naive::ComputePijKernel<<<NBLOCKS1, BLOCKSIZE1>>>(
-                        thrust::raw_pointer_cast(pij.data()),
-                        thrust::raw_pointer_cast(squared_dist.data()),
-                        thrust::raw_pointer_cast(betas.data()),
-                        num_points);
-        GpuErrorCheck(cudaDeviceSynchronize());
-        
-        // compute entropy of current row
-        row_sum = tsnecuda::util::ReduceSum(handle, pij, num_points, num_points, 0);
-        thrust::transform(pij.begin(), pij.end(), entropy.begin(), tsnecuda::util::FunctionalEntropy());
-        neg_entropy = tsnecuda::util::ReduceAlpha(handle, entropy, num_points, num_points, -1.0f, 0);
-
-        // binary search for beta
-        tsnecuda::PerplexitySearchKernel<<<NBLOCKS2, BLOCKSIZE2>>>(
-                                                            thrust::raw_pointer_cast(betas.data()),
-                                                            thrust::raw_pointer_cast(lower_bound_beta.data()),
-                                                            thrust::raw_pointer_cast(upper_bound_beta.data()),
-                                                            thrust::raw_pointer_cast(found.data()),
-                                                            thrust::raw_pointer_cast(neg_entropy.data()),
-                                                            thrust::raw_pointer_cast(row_sum.data()),
-                                                            perplexity_target, epsilon, num_points);
-        GpuErrorCheck(cudaDeviceSynchronize());
-
-        // Check if searching is done
-        all_found = thrust::reduce(found.begin(), found.end(), 1, thrust::minimum<int>());
-        iters++;
-    } while (!all_found && iters < 200);
-    // TODO: Warn if iters == 200 because perplexity not found?
-
-    tsnecuda::util::BroadcastMatrixVector(pij, row_sum, num_points, num_points, thrust::divides<float>(), 1, 1.0f);
 }

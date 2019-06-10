@@ -150,15 +150,13 @@ set(SOURCES
 
     # Kernels
     src/kernels/apply_forces.cu
-    src/kernels/bh_attr_forces.cu
+    src/kernels/attr_forces.cu
     src/kernels/perplexity_search.cu
-    src/kernels/initialization.cu
 
     # Method files
     src/ext/pymodule_ext.cu
-    src/bh_tsne.cu
+    src/fit_tsne.cu
     src/nbodyfft.cu
-    # src/naive_tsne.cu
 )
 
 

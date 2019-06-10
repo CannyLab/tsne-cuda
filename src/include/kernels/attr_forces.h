@@ -9,12 +9,12 @@
 #ifndef SRC_INCLUDE_KERNELS_BH_ATTR_FORCES_H_
 #define SRC_INCLUDE_KERNELS_BH_ATTR_FORCES_H_
 
-#include "include/common.h"
-#include "include/options.h"
-#include "include/util/cuda_utils.h"
+#include "../common.h"
+#include "../options.h"
+#include "../util/cuda_utils.h"
 
 namespace tsnecuda {
-namespace bh {
+
  __global__
 void ComputePijxQijKernel(
                             float * __restrict__ attr_forces,
@@ -38,7 +38,6 @@ void ComputeAttractiveForces(
                     const int num_nodes,
                     const int num_points,
                     const int num_nonzero);
-}
 }
 
 #endif
