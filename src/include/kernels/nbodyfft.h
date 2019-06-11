@@ -4,9 +4,9 @@
 #include <complex>
 #include <cufft.h>
 #include <thrust/complex.h>
-#include "../common.h"
-#include "../util/cuda_utils.h"
-#include "../util/matrix_broadcast_utils.h"
+#include "common.h"
+#include "util/cuda_utils.h"
+#include "util/matrix_broadcast_utils.h"
 
 namespace tsnecuda {
 

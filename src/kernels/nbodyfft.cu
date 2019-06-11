@@ -1,4 +1,4 @@
-#include "../include/kernels/nbodyfft.h"
+#include "include/kernels/nbodyfft.h"
 
 __global__ void copy_to_fft_input(volatile float * __restrict__ fft_input,
                                   const float * w_coefficients_device,

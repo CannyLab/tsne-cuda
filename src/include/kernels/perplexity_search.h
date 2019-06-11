@@ -9,12 +9,12 @@
 #ifndef SRC_INCLUDE_KERNELS_PERPLEXITY_SEARCH_H_
 #define SRC_INCLUDE_KERNELS_PERPLEXITY_SEARCH_H_
 
-#include "../common.h"
-#include "../options.h"
-#include "../util/cuda_utils.h"
-#include "../util/reduce_utils.h"
-#include "../util/matrix_broadcast_utils.h"
-#include "../util/thrust_transform_functions.h"
+#include "common.h"
+#include "options.h"
+#include "util/cuda_utils.h"
+#include "util/reduce_utils.h"
+#include "util/matrix_broadcast_utils.h"
+#include "util/thrust_transform_functions.h"
 
 namespace tsnecuda {
 __global__

@@ -10,9 +10,9 @@
 #ifndef SRC_INCLUDE_KERNELS_APPLY_FORCES_H_
 #define SRC_INCLUDE_KERNELS_APPLY_FORCES_H_
 
-#include "../common.h"
-#include "../options.h"
-#include "../util/cuda_utils.h"
+#include "common.h"
+#include "options.h"
+#include "util/cuda_utils.h"
 
 namespace tsnecuda {
 __global__

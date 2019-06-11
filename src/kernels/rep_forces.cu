@@ -1,4 +1,4 @@
-#include "../include/kernels/rep_forces.h"
+#include "include/kernels/rep_forces.h"
 
 
 __global__ void compute_repulsive_forces_kernel(

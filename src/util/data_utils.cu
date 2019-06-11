@@ -7,7 +7,7 @@
  * Copyright (c) 2018, Regents of the University of Californias
  */
 
-#include "../include/util/data_utils.h"
+#include "include/util/data_utils.h"
 
 float* tsnecuda::util::LoadMnist(std::string file_name, int32_t& num_images,
         int32_t& num_rows, int32_t& num_columns) {

@@ -2,7 +2,7 @@
     Apply forces to the points with momentum, exaggeration, etc.
 */
 
-#include "../include/kernels/apply_forces.h"
+#include "include/kernels/apply_forces.h"
 
 
 /******************************************************************************/

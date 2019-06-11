@@ -34,7 +34,7 @@
 #ifndef CUDA_UTILITIES_CUH
 #define CUDA_UTILITIES_CUH
 
-#include "../common.h"
+#include "common.h"
 
 __host__ __device__ int iDivUp(int, int);
 extern "C" void CublasSafeCall(cublasStatus_t);
