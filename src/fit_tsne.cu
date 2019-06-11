@@ -9,55 +9,6 @@
 #define END_IL_TIMER(x) stop = std::chrono::high_resolution_clock::now(); duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); x += duration; total_time += duration;
 #define PRINT_IL_TIMER(x) std::cout << #x << ": " << ((float) x.count()) / 1000000.0 << "s" << std::endl
 
-float squared_cauchy_2d(float x1, float x2, float y1, float y2) {
-    return pow(1.0 + pow(x1 - y1, 2) + pow(x2 - y2, 2), -2);
-}
-// compute minimum and maximum values in a single reduction
-
-// minmax_pair stores the minimum and maximum
-// values that have been encountered so far
-// template <typename T>
-// struct minmax_pair
-// {
-  // T min_val;
-  // T max_val;
-// };
-
-// minmax_unary_op is a functor that takes in a value x and
-// returns a minmax_pair whose minimum and maximum values
-// are initialized to x.
-// template <typename T>
-// struct minmax_unary_op
-  // : public thrust::unary_function< T, minmax_pair<T> >
-// {
-  // __host__ __device__
-  // minmax_pair<T> operator()(const T& x) const
-  // {
-    // minmax_pair<T> result;
-    // result.min_val = x;
-    // result.max_val = x;
-    // return result;
-  // }
-// };
-
-// minmax_binary_op is a functor that accepts two minmax_pair
-// structs and returns a new minmax_pair whose minimum and
-// maximum values are the min() and max() respectively of
-// the minimums and maximums of the input pairs
-// template <typename T>
-// struct minmax_binary_op
-  // : public thrust::binary_function< minmax_pair<T>, minmax_pair<T>, minmax_pair<T> >
-// {
-  // __host__ __device__
-  // minmax_pair<T> operator()(const minmax_pair<T>& x, const minmax_pair<T>& y) const
-  // {
-    // minmax_pair<T> result;
-    // result.min_val = thrust::min(x.min_val, y.min_val);
-    // result.max_val = thrust::max(x.max_val, y.max_val);
-    // return result;
-  // }
-// };
-//
 void tsnecuda::RunTsne(tsnecuda::Options &opt,
                        tsnecuda::GpuOptions &gpu_opt)
 {
