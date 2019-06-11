@@ -55,6 +55,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     // Setup some return information if we're working on snapshots
     int snap_num = 0;
+    int snap_interval = 1;
+    if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT) {
+        snap_interval = opt.iterations / (opt.num_snapshots - 1);
+    }
 
     // Get constants from options
     const int num_points = opt.num_points;
@@ -68,23 +72,16 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     float attr_exaggeration = opt.early_exaggeration;
     float normalization;
 
-    // Figure out number of nodes needed for BH tree
-    int nnodes = num_points * 2;
-    if (nnodes < 1024 * num_blocks) nnodes = 1024 * num_blocks;
-    while ((nnodes & (gpu_opt.warp_size - 1)) != 0)
-        nnodes++;
-    nnodes--;
-    const int num_nodes = nnodes;
-    opt.num_nodes = num_nodes;
-
     // Allocate host memory
     float *knn_squared_distances = new float[num_points * num_neighbors];
     memset(knn_squared_distances, 0, num_points * num_neighbors * sizeof(float));
     long *knn_indices = new long[num_points * num_neighbors];
 
-    // Initialize global variables
-    thrust::device_vector<int> err_device(1);
-    // tsnecuda::Initialize(gpu_opt, err_device);
+    // Set cache configs
+    cudaFuncSetCacheConfig(tsnecuda::IntegrationKernel, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(tsnecuda::ComputePijxQijKernel, cudaFuncCachePreferShared);
+    GpuErrorCheck(cudaDeviceSynchronize());
+
 
     END_IL_TIMER(_time_initialization);
     START_IL_TIMER();
@@ -330,11 +327,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
             std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
     #endif
 
-
-
     END_IL_TIMER(_time_init_fft);
-
-
     // Support for infinite iteration
     for (size_t step = 0; step != opt.iterations; step++) {
 
@@ -483,12 +476,12 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         }
 
         // // Handle snapshoting
-        // if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && step % snap_interval == 0 && opt.return_data != nullptr) {
-        //   thrust::copy(points_device.begin(),
-        //                points_device.end(),
-        //                snap_num*opt.num_points*2 + opt.return_data);
-        //   snap_num += 1;
-        // }
+        if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && step % snap_interval == 0 && opt.return_data != nullptr) {
+          thrust::copy(points_device.begin(),
+                       points_device.end(),
+                       snap_num*opt.num_points*2 + opt.return_data);
+          snap_num += 1;
+        }
 
     }
 
