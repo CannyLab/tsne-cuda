@@ -21,14 +21,13 @@
 #include "include/util/thrust_transform_functions.h"
 
 #include "include/kernels/apply_forces.h"
-#include "include/kernels/bh_attr_forces.h"
+#include "include/kernels/attr_forces.h"
 #include "include/kernels/perplexity_search.h"
-#include "include/kernels/initialization.h"
+#include "include/kernels/nbodyfft.h"
+#include "include/kernels/rep_forces.h"
 
 namespace tsnecuda {
-namespace bh {
 void RunTsne(tsnecuda::Options &opt, tsnecuda::GpuOptions &gpu_opt);
-}
 }
 
 

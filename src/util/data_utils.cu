@@ -1,6 +1,6 @@
 /**
  * @brief Implementation file of the data_utils.h header
- * 
+ *
  * @file data_utils.cu
  * @author your name
  * @date 2018-05-05
@@ -92,7 +92,7 @@ float* tsnecuda::util::LoadCifar10(std::string file_path) {
     for (size_t i = 0; i < 5; i++) {
         char binary_file_name[50];
         snprintf(binary_file_name, sizeof(binary_file_name),
-            "/data_batch_%d.bin", i + 1);
+            "/data_batch_%zu.bin", i + 1);
 
         std::string file_name = file_path;
         file_name.append(binary_file_name);

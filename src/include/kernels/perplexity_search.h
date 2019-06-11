@@ -9,12 +9,12 @@
 #ifndef SRC_INCLUDE_KERNELS_PERPLEXITY_SEARCH_H_
 #define SRC_INCLUDE_KERNELS_PERPLEXITY_SEARCH_H_
 
-#include "include/common.h"
-#include "include/options.h"
-#include "include/util/cuda_utils.h"
-#include "include/util/reduce_utils.h"
-#include "include/util/matrix_broadcast_utils.h"
-#include "include/util/thrust_transform_functions.h"
+#include "common.h"
+#include "options.h"
+#include "util/cuda_utils.h"
+#include "util/reduce_utils.h"
+#include "util/matrix_broadcast_utils.h"
+#include "util/thrust_transform_functions.h"
 
 namespace tsnecuda {
 __global__
@@ -28,7 +28,6 @@ void PerplexitySearchKernel(
                             const float perplexity_target,
                             const float epsilon,
                             const int num_points);
-namespace bh {
 __global__
 void ComputePijKernel(
                       volatile float * __restrict__ pij,
@@ -45,23 +44,6 @@ void SearchPerplexity(tsnecuda::GpuOptions &gpu_opt,
                             const float epsilon,
                             const int num_points,
                             const int num_near_neighbors);
-}
-
-namespace naive {
-__global__
-void ComputePijKernel(
-                        volatile float * __restrict__ pij,
-                        const float * __restrict__ squared_dist,
-                        const float * __restrict__ betas,
-                        const unsigned int num_points);
-
-void SearchPerplexity(cublasHandle_t &handle,
-                                     thrust::device_vector<float> &pij,
-                                     thrust::device_vector<float> &squared_dist,
-                                     const float perplexity_target,
-                                     const float epsilon,
-                                     const int num_points);
-}
 }
 
 #endif

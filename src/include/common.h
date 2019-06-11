@@ -1,6 +1,6 @@
 /**
  * @brief Common includes for the Cuda-TSNE project
- * 
+ *
  * @file common.h
  * @author David Chan
  * @date 2018-04-04
@@ -56,8 +56,5 @@
 #include <algorithm>
 #include <iomanip>
 #include <cmath>
-
-// Additional Macros
-#include "macros.h"
 
 #endif

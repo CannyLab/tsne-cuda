@@ -10,12 +10,11 @@
 #ifndef SRC_INCLUDE_KERNELS_APPLY_FORCES_H_
 #define SRC_INCLUDE_KERNELS_APPLY_FORCES_H_
 
-#include "include/common.h"
-#include "include/options.h"
-#include "include/util/cuda_utils.h"
- 
+#include "common.h"
+#include "options.h"
+#include "util/cuda_utils.h"
+
 namespace tsnecuda {
-namespace bh {
 __global__
 void IntegrationKernel(
                                  volatile float * __restrict__ points,
@@ -36,7 +35,7 @@ void ApplyForces(
                     thrust::device_vector<float> &points,
                     thrust::device_vector<float> &attr_forces,
                     thrust::device_vector<float> &rep_forces,
-                    thrust::device_vector<float> &gains, 
+                    thrust::device_vector<float> &gains,
                     thrust::device_vector<float> &old_forces,
                     const float eta,
                     const float normalization,
@@ -46,31 +45,5 @@ void ApplyForces(
                     const int num_points,
                     const int num_blocks
             );
-}
-
-namespace naive {
-
-__global__
-void IntegrationKernel(
-                                 volatile float * __restrict__ points,
-                                 volatile float * __restrict__ forces,
-                                 volatile float * __restrict__ gains,
-                                 volatile float * __restrict__ old_forces,
-                                 const float eta,
-                                 const float momentum,
-                                 const int num_points
-                      );
-
-
-void ApplyForces(thrust::device_vector<float> &points,
-                                  thrust::device_vector<float> &forces,
-                                  thrust::device_vector<float> &gains,
-                                  thrust::device_vector<float> &old_forces,
-                                  const float eta,
-                                  const float momentum,
-                                  const int num_points,
-                                  const int num_blocks);
-
-}
 }
 #endif

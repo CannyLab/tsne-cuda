@@ -1,63 +1,6 @@
-#include "nbodyfft.h"
-#include <cufft.h>
-#include "include/util/cuda_utils.h"
-#include "include/util/matrix_broadcast_utils.h"
+#include "include/kernels/nbodyfft.h"
 
-#define cufftSafeCall(err)  __cufftSafeCall(err, __FILE__, __LINE__)
-
-clock_t _nbody_fft_timer;
-float _nbody_times[10];
-
-#define _ntime(x) _nbody_times[x] += ( (float) clock() - _nbody_fft_timer ) / CLOCKS_PER_SEC; _nbody_fft_timer = clock();
-
-static const char *_cudaGetErrorEnum(cufftResult error)
-{
-    switch (error)
-    {
-        case CUFFT_SUCCESS:
-            return "CUFFT_SUCCESS";
-
-        case CUFFT_INVALID_PLAN:
-            return "CUFFT_INVALID_PLAN";
-
-        case CUFFT_ALLOC_FAILED:
-            return "CUFFT_ALLOC_FAILED";
-
-        case CUFFT_INVALID_TYPE:
-            return "CUFFT_INVALID_TYPE";
-
-        case CUFFT_INVALID_VALUE:
-            return "CUFFT_INVALID_VALUE";
-
-        case CUFFT_INTERNAL_ERROR:
-            return "CUFFT_INTERNAL_ERROR";
-
-        case CUFFT_EXEC_FAILED:
-            return "CUFFT_EXEC_FAILED";
-
-        case CUFFT_SETUP_FAILED:
-            return "CUFFT_SETUP_FAILED";
-
-        case CUFFT_INVALID_SIZE:
-            return "CUFFT_INVALID_SIZE";
-
-        case CUFFT_UNALIGNED_DATA:
-            return "CUFFT_UNALIGNED_DATA";
-    }
-
-    return "<unknown>";
-}
-
-inline void __cufftSafeCall(cufftResult err, const char *file, const int line)
-{
-    if( CUFFT_SUCCESS != err) {
-		fprintf(stderr, "CUFFT error in file '%s', line %d\n %s\nerror %d: %s\nterminating!\n",__FILE__, __LINE__,err, \
-									_cudaGetErrorEnum(err)); \
-		cudaDeviceReset(); assert(0); \
-    }
-}
-
-__global__ void copy_to_fft_input(volatile float * __restrict__ fft_input, 
+__global__ void copy_to_fft_input(volatile float * __restrict__ fft_input,
                                   const float * w_coefficients_device,
                                   const int n_fft_coeffs,
                                   const int n_fft_coeffs_half,
@@ -70,14 +13,14 @@ __global__ void copy_to_fft_input(volatile float * __restrict__ fft_input,
 
     register int current_term = TID / (n_fft_coeffs_half * n_fft_coeffs_half);
     register int current_loc = TID % (n_fft_coeffs_half * n_fft_coeffs_half);
-    
+
     i = current_loc / n_fft_coeffs_half;
     j = current_loc % n_fft_coeffs_half;
 
     fft_input[current_term * (n_fft_coeffs * n_fft_coeffs) + i * n_fft_coeffs + j] = w_coefficients_device[current_term + current_loc * n_terms];
 }
 
-__global__ void copy_from_fft_output(volatile float * __restrict__ y_tilde_values, 
+__global__ void copy_from_fft_output(volatile float * __restrict__ y_tilde_values,
     const float * fft_output,
     const int n_fft_coeffs,
     const int n_fft_coeffs_half,
@@ -107,12 +50,12 @@ __global__ void compute_point_box_idx(volatile int * __restrict__ point_box_idx,
                                       const float box_width,
                                       const int n_boxes,
                                       const int n_total_boxes,
-                                      const int N) 
+                                      const int N)
 {
     register int TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= N)
         return;
-    
+
     register int x_idx = (int) ((xs[TID] - coord_min) / box_width);
     register int y_idx = (int) ((ys[TID] - coord_min) / box_width);
 
@@ -146,7 +89,7 @@ __global__ void interpolate_device(
 
     i = TID % N;
     j = TID / N;
-    
+
     value = 1;
     ybox_i = y_in_box[i];
 
@@ -174,7 +117,7 @@ __global__ void compute_interpolated_indices(
     TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= n_terms * n_interpolation_points * n_interpolation_points * N)
         return;
-    
+
     current_term = TID % n_terms;
     i = (TID / n_terms) % N;
     interp_j = ((TID / n_terms) / N) % n_interpolation_points;
@@ -189,7 +132,7 @@ __global__ void compute_interpolated_indices(
                                 (box_j * n_interpolation_points) + interp_j;
     // interpolated_indices[TID] = idx * n_terms + current_term;
     atomicAdd(
-        w_coefficients_device + idx * n_terms + current_term, 
+        w_coefficients_device + idx * n_terms + current_term,
         x_interpolated_values[i + interp_i * N] * y_interpolated_values[i + interp_j * N] * chargesQij[i * n_terms + current_term]);
 }
 
@@ -208,7 +151,7 @@ __global__ void compute_potential_indices(
     TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= n_terms * n_interpolation_points * n_interpolation_points * N)
         return;
-    
+
     current_term = TID % n_terms;
     i = (TID / n_terms) % N;
     interp_j = ((TID / n_terms) / N) % n_interpolation_points;
@@ -223,7 +166,7 @@ __global__ void compute_potential_indices(
     // interpolated_values[TID] = x_interpolated_values[i + interp_i * N] * y_interpolated_values[i + interp_j * N] * y_tilde_values[idx * n_terms + current_term];
     // interpolated_indices[TID] = i * n_terms + current_term;
     atomicAdd(
-        potentialsQij + i * n_terms + current_term, 
+        potentialsQij + i * n_terms + current_term,
         x_interpolated_values[i + interp_i * N] * y_interpolated_values[i + interp_j * N] * y_tilde_values[idx * n_terms + current_term]);
 }
 
@@ -244,7 +187,7 @@ __global__ void compute_kernel_tilde(
     TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= n_interpolation_points_1d * n_interpolation_points_1d)
         return;
-    
+
     i = TID / n_interpolation_points_1d;
     j = TID % n_interpolation_points_1d;
 
@@ -253,8 +196,8 @@ __global__ void compute_kernel_tilde(
     kernel_tilde[(n_interpolation_points_1d - i) * n_fft_coeffs + (n_interpolation_points_1d + j)] = tmp;
     kernel_tilde[(n_interpolation_points_1d + i) * n_fft_coeffs + (n_interpolation_points_1d - j)] = tmp;
     kernel_tilde[(n_interpolation_points_1d - i) * n_fft_coeffs + (n_interpolation_points_1d - j)] = tmp;
-    
-} 
+
+}
 
 __global__ void compute_upper_and_lower_bounds(
     volatile float * __restrict__ box_upper_bounds,
@@ -293,9 +236,18 @@ __global__ void copy_to_w_coefficients(
     w_coefficients_device[output_indices[TID]] = output_values[TID];
 }
 
-void precompute_2d(cufftHandle &plan_kernel_tilde, float x_max, float x_min, float y_max, float y_min, int n_boxes, int n_interpolation_points,
-                   thrust::device_vector<float> &box_lower_bounds_device, thrust::device_vector<float> &box_upper_bounds_device, 
-                   thrust::device_vector<float> &kernel_tilde_device, thrust::device_vector<thrust::complex<float>> &fft_kernel_tilde_device) {
+void tsnecuda::PrecomputeFFT2D(
+        cufftHandle &plan_kernel_tilde,
+        float x_max,
+        float x_min,
+        float y_max,
+        float y_min,
+        int n_boxes,
+        int n_interpolation_points,
+        thrust::device_vector<float> &box_lower_bounds_device,
+        thrust::device_vector<float> &box_upper_bounds_device,
+        thrust::device_vector<float> &kernel_tilde_device,
+        thrust::device_vector<thrust::complex<float> > &fft_kernel_tilde_device) {
     const int num_threads = 32;
     int num_blocks = (n_boxes * n_boxes + num_threads - 1) / num_threads;
     /*
@@ -303,7 +255,7 @@ void precompute_2d(cufftHandle &plan_kernel_tilde, float x_max, float x_min, flo
      */
     int n_total_boxes = n_boxes * n_boxes;
     float box_width = (x_max - x_min) / (float) n_boxes;
-    
+
     // Left and right bounds of each box, first the lower bounds in the x direction, then in the y direction
     compute_upper_and_lower_bounds<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(box_upper_bounds_device.data()),
@@ -323,27 +275,27 @@ void precompute_2d(cufftHandle &plan_kernel_tilde, float x_max, float x_min, flo
     // thrust::device_vector<float> kernel_tilde_device(n_fft_coeffs * n_fft_coeffs);
     num_blocks = (n_interpolation_points_1d * n_interpolation_points_1d + num_threads - 1) / num_threads;
     compute_kernel_tilde<<<num_blocks, num_threads>>>(
-        thrust::raw_pointer_cast(kernel_tilde_device.data()), 
+        thrust::raw_pointer_cast(kernel_tilde_device.data()),
         x_min, y_min, h, n_interpolation_points_1d, n_fft_coeffs);
     GpuErrorCheck(cudaDeviceSynchronize());
-    
+
     // Precompute the FFT of the kernel generating matrix
-    
-    cufftExecR2C(plan_kernel_tilde, 
+
+    cufftExecR2C(plan_kernel_tilde,
         reinterpret_cast<cufftReal *>(thrust::raw_pointer_cast(kernel_tilde_device.data())),
         reinterpret_cast<cufftComplex *>(thrust::raw_pointer_cast(fft_kernel_tilde_device.data())));
-    
+
 }
 
 
 
-void n_body_fft_2d(
+void tsnecuda::NbodyFFT2D(
     cufftHandle &plan_dft,
     cufftHandle &plan_idft,
-    int N, 
-    int n_terms, 
+    int N,
+    int n_terms,
     int n_boxes,
-    int n_interpolation_points, 
+    int n_interpolation_points,
     thrust::device_vector<thrust::complex<float>> &fft_kernel_tilde_device,
     int n_total_boxes,
     int total_interpolation_points,
@@ -355,7 +307,7 @@ void n_body_fft_2d(
     thrust::device_vector<float> &fft_input,
     thrust::device_vector<thrust::complex<float>> &fft_w_coefficients,
     thrust::device_vector<float> &fft_output,
-    thrust::device_vector<int> &point_box_idx_device, 
+    thrust::device_vector<int> &point_box_idx_device,
     thrust::device_vector<float> &x_in_box_device,
     thrust::device_vector<float> &y_in_box_device,
     thrust::device_vector<float> &points_device,
@@ -375,13 +327,13 @@ void n_body_fft_2d(
     // std::cout << "start" << std::endl;
     const int num_threads = 128;
     int num_blocks = (N + num_threads - 1) / num_threads;
-    
+
      // Compute box indices and the relative position of each point in its box in the interval [0, 1]
     compute_point_box_idx<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(point_box_idx_device.data()),
         thrust::raw_pointer_cast(x_in_box_device.data()),
         thrust::raw_pointer_cast(y_in_box_device.data()),
-        thrust::raw_pointer_cast(points_device.data()), 
+        thrust::raw_pointer_cast(points_device.data()),
         thrust::raw_pointer_cast(points_device.data() + num_nodes + 1),
         thrust::raw_pointer_cast(box_lower_bounds_device.data()),
         coord_min,
@@ -392,11 +344,11 @@ void n_body_fft_2d(
     );
 
     GpuErrorCheck(cudaDeviceSynchronize());
+
     /*
      * Step 1: Interpolate kernel using Lagrange polynomials and compute the w coefficients
      */
     // Compute the interpolated values at each real point with each Lagrange polynomial in the `x` direction
-
     num_blocks = (N * n_interpolation_points + num_threads - 1) / num_threads;
     interpolate_device<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(x_interpolated_values_device.data()),
@@ -432,10 +384,11 @@ void n_body_fft_2d(
         n_terms
     );
     GpuErrorCheck(cudaDeviceSynchronize());
+
     /*
      * Step 2: Compute the values v_{m, n} at the equispaced nodes, multiply the kernel matrix with the coefficients w
      */
-    
+
     num_blocks = ((n_terms * n_fft_coeffs_half * n_fft_coeffs_half) + num_threads - 1) / num_threads;
     copy_to_fft_input<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(fft_input.data()),
@@ -446,21 +399,21 @@ void n_body_fft_2d(
     );
     GpuErrorCheck(cudaDeviceSynchronize());
     // Compute fft values at interpolated nodes
-    cufftExecR2C(plan_dft, 
-        reinterpret_cast<cufftReal *>(thrust::raw_pointer_cast(fft_input.data())), 
+    cufftExecR2C(plan_dft,
+        reinterpret_cast<cufftReal *>(thrust::raw_pointer_cast(fft_input.data())),
         reinterpret_cast<cufftComplex *>(thrust::raw_pointer_cast(fft_w_coefficients.data())));
     GpuErrorCheck(cudaDeviceSynchronize());
 
     // Take the broadcasted Hadamard product of a complex matrix and a complex vector
     tsnecuda::util::BroadcastMatrixVector(
-        fft_w_coefficients, fft_kernel_tilde_device, n_fft_coeffs * (n_fft_coeffs / 2 + 1), n_terms, 
+        fft_w_coefficients, fft_kernel_tilde_device, n_fft_coeffs * (n_fft_coeffs / 2 + 1), n_terms,
         thrust::multiplies<thrust::complex<float>>(), 0, thrust::complex<float>(1.0));
 
-    
+
 
     // Invert the computed values at the interpolated nodes
-    cufftExecC2R(plan_idft, 
-        reinterpret_cast<cufftComplex *>(thrust::raw_pointer_cast(fft_w_coefficients.data())), 
+    cufftExecC2R(plan_idft,
+        reinterpret_cast<cufftComplex *>(thrust::raw_pointer_cast(fft_w_coefficients.data())),
         reinterpret_cast<cufftReal *>(thrust::raw_pointer_cast(fft_output.data())));
     GpuErrorCheck(cudaDeviceSynchronize());
     copy_from_fft_output<<<num_blocks, num_threads>>>(
@@ -471,6 +424,7 @@ void n_body_fft_2d(
         n_terms
     );
     GpuErrorCheck(cudaDeviceSynchronize());
+
     /*
      * Step 3: Compute the potentials \tilde{\phi}
      */
@@ -487,38 +441,4 @@ void n_body_fft_2d(
         n_terms
     );
     GpuErrorCheck(cudaDeviceSynchronize());
-}
-
-float* get_ntime() {
-	return _nbody_times;
-}
-
-
-void interpolate(int n_interpolation_points, int N, const float *y_in_box, const float *y_tilde_spacings,
-                 float *interpolated_values, const float *denominator) {
-    // The denominators are the same across the interpolants, so we only need to compute them once
-    // auto *denominator = new float[n_interpolation_points];
-    // for (int i = 0; i < n_interpolation_points; i++) {
-    //     denominator[i] = 1;
-    //     for (int j = 0; j < n_interpolation_points; j++) {
-    //         if (i != j) {
-    //             denominator[i] *= y_tilde_spacings[i] - y_tilde_spacings[j];
-    //         }
-    //     }
-    // }
-
-    // Compute the numerators and the interpolant value
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < n_interpolation_points; j++) {
-            interpolated_values[j * N + i] = 1;
-            for (int k = 0; k < n_interpolation_points; k++) {
-                if (j != k) {
-                    interpolated_values[j * N + i] *= y_in_box[i] - y_tilde_spacings[k];
-                }
-            }
-            interpolated_values[j * N + i] /= denominator[j];
-        }
-    }
-
-    // delete[] denominator;
 }

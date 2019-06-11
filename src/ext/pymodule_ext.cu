@@ -1,7 +1,7 @@
 
 // Implementation file for the python extensions
 
-#include "include/ext/pymodule_ext.h"
+#include "ext/pymodule_ext.h"
 
 void pymodule_bh_tsne(float *result,
                       float* points,
@@ -108,7 +108,7 @@ void pymodule_bh_tsne(float *result,
     }
 
     // Do the t-SNE
-    tsnecuda::bh::RunTsne(opt, gpu_opt);
+    tsnecuda::RunTsne(opt, gpu_opt);
 
     // Copy the data back from the GPU
     cudaDeviceSynchronize();
