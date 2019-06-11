@@ -6,7 +6,7 @@
     Attractive force is given by pij*qij.
 */
 
-#include "../include/kernels/attr_forces.h"
+#include "kernels/attr_forces.h"
 
 __global__
 void tsnecuda::ComputePijxQijKernel(

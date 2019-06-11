@@ -2,10 +2,10 @@
 #define PYMODULE_EXT_H
 
     #include <sys/types.h>
-    #include "../common.h"
-    #include "../options.h"
-    #include "../util/distance_utils.h"
-    #include "../fit_tsne.h"
+    #include "common.h"
+    #include "options.h"
+    #include "util/distance_utils.h"
+    #include "fit_tsne.h"
 
     extern "C" {
         /**

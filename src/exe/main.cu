@@ -2,12 +2,8 @@
 // args, so we don't have to re-build to change options.
 
 // Detailed includes
-// #include "../include/common.h"
-#include "../include/util/data_utils.h"
-// #include "../include/util/cuda_utils.h"
-// #include "../include/util/random_utils.h"
-// #include "../include/util/distance_utils.h"
-#include "../include/fit_tsne.h"
+#include "include/util/data_utils.h"
+#include "include/fit_tsne.h"
 #include <time.h>
 #include <string>
 

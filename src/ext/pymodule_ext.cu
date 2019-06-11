@@ -1,7 +1,7 @@
 
 // Implementation file for the python extensions
 
-#include "../include/ext/pymodule_ext.h"
+#include "ext/pymodule_ext.h"
 
 void pymodule_bh_tsne(float *result,
                       float* points,

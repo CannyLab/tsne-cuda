@@ -31,7 +31,7 @@
     or send an e-mail to: info@orangeowlsolutions.com
 */
 
-#include "../include/util/cuda_utils.h"
+#include "util/cuda_utils.h"
 
 /*******************/
 /* iDivUp FUNCTION */

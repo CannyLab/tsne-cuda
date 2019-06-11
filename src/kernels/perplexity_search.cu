@@ -5,7 +5,7 @@
     Note that FAISS returns the first row as the same point, with distance = 0. pii is defined as zero.
 */
 
-#include "../include/kernels/perplexity_search.h"
+#include "kernels/perplexity_search.h"
 
 __global__
 void tsnecuda::ComputePijKernel(
