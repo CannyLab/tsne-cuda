@@ -23,6 +23,7 @@
 #include "include/kernels/apply_forces.h"
 #include "include/kernels/attr_forces.h"
 #include "include/kernels/perplexity_search.h"
+#include "include/kernels/nbodyfft.h"
 
 namespace tsnecuda {
 void RunTsne(tsnecuda::Options &opt, tsnecuda::GpuOptions &gpu_opt);

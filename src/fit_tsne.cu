@@ -3,61 +3,12 @@
 */
 
 #include "include/fit_tsne.h"
-#include "include/nbodyfft.h"
 #include <chrono>
-
-#define cufftSafeCall(err)  __cufftSafeCall(err, __FILE__, __LINE__)
 
 #define START_IL_TIMER() start = std::chrono::high_resolution_clock::now();
 #define END_IL_TIMER(x) stop = std::chrono::high_resolution_clock::now(); duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); x += duration; total_time += duration;
 #define PRINT_IL_TIMER(x) std::cout << #x << ": " << ((float) x.count()) / 1000000.0 << "s" << std::endl
 
-static const char *_cudaGetErrorEnum(cufftResult error)
-{
-    switch (error)
-    {
-        case CUFFT_SUCCESS:
-            return "CUFFT_SUCCESS";
-
-        case CUFFT_INVALID_PLAN:
-            return "CUFFT_INVALID_PLAN";
-
-        case CUFFT_ALLOC_FAILED:
-            return "CUFFT_ALLOC_FAILED";
-
-        case CUFFT_INVALID_TYPE:
-            return "CUFFT_INVALID_TYPE";
-
-        case CUFFT_INVALID_VALUE:
-            return "CUFFT_INVALID_VALUE";
-
-        case CUFFT_INTERNAL_ERROR:
-            return "CUFFT_INTERNAL_ERROR";
-
-        case CUFFT_EXEC_FAILED:
-            return "CUFFT_EXEC_FAILED";
-
-        case CUFFT_SETUP_FAILED:
-            return "CUFFT_SETUP_FAILED";
-
-        case CUFFT_INVALID_SIZE:
-            return "CUFFT_INVALID_SIZE";
-
-        case CUFFT_UNALIGNED_DATA:
-            return "CUFFT_UNALIGNED_DATA";
-    }
-
-    return "<unknown>";
-}
-
-inline void __cufftSafeCall(cufftResult err, const char *file, const int line)
-{
-    if( CUFFT_SUCCESS != err) {
-		fprintf(stderr, "CUFFT error in file '%s', line %d\n %s\nerror %d: %s\nterminating!\n",__FILE__, __LINE__,err, \
-									_cudaGetErrorEnum(err)); \
-		cudaDeviceReset(); assert(0); \
-    }
-}
 
 float squared_cauchy_2d(float x1, float x2, float y1, float y2) {
     return pow(1.0 + pow(x1 - y1, 2) + pow(x2 - y2, 2), -2);
@@ -245,11 +196,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     cusparseSetMatIndexBase(sparse_matrix_descriptor,CUSPARSE_INDEX_BASE_ZERO);
 
     // Setup some return information if we're working on snapshots
-    int snap_interval;
     int snap_num = 0;
-    if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT) {
-      snap_interval = opt.iterations / (opt.num_snapshots-1);
-    }
 
     // Get constants from options
     const int num_points = opt.num_points;
@@ -461,18 +408,18 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     // Create the FFT Handles
     cufftHandle plan_kernel_tilde, plan_dft, plan_idft;;
-    cufftSafeCall(cufftCreate(&plan_kernel_tilde));
-    cufftSafeCall(cufftCreate(&plan_dft));
-    cufftSafeCall(cufftCreate(&plan_idft));
+    CufftSafeCall(cufftCreate(&plan_kernel_tilde));
+    CufftSafeCall(cufftCreate(&plan_dft));
+    CufftSafeCall(cufftCreate(&plan_idft));
 
     size_t work_size, work_size_dft, work_size_idft;
     int fft_dimensions[2] = {n_fft_coeffs, n_fft_coeffs};
-    cufftSafeCall(cufftMakePlan2d(plan_kernel_tilde, fft_dimensions[0], fft_dimensions[1], CUFFT_R2C, &work_size));
-    cufftSafeCall(cufftMakePlanMany(plan_dft, 2, fft_dimensions,
+    CufftSafeCall(cufftMakePlan2d(plan_kernel_tilde, fft_dimensions[0], fft_dimensions[1], CUFFT_R2C, &work_size));
+    CufftSafeCall(cufftMakePlanMany(plan_dft, 2, fft_dimensions,
                                     NULL, 1, n_fft_coeffs * n_fft_coeffs,
                                     NULL, 1, n_fft_coeffs * (n_fft_coeffs / 2 + 1),
                                     CUFFT_R2C, n_terms, &work_size_dft));
-    cufftSafeCall(cufftMakePlanMany(plan_idft, 2, fft_dimensions,
+    CufftSafeCall(cufftMakePlanMany(plan_idft, 2, fft_dimensions,
                                     NULL, 1, n_fft_coeffs * (n_fft_coeffs / 2 + 1),
                                     NULL, 1, n_fft_coeffs * n_fft_coeffs,
                                     CUFFT_C2R, n_terms, &work_size_idft));
@@ -690,9 +637,9 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     }
 
-    cufftSafeCall(cufftDestroy(plan_kernel_tilde));
-    cufftSafeCall(cufftDestroy(plan_dft));
-    cufftSafeCall(cufftDestroy(plan_idft));
+    CufftSafeCall(cufftDestroy(plan_kernel_tilde));
+    CufftSafeCall(cufftDestroy(plan_dft));
+    CufftSafeCall(cufftDestroy(plan_idft));
 
     if (opt.verbosity > 0) {
         PRINT_IL_TIMER(_time_initialization);

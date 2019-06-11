@@ -1,13 +1,13 @@
 /**
  * @brief Implementation file of the data_utils.h header
- * 
+ *
  * @file data_utils.cu
  * @author your name
  * @date 2018-05-05
  * Copyright (c) 2018, Regents of the University of Californias
  */
 
-#include "include/util/data_utils.h"
+#include "../include/util/data_utils.h"
 
 float* tsnecuda::util::LoadMnist(std::string file_name, int32_t& num_images,
         int32_t& num_rows, int32_t& num_columns) {
@@ -92,7 +92,7 @@ float* tsnecuda::util::LoadCifar10(std::string file_path) {
     for (size_t i = 0; i < 5; i++) {
         char binary_file_name[50];
         snprintf(binary_file_name, sizeof(binary_file_name),
-            "/data_batch_%d.bin", i + 1);
+            "/data_batch_%zu.bin", i + 1);
 
         std::string file_name = file_path;
         file_name.append(binary_file_name);

@@ -152,11 +152,11 @@ set(SOURCES
     src/kernels/apply_forces.cu
     src/kernels/attr_forces.cu
     src/kernels/perplexity_search.cu
+    src/kernels/nbodyfft.cu
 
     # Method files
     src/ext/pymodule_ext.cu
     src/fit_tsne.cu
-    src/nbodyfft.cu
 )
 
 

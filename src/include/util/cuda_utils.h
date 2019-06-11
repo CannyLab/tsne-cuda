@@ -1,17 +1,17 @@
 /**
  * @brief Utility/Error Checking code.
- * 
+ *
  * @file cuda_utils.cu
  * @date 2018-04-04
- * Copyright (C) 2012-2017 Orange Owl Solutions.  
+ * Copyright (C) 2012-2017 Orange Owl Solutions.
  */
 
  /*
  CUDA Utilities - Utilities for high performance CPUs/C/C++ and GPUs/CUDA computing library.
-    
-    Copyright (C) 2012-2017 Orange Owl Solutions.  
 
-    
+    Copyright (C) 2012-2017 Orange Owl Solutions.
+
+
     CUDA Utilities is free software: you can redistribute it and/or modify
     it under the terms of the Lesser GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -34,11 +34,12 @@
 #ifndef CUDA_UTILITIES_CUH
 #define CUDA_UTILITIES_CUH
 
-#include "include/common.h"
+#include "../common.h"
 
 __host__ __device__ int iDivUp(int, int);
 extern "C" void CublasSafeCall(cublasStatus_t);
 extern "C" void CusparseSafeCall(cusparseStatus_t err);
+extern "C" void CufftSafeCall(cufftResult err);
 extern "C" void GpuErrorCheck(cudaError_t ans);
 
 #endif

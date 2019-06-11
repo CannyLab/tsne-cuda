@@ -1,18 +1,18 @@
 /**
  * @brief Utility/Error Checking code.
- * 
+ *
  * @file cuda_utils.cu
  * @date 2018-04-04
- * Copyright (C) 2012-2017 Orange Owl Solutions.  
+ * Copyright (C) 2012-2017 Orange Owl Solutions.
  */
 
 
  /*
  CUDA Utilities - Utilities for high performance CPUs/C/C++ and GPUs/CUDA computing library.
-    
-    Copyright (C) 2012-2017 Orange Owl Solutions.  
 
-    
+    Copyright (C) 2012-2017 Orange Owl Solutions.
+
+
     CUDA Utilities is free software: you can redistribute it and/or modify
     it under the terms of the Lesser GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -31,7 +31,7 @@
     or send an e-mail to: info@orangeowlsolutions.com
 */
 
-#include "include/util/cuda_utils.h"
+#include "../include/util/cuda_utils.h"
 
 /*******************/
 /* iDivUp FUNCTION */
@@ -158,6 +158,85 @@ inline void __CusparseSafeCall(cusparseStatus_t err, const char *file, const int
 }
 
 extern "C" void CusparseSafeCall(cusparseStatus_t err) { __CusparseSafeCall(err, __FILE__, __LINE__); }
+
+/************************/
+/* CUFFT ERROR CHECKING */
+/************************/
+
+static const char *_cufftGetErrorEnum(cufftResult error)
+{
+    switch (error)
+    {
+        case CUFFT_SUCCESS:
+            return "CUFFT_SUCCESS";
+
+        case CUFFT_INVALID_PLAN:
+            return "CUFFT_INVALID_PLAN";
+
+        case CUFFT_ALLOC_FAILED:
+            return "CUFFT_ALLOC_FAILED";
+
+        case CUFFT_INVALID_TYPE:
+            return "CUFFT_INVALID_TYPE";
+
+        case CUFFT_INVALID_VALUE:
+            return "CUFFT_INVALID_VALUE";
+
+        case CUFFT_INTERNAL_ERROR:
+            return "CUFFT_INTERNAL_ERROR";
+
+        case CUFFT_EXEC_FAILED:
+            return "CUFFT_EXEC_FAILED";
+
+        case CUFFT_SETUP_FAILED:
+            return "CUFFT_SETUP_FAILED";
+
+        case CUFFT_INVALID_SIZE:
+            return "CUFFT_INVALID_SIZE";
+
+        case CUFFT_UNALIGNED_DATA:
+            return "CUFFT_UNALIGNED_DATA";
+
+        case CUFFT_INVALID_DEVICE:
+            return "CUFFT_INVALID_DEVICE";
+
+        case CUFFT_INCOMPLETE_PARAMETER_LIST:
+            return "CUFFT_INCOMPLETE_PARAMETER_LIST";
+
+        case CUFFT_PARSE_ERROR:
+            return "CUFFT_PARSE_ERROR";
+
+        case CUFFT_NO_WORKSPACE:
+            return "CUFFT_NO_WORKSPACE";
+
+        case CUFFT_NOT_SUPPORTED:
+            return "CUFFT_NOT_SUPPORTED";
+
+        case CUFFT_NOT_IMPLEMENTED:
+            return "CUFFT_NOT_IMPLEMENTED";
+
+        case CUFFT_LICENSE_ERROR:
+            return "CUFFT_LICENSE_ERROR";
+
+        default:
+            return "<unknown>";
+    }
+}
+
+inline void __cufftSafeCall(cufftResult err, const char *file, const int line)
+{
+    if( CUFFT_SUCCESS != err) {
+		fprintf(stderr,
+                "CUFFT error in file '%s', line %d, error %s\nterminating!\n",
+                __FILE__,
+                __LINE__,
+				_cufftGetErrorEnum(err));
+		cudaDeviceReset();
+        assert(0);
+    }
+}
+
+extern "C" void CufftSafeCall(cufftResult err) { __cufftSafeCall(err, __FILE__, __LINE__); }
 
 
 /// END OF CUDA UTILITIES
