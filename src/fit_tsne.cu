@@ -384,10 +384,6 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         END_IL_TIMER(_time_nbodyfft);
         START_IL_TIMER();
 
-        // Compute the normalization constant Z or sum of q_{ij}. This expression is different from the one in the original
-        // paper, but equivalent. This is done so we need only use a single kernel (K_2 in the paper) instead of two
-        // different ones. We subtract N at the end because the following sums over all i, j, whereas Z contains i \neq j
-
         // Make the negative term, or F_rep in the equation 3 of the paper
         normalization = tsnecuda::ComputeRepulsiveForces(
             repulsive_forces_device, normalization_vec_device, points_device,
@@ -431,24 +427,24 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                                   num_blocks);
 
         // // Compute the gradient norm
-        // tsnecuda::util::SquareDeviceVector(attractive_forces_device, old_forces_device);
-        // thrust::transform(attractive_forces_device.begin(), attractive_forces_device.begin()+num_points,
-                          // attractive_forces_device.begin()+num_points, attractive_forces_device.begin(),
-                          // thrust::plus<float>());
-        // tsnecuda::util::SqrtDeviceVector(attractive_forces_device, attractive_forces_device);
-        // float grad_norm = thrust::reduce(
-        //     attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
-        //     0.0f, thrust::plus<float>()) / num_points;
-        // thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
+        tsnecuda::util::SquareDeviceVector(attractive_forces_device, old_forces_device);
+        thrust::transform(attractive_forces_device.begin(), attractive_forces_device.begin()+num_points,
+                          attractive_forces_device.begin()+num_points, attractive_forces_device.begin(),
+                          thrust::plus<float>());
+        tsnecuda::util::SqrtDeviceVector(attractive_forces_device, attractive_forces_device);
+        float grad_norm = thrust::reduce(
+            attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
+            0.0f, thrust::plus<float>()) / num_points;
+        thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
 
-        // if (grad_norm < opt.min_gradient_norm) {
-        //     if (opt.verbosity >= 1) std::cout << "Reached minimum gradient norm: " << grad_norm << std::endl;
-        //     break;
-        // }
+        if (grad_norm < opt.min_gradient_norm) {
+            if (opt.verbosity >= 1) std::cout << "Reached minimum gradient norm: " << grad_norm << std::endl;
+            break;
+        }
 
-        // if (opt.verbosity >= 1 && step % opt.print_interval == 0) {
-        //     std::cout << "[Step " << step << "] Avg. Gradient Norm: " << grad_norm << std::endl;
-        // }
+        if (opt.verbosity >= 1 && step % opt.print_interval == 0) {
+            std::cout << "[Step " << step << "] Avg. Gradient Norm: " << grad_norm << std::endl;
+        }
 
         END_IL_TIMER(_time_apply_forces);
 
