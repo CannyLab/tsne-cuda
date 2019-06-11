@@ -6,8 +6,8 @@
  * @date 2018-05-08
  * Copyright (c) 2018, Regents of the University of California
  */
-#ifndef SRC_INCLUDE_KERNELS_BH_ATTR_FORCES_H_
-#define SRC_INCLUDE_KERNELS_BH_ATTR_FORCES_H_
+#ifndef SRC_INCLUDE_KERNELS_ATTR_FORCES_H_
+#define SRC_INCLUDE_KERNELS_ATTR_FORCES_H_
 
 #include "../common.h"
 #include "../options.h"

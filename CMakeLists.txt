@@ -151,6 +151,7 @@ set(SOURCES
     # Kernels
     src/kernels/apply_forces.cu
     src/kernels/attr_forces.cu
+    src/kernels/rep_forces.cu
     src/kernels/perplexity_search.cu
     src/kernels/nbodyfft.cu
 
