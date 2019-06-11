@@ -2,7 +2,7 @@
 
 ***WARNING: This code is still in active development. While the core code is tested and working, some features need aditional testing.***
 
-This repo is an optimized CUDA version of [Barnes-Hut t-SNE](https://github.com/lvdmaaten/bhtsne) by L. Van der Maaten with associated python modules. We find that our implementation of t-SNE can be up to 1200x faster than Sklearn, or up to 50x faster than Multicore-TSNE when used with the right GPU. The paper describing our approach, as well as the results below, is available at [https://arxiv.org/abs/1807.11824](https://arxiv.org/abs/1807.11824).
+This repo is an optimized CUDA version of [FIt-SNE algorithm](https://github.com/KlugerLab/FIt-SNE) with associated python modules. We find that our implementation of t-SNE can be up to 1200x faster than Sklearn, or up to 50x faster than Multicore-TSNE when used with the right GPU. The paper describing our approach, as well as the results below, is available at [https://arxiv.org/abs/1807.11824](https://arxiv.org/abs/1807.11824).
 
 To begin, check out our wiki for install instructions and usage: [https://github.com/CannyLab/tsne-cuda/wiki/](https://github.com/CannyLab/tsne-cuda/wiki/)
 
@@ -50,19 +50,9 @@ It's worth noting that if n_components is >= 3, then the program uses the naive 
 
 For more information on running the library, or using it as a C++ library, see the [Python usage](https://github.com/CannyLab/tsne-cuda/wiki/Basic-Usage:-Python) or [C++ Usage](https://github.com/CannyLab/tsne-cuda/wiki/Basic-Usage:-Cxx) sections of the wiki.
 
-# Future work
-
-- Allow for double precision
-- Expand FMM methods
-- Add multi-threaded CPU version for those without a GPU
-
-# Known Bugs
-
-- Odd bug with some datasets that causes a hang/gpu memory error. 
-
 # Citation
 
-Please cite this repository if it was useful for your research:
+Please cite the corresponding paper if it was useful for your research:
 
 ```
 @article{chan2018t,
@@ -76,6 +66,8 @@ Please cite this repository if it was useful for your research:
 This library is built on top of the following technology, without this tech, none of this would be possible!
 
 [L. Van der Maaten's paper](http://lvdmaaten.github.io/publications/papers/JMLR_2014.pdf)
+
+[FIt-SNE](https://github.com/KlugerLab/FIt-SNE)
 
 [Multicore-TSNE](https://github.com/DmitryUlyanov/Multicore-TSNE)
 
