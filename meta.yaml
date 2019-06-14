@@ -1,5 +1,5 @@
 {% set name = "tsnecuda" %}
-{% set version = "0.2.1" %}
+{% set version = "2.0.0" %}
 
 package:
   name: '{{ name|lower }}'
@@ -9,25 +9,34 @@ source:
   git_url: https://github.com/CannyLab/tsne-cuda.git
   git_rev: HEAD
 
+build:
+    features: {{ cuda_version }}
+    string: {{ cuda_version }}
+
 requirements:
   build:
+    - {{ compiler('cxx') }}
     - python
-    - gcc_49
+      # - gcc_49
     - cmake
     - setuptools
-    - openblas
-    - libgfortran
   host:
     - python
     - openblas
     - setuptools
     - numpy >=1.14.1
     - libgfortran
+    - libopenblas
+    - libgcc-ng
+    - libstdcxx-ng
   run:
     - python
     - openblas
     - numpy >=1.14.1
     - libgfortran
+    - libopenblas
+    - libgcc-ng
+    - libstdcxx-ng
 
 about:
   home: https://github.com/CannyLab/tsne-cuda
