@@ -38,6 +38,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     START_IL_TIMER();
 
+    if (opt.verbosity >= 1) {
+        std::cout << "Initializing cuda handles... " << std::flush;
+    }
+
     // Construct the handles
     cublasHandle_t dense_handle;
     CublasSafeCall(cublasCreate(&dense_handle));
@@ -86,6 +90,9 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     END_IL_TIMER(_time_initialization);
     START_IL_TIMER();
 
+    if (opt.verbosity >= 1) {
+        std::cout << "done. \nKNN Computation..." << std::flush;
+    }
     // Compute approximate K Nearest Neighbors and squared distances
     tsnecuda::util::KNearestNeighbors(gpu_opt, knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
     thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
@@ -100,6 +107,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     END_IL_TIMER(_time_knn);
     START_IL_TIMER();
+
+    if (opt.verbosity >= 1) {
+        std::cout << "done.\n Computing Pij matrix..." << std::flush;
+    }
 
     // Search Perplexity
     thrust::device_vector<float> pij_non_symmetric_device(num_points * num_neighbors);
@@ -145,6 +156,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     END_IL_TIMER(_time_symmetry);
     START_IL_TIMER();
 
+    if (opt.verbosity >= 1) {
+        std::cout << "done.\n Initializing low dim points" << std::flush;
+    }
+
     // Initialize Low-Dim Points
     thrust::device_vector<float> points_device(num_points * 2);
     thrust::device_vector<float> random_vector_device(points_device.size());
@@ -188,6 +203,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     END_IL_TIMER(_time_init_low_dim);
     START_IL_TIMER();
+
+    if (opt.verbosity >= 1) {
+        std::cout << "done.\n Initializing CUDA memory..." << std::flush;
+    }
 
     // FIT-TNSE Parameters
     int n_interpolation_points = 3;
@@ -327,8 +346,13 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
             std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
     #endif
 
+    if (opt.verbosity >= 1) {
+        std::cout << "done." << std::endl;
+    }
+
     END_IL_TIMER(_time_init_fft);
     // Support for infinite iteration
+    std::cout << "ex: " << attr_exaggeration << " lr:" << eta << std::endl;
     for (size_t step = 0; step != opt.iterations; step++) {
 
         START_IL_TIMER();
