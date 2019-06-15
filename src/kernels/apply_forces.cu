@@ -10,7 +10,7 @@
 /******************************************************************************/
 // Edited to add momentum, repulsive, attr forces, etc.
 __global__
-void tsnecuda::IntegrationKernel(
+void IntegrationKernel(
                                  volatile float * __restrict__ points,
                                  volatile float * __restrict__ attr_forces,
                                  volatile float * __restrict__ rep_forces,
@@ -20,7 +20,6 @@ void tsnecuda::IntegrationKernel(
                                  const float normalization,
                                  const float momentum,
                                  const float exaggeration,
-                                 const int num_nodes,
                                  const int num_points)
 {
   register int i, inc;
@@ -34,7 +33,7 @@ void tsnecuda::IntegrationKernel(
         gx = gains[i];
         gy = gains[num_points + i];
         dx = exaggeration*attr_forces[i] - (rep_forces[i] / normalization);
-        dy = exaggeration*attr_forces[i + num_points] - (rep_forces[num_nodes + 1 + i] / normalization);
+        dy = exaggeration*attr_forces[i + num_points] - (rep_forces[i + num_points] / normalization);
 
         gx = (signbit(dx) != signbit(ux)) ? gx + 0.2 : gx * 0.8;
         gy = (signbit(dy) != signbit(uy)) ? gy + 0.2 : gy * 0.8;
@@ -45,12 +44,12 @@ void tsnecuda::IntegrationKernel(
         uy = momentum * uy - eta * gy * dy;
 
         points[i] += ux;
-        points[i + num_nodes + 1] += uy;
+        points[i + num_points] += uy;
 
         attr_forces[i] = 0.0f;
         attr_forces[num_points + i] = 0.0f;
         rep_forces[i] = 0.0f;
-        rep_forces[i + num_nodes + 1] = 0.0f;
+        rep_forces[num_points + i] = 0.0f;
         old_forces[i] = ux;
         old_forces[num_points + i] = uy;
         gains[i] = gx;
@@ -68,11 +67,10 @@ void tsnecuda::ApplyForces(tsnecuda::GpuOptions &gpu_opt,
                                 const float normalization,
                                 const float momentum,
                                 const float exaggeration,
-                                const int num_nodes,
                                 const int num_points,
                                 const int num_blocks)
 {
-    tsnecuda::IntegrationKernel<<<num_blocks * gpu_opt.integration_kernel_factor,
+    IntegrationKernel<<<num_blocks * gpu_opt.integration_kernel_factor,
                                   gpu_opt.integration_kernel_threads>>>(
                     thrust::raw_pointer_cast(points.data()),
                     thrust::raw_pointer_cast(attr_forces.data()),
@@ -80,6 +78,6 @@ void tsnecuda::ApplyForces(tsnecuda::GpuOptions &gpu_opt,
                     thrust::raw_pointer_cast(gains.data()),
                     thrust::raw_pointer_cast(old_forces.data()),
                     eta, normalization, momentum, exaggeration,
-                    num_nodes, num_points);
+                    num_points);
     GpuErrorCheck(cudaDeviceSynchronize());
 }

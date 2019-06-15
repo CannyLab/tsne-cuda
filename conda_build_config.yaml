@@ -1,0 +1,6 @@
+cuda_version:
+    - cuda90
+    - cuda91
+    - cuda92
+    - cuda100
+    - cuda101

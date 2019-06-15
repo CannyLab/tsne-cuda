@@ -8,7 +8,6 @@ __global__ void compute_repulsive_forces_kernel(
     const float * const ys,
     const float * const potentialsQij,
     const int num_points,
-    const int num_nodes,
     const int n_terms)
 {
     register int TID = threadIdx.x + blockIdx.x * blockDim.x;
@@ -29,7 +28,7 @@ __global__ void compute_repulsive_forces_kernel(
         (1 + x_pt * x_pt + y_pt * y_pt) * phi1 - 2 * (x_pt * phi2 + y_pt * phi3) + phi4;
 
     repulsive_forces_device[TID] = x_pt * phi1 - phi2;
-    repulsive_forces_device[TID + num_nodes + 1] = y_pt * phi1 - phi3;
+    repulsive_forces_device[TID + num_points] = y_pt * phi1 - phi3;
 }
 
 float tsnecuda::ComputeRepulsiveForces(
@@ -38,7 +37,6 @@ float tsnecuda::ComputeRepulsiveForces(
     thrust::device_vector<float> &points_device,
     thrust::device_vector<float> &potentialsQij,
     const int num_points,
-    const int num_nodes,
     const int n_terms)
 {
     const int num_threads = 1024;
@@ -47,9 +45,9 @@ float tsnecuda::ComputeRepulsiveForces(
         thrust::raw_pointer_cast(repulsive_forces_device.data()),
         thrust::raw_pointer_cast(normalization_vec_device.data()),
         thrust::raw_pointer_cast(points_device.data()),
-        thrust::raw_pointer_cast(points_device.data() + num_nodes + 1),
+        thrust::raw_pointer_cast(points_device.data() + num_points),
         thrust::raw_pointer_cast(potentialsQij.data()),
-        num_points, num_nodes, n_terms);
+        num_points, n_terms);
     float sumQ = thrust::reduce(
         normalization_vec_device.begin(), normalization_vec_device.end(), 0,
         thrust::plus<float>());
@@ -81,7 +79,6 @@ void tsnecuda::ComputeChargesQij(
     thrust::device_vector<float> &chargesQij,
     thrust::device_vector<float> &points_device,
     const int num_points,
-    const int num_nodes,
     const int n_terms)
 {
     const int num_threads = 1024;
@@ -89,6 +86,6 @@ void tsnecuda::ComputeChargesQij(
     compute_chargesQij_kernel<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(chargesQij.data()),
         thrust::raw_pointer_cast(points_device.data()),
-        thrust::raw_pointer_cast(points_device.data() + num_nodes + 1),
+        thrust::raw_pointer_cast(points_device.data() + num_points),
         num_points, n_terms);
 }

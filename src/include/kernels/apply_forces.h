@@ -15,20 +15,6 @@
 #include "util/cuda_utils.h"
 
 namespace tsnecuda {
-__global__
-void IntegrationKernel(
-                                 volatile float * __restrict__ points,
-                                 volatile float * __restrict__ attr_forces,
-                                 volatile float * __restrict__ rep_forces,
-                                 volatile float * __restrict__ gains,
-                                 volatile float * __restrict__ old_forces,
-                                 const float eta,
-                                 const float normalization,
-                                 const float momentum,
-                                 const float exaggeration,
-                                 const int num_nodes,
-                                 const int num_points
-                      );
 
 void ApplyForces(
                     tsnecuda::GpuOptions &gpu_opt,
@@ -41,7 +27,6 @@ void ApplyForces(
                     const float normalization,
                     const float momentum,
                     const float exaggeration,
-                    const int num_nodes,
                     const int num_points,
                     const int num_blocks
             );

@@ -9,12 +9,12 @@
 #include "kernels/attr_forces.h"
 
 __global__
-void tsnecuda::ComputePijxQijKernel(
+void ComputePijxQijKernel(
                             float * __restrict__ attr_forces,
                             const float * __restrict__ pij,
                             const float * __restrict__ points,
                             const int * __restrict__ coo_indices,
-                            const int num_nodes,
+                            const int num_points,
                             const int num_nonzero)
 {
     register int TID, i, j;
@@ -23,15 +23,14 @@ void tsnecuda::ComputePijxQijKernel(
     if (TID >= num_nonzero) return;
     i = coo_indices[2*TID];
     j = coo_indices[2*TID+1];
-    // if (i >= num_nodes || i < 0 || j >= num_nodes || j < 0)
-    //     printf("%d, %d\n", i, j);
-    ix = points[i]; iy = points[num_nodes + 1 + i];
-    jx = points[j]; jy = points[num_nodes + 1 + j];
+
+    ix = points[i]; iy = points[num_points + i];
+    jx = points[j]; jy = points[num_points + j];
     dx = ix - jx;
     dy = iy - jy;
     pijqij = pij[TID] / (1 + dx*dx + dy*dy);
     atomicAdd(attr_forces + i, pijqij * dx);
-    atomicAdd(attr_forces + num_nodes + 1 + i, pijqij * dy);
+    atomicAdd(attr_forces + num_points + i, pijqij * dy);
 }
 
 void tsnecuda::ComputeAttractiveForces(
@@ -45,7 +44,6 @@ void tsnecuda::ComputeAttractiveForces(
                     thrust::device_vector<int> &coo_indices,
                     thrust::device_vector<float> &points,
                     thrust::device_vector<float> &ones,
-                    const int num_nodes,
                     const int num_points,
                     const int num_nonzero)
 {
@@ -53,12 +51,12 @@ void tsnecuda::ComputeAttractiveForces(
     // TODO: this is bad style
     const int BLOCKSIZE = 1024;
     const int NBLOCKS = iDivUp(num_nonzero, BLOCKSIZE);
-    tsnecuda::ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(
+    ComputePijxQijKernel<<<NBLOCKS, BLOCKSIZE>>>(
                     thrust::raw_pointer_cast(attr_forces.data()),
                     thrust::raw_pointer_cast(sparse_pij.data()),
                     thrust::raw_pointer_cast(points.data()),
                     thrust::raw_pointer_cast(coo_indices.data()),
-                    num_nodes,
+                    num_points,
                     num_nonzero);
     GpuErrorCheck(cudaDeviceSynchronize());
 }

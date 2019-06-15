@@ -38,6 +38,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     START_IL_TIMER();
 
+    if (opt.verbosity > 0) {
+        std::cout << "Initializing cuda handles... " << std::flush;
+    }
+
     // Construct the handles
     cublasHandle_t dense_handle;
     CublasSafeCall(cublasCreate(&dense_handle));
@@ -78,14 +82,17 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     long *knn_indices = new long[num_points * num_neighbors];
 
     // Set cache configs
-    cudaFuncSetCacheConfig(tsnecuda::IntegrationKernel, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(tsnecuda::ComputePijxQijKernel, cudaFuncCachePreferShared);
+    // cudaFuncSetCacheConfig(tsnecuda::IntegrationKernel, cudaFuncCachePreferL1);
+    // cudaFuncSetCacheConfig(tsnecuda::ComputePijxQijKernel, cudaFuncCachePreferShared);
     GpuErrorCheck(cudaDeviceSynchronize());
 
 
     END_IL_TIMER(_time_initialization);
     START_IL_TIMER();
 
+    if (opt.verbosity > 0) {
+        std::cout << "done.\nKNN Computation... " << std::flush;
+    }
     // Compute approximate K Nearest Neighbors and squared distances
     tsnecuda::util::KNearestNeighbors(gpu_opt, knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
     thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
@@ -100,6 +107,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     END_IL_TIMER(_time_knn);
     START_IL_TIMER();
+
+    if (opt.verbosity > 0) {
+        std::cout << "done.\nComputing Pij matrix... " << std::flush;
+    }
 
     // Search Perplexity
     thrust::device_vector<float> pij_non_symmetric_device(num_points * num_neighbors);
@@ -145,6 +156,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     END_IL_TIMER(_time_symmetry);
     START_IL_TIMER();
 
+    if (opt.verbosity > 0) {
+        std::cout << "done.\nInitializing low dim points... " << std::flush;
+    }
+
     // Initialize Low-Dim Points
     thrust::device_vector<float> points_device(num_points * 2);
     thrust::device_vector<float> random_vector_device(points_device.size());
@@ -188,6 +203,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     END_IL_TIMER(_time_init_low_dim);
     START_IL_TIMER();
+
+    if (opt.verbosity > 0) {
+        std::cout << "done.\nInitializing CUDA memory... " << std::flush;
+    }
 
     // FIT-TNSE Parameters
     int n_interpolation_points = 3;
@@ -327,6 +346,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
             std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
     #endif
 
+    if (opt.verbosity > 0) {
+        std::cout << "done." << std::endl;
+    }
+
     END_IL_TIMER(_time_init_fft);
     // Support for infinite iteration
     for (size_t step = 0; step != opt.iterations; step++) {
@@ -346,7 +369,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
         // Prepare the terms that we'll use to compute the sum i.e. the repulsive forces
         START_IL_TIMER();
-        tsnecuda::ComputeChargesQij(chargesQij_device, points_device, num_points, num_points - 1, n_terms);
+        tsnecuda::ComputeChargesQij(chargesQij_device, points_device, num_points, n_terms);
         END_IL_TIMER(_time_compute_charges);
 
         // Compute Minimax elements
@@ -373,7 +396,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
             plan_dft, plan_idft,
             N, n_terms, n_boxes_per_dim, n_interpolation_points,
             fft_kernel_tilde_device, n_total_boxes,
-            total_interpolation_points, min_coord, box_width, n_fft_coeffs_half, n_fft_coeffs, num_points - 1,
+            total_interpolation_points, min_coord, box_width, n_fft_coeffs_half, n_fft_coeffs,
             fft_input, fft_w_coefficients, fft_output,
             point_box_idx_device, x_in_box_device, y_in_box_device, points_device,
             box_lower_bounds_device, y_tilde_spacings_device, denominator_device, y_tilde_values,
@@ -387,7 +410,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         // Make the negative term, or F_rep in the equation 3 of the paper
         normalization = tsnecuda::ComputeRepulsiveForces(
             repulsive_forces_device, normalization_vec_device, points_device,
-            potentialsQij_device, num_points, num_points - 1, n_terms);
+            potentialsQij_device, num_points, n_terms);
 
         END_IL_TIMER(_time_norm);
         START_IL_TIMER();
@@ -404,7 +427,6 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                                               coo_indices_device,
                                               points_device,
                                               ones_device,
-                                              num_points - 1,
                                               num_points,
                                               num_nonzero);
 
@@ -422,7 +444,6 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                                   normalization,
                                   momentum,
                                   attr_exaggeration,
-                                  num_points - 1,
                                   num_points,
                                   num_blocks);
 
