@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
     options.add_options()
         ("l,learning-rate", "Learning Rate", cxxopts::value<float>()->default_value("200"))
         ("p,perplexity", "Perplexity", cxxopts::value<float>()->default_value("50.0"))
-        ("e,early-ex", "Early Exaggeration Factor", cxxopts::value<float>()->default_value("2.0"))
+        ("e,early-ex", "Early Exaggeration Factor", cxxopts::value<float>()->default_value("12.0"))
         ("s,data", "Which program to run on <cifar10,cifar100,mnist,sim>", cxxopts::value<std::string>()->default_value("sim"))
         ("k,num-points", "How many simulated points to use", cxxopts::value<int>()->default_value("5000"))
         ("u,nearest-neighbors", "How many nearest neighbors should we use", cxxopts::value<int>()->default_value("32"))

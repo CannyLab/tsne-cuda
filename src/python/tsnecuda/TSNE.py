@@ -38,7 +38,7 @@ class TSNE(object):
     def __init__(self,
                  n_components=2,
                  perplexity=50.0,
-                 early_exaggeration=2.0,
+                 early_exaggeration=12.0,
                  learning_rate=200.0,
                  num_neighbors=32,
                  force_magnify_iters=250,

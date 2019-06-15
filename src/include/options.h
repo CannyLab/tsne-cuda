@@ -43,7 +43,7 @@ namespace tsnecuda {
             // Algorithm options
             float perplexity = 50.0f;
             float learning_rate = 200.0f;
-            float early_exaggeration = 2.0f;
+            float early_exaggeration = 12.0f;
             float magnitude_factor = 5.0f;
             int num_neighbors = 1023;
             int iterations = 1000;
