@@ -13,14 +13,12 @@ float ComputeRepulsiveForces(
     thrust::device_vector<float> &points_device,
     thrust::device_vector<float> &potentialsQij,
     const int num_points,
-    const int num_nodes,
     const int n_terms);
 
 void ComputeChargesQij(
     thrust::device_vector<float> &chargesQij,
     thrust::device_vector<float> &points_device,
     const int num_points,
-    const int num_nodes,
     const int n_terms);
 }
 

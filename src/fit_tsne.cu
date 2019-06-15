@@ -78,8 +78,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     long *knn_indices = new long[num_points * num_neighbors];
 
     // Set cache configs
-    cudaFuncSetCacheConfig(tsnecuda::IntegrationKernel, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(tsnecuda::ComputePijxQijKernel, cudaFuncCachePreferShared);
+    // cudaFuncSetCacheConfig(tsnecuda::IntegrationKernel, cudaFuncCachePreferL1);
+    // cudaFuncSetCacheConfig(tsnecuda::ComputePijxQijKernel, cudaFuncCachePreferShared);
     GpuErrorCheck(cudaDeviceSynchronize());
 
 
@@ -346,7 +346,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
         // Prepare the terms that we'll use to compute the sum i.e. the repulsive forces
         START_IL_TIMER();
-        tsnecuda::ComputeChargesQij(chargesQij_device, points_device, num_points, num_points - 1, n_terms);
+        tsnecuda::ComputeChargesQij(chargesQij_device, points_device, num_points, n_terms);
         END_IL_TIMER(_time_compute_charges);
 
         // Compute Minimax elements
@@ -373,7 +373,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
             plan_dft, plan_idft,
             N, n_terms, n_boxes_per_dim, n_interpolation_points,
             fft_kernel_tilde_device, n_total_boxes,
-            total_interpolation_points, min_coord, box_width, n_fft_coeffs_half, n_fft_coeffs, num_points - 1,
+            total_interpolation_points, min_coord, box_width, n_fft_coeffs_half, n_fft_coeffs,
             fft_input, fft_w_coefficients, fft_output,
             point_box_idx_device, x_in_box_device, y_in_box_device, points_device,
             box_lower_bounds_device, y_tilde_spacings_device, denominator_device, y_tilde_values,
@@ -387,7 +387,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         // Make the negative term, or F_rep in the equation 3 of the paper
         normalization = tsnecuda::ComputeRepulsiveForces(
             repulsive_forces_device, normalization_vec_device, points_device,
-            potentialsQij_device, num_points, num_points - 1, n_terms);
+            potentialsQij_device, num_points, n_terms);
 
         END_IL_TIMER(_time_norm);
         START_IL_TIMER();
@@ -404,7 +404,6 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                                               coo_indices_device,
                                               points_device,
                                               ones_device,
-                                              num_points - 1,
                                               num_points,
                                               num_nonzero);
 
@@ -422,7 +421,6 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                                   normalization,
                                   momentum,
                                   attr_exaggeration,
-                                  num_points - 1,
                                   num_points,
                                   num_blocks);
 

@@ -37,7 +37,6 @@ void NbodyFFT2D(
     float box_width,
     int n_fft_coeffs_half,
     int n_fft_coeffs,
-    int num_nodes,
     thrust::device_vector<float> &fft_input,
     thrust::device_vector<thrust::complex<float>> &fft_w_coefficients,
     thrust::device_vector<float> &fft_output,

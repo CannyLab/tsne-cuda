@@ -1,6 +1,6 @@
 /**
  * @brief Options header containing both options objects
-  * 
+  *
  * @file options.h
  * @author David Chan
  * @date 2018-05-11
@@ -20,7 +20,7 @@ namespace tsnecuda {
     enum RETURN_STYLE {
         ONCE, SNAPSHOT
     };
-    
+
     class Options {
 
         private:
@@ -65,14 +65,13 @@ namespace tsnecuda {
             // Verbosity control
             int verbosity = 20;
             int print_interval= 10;
-            
+
             // Return methods
             RETURN_STYLE return_style = RETURN_STYLE::ONCE;
             /*NECESSARY*/ float* return_data = nullptr;
             int num_snapshots = 0; //TODO: Allow for evenly spaced snapshots
 
             // Editable by the tsne method
-            int num_nodes = -1;
             float trained_norm = -1.0;
             bool trained = false;
 
@@ -82,13 +81,13 @@ namespace tsnecuda {
 
             // Various Constructors
             Options() {}
-            Options(float* return_data, float* points, int num_points, int num_dims) : 
+            Options(float* return_data, float* points, int num_points, int num_dims) :
                 return_data(return_data), points(points), num_points(num_points),
                         num_dims(num_dims) {this->random_seed = time(NULL);}
-            Options(float* points, int num_points, int num_dims, 
+            Options(float* points, int num_points, int num_dims,
                     float perplexity, float learning_rate, float magnitude_factor, int num_neighbors,
                     int iterations, int iterations_no_progress, int force_magnify_iters, float perplexity_search_epsilon, float pre_exaggeration_momentum, float post_exaggeration_momentum, float theta, float epssq, float min_gradient_norm,
-                    TSNE_INIT initialization, float* preinit_data, 
+                    TSNE_INIT initialization, float* preinit_data,
                     bool dump_points, int dump_interval,
                     RETURN_STYLE return_style, float* return_data, int num_snapshots,
                     bool use_interactive, std::string viz_server,
@@ -102,7 +101,7 @@ namespace tsnecuda {
                     magnitude_factor(magnitude_factor),
                     num_neighbors(num_neighbors),
                     iterations(iterations),
-                    iterations_no_progress(iterations_no_progress), 
+                    iterations_no_progress(iterations_no_progress),
                     force_magnify_iters(force_magnify_iters),
                     perplexity_search_epsilon(perplexity_search_epsilon),
                     pre_exaggeration_momentum(pre_exaggeration_momentum),
@@ -157,7 +156,7 @@ namespace tsnecuda {
             int get_viz_timeout() {return this->viz_timeout;}
             std::string get_viz_server() {return this->viz_server;}
 
-            
+
     };  // End Options
 
     class GpuOptions {
@@ -216,7 +215,7 @@ namespace tsnecuda {
             //     this->summary_kernel_threads        = 768;
             //     this->summary_kernel_factor         = 1;
 
-            // } else 
+            // } else
             if (device_properties.major >= 5) {  // MAXWELL
 
                 this->integration_kernel_threads    = 1024;

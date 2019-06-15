@@ -15,15 +15,6 @@
 
 namespace tsnecuda {
 
- __global__
-void ComputePijxQijKernel(
-                            float * __restrict__ attr_forces,
-                            const float * __restrict__ pij,
-                            const float * __restrict__ points,
-                            const int * __restrict__ coo_indices,
-                            const int num_nodes,
-                            const int num_nonzero);
-
 void ComputeAttractiveForces(
                     tsnecuda::GpuOptions &gpu_opt,
                     cusparseHandle_t &handle,
@@ -35,7 +26,6 @@ void ComputeAttractiveForces(
                     thrust::device_vector<int> &coo_indices,
                     thrust::device_vector<float> &points,
                     thrust::device_vector<float> &ones,
-                    const int num_nodes,
                     const int num_points,
                     const int num_nonzero);
 }
