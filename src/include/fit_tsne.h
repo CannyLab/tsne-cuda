@@ -26,6 +26,10 @@
 #include "include/kernels/nbodyfft.h"
 #include "include/kernels/rep_forces.h"
 
+#ifndef NO_ZMQ
+    #include <zmq.hpp>
+#endif
+
 namespace tsnecuda {
 void RunTsne(tsnecuda::Options &opt, tsnecuda::GpuOptions &gpu_opt);
 }
