@@ -49,7 +49,7 @@ float tsnecuda::ComputeRepulsiveForces(
         thrust::raw_pointer_cast(potentialsQij.data()),
         num_points, n_terms);
     float sumQ = thrust::reduce(
-        normalization_vec_device.begin(), normalization_vec_device.end(), 0,
+        normalization_vec_device.begin(), normalization_vec_device.end(), 0.0f,
         thrust::plus<float>());
     return sumQ - num_points;
 }
