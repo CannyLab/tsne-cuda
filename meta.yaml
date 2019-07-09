@@ -1,5 +1,5 @@
 {% set name = "tsnecuda" %}
-{% set version = "2.0.0" %}
+{% set version = "2.1.0" %}
 
 package:
   name: '{{ name|lower }}'
@@ -15,9 +15,9 @@ build:
 
 requirements:
   build:
-    - {{ compiler('cxx') }}
+      # - {{ compiler('cxx') }}
     - python
-      # - gcc_49
+    - gcc_49
     - cmake
     - setuptools
   host:
@@ -25,7 +25,6 @@ requirements:
     - openblas
     - setuptools
     - numpy >=1.14.1
-    - libgfortran
     - libopenblas
     - libgcc-ng
     - libstdcxx-ng
@@ -33,7 +32,6 @@ requirements:
     - python
     - openblas
     - numpy >=1.14.1
-    - libgfortran
     - libopenblas
     - libgcc-ng
     - libstdcxx-ng
