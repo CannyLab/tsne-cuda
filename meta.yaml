@@ -10,8 +10,8 @@ source:
   git_rev: HEAD
 
 build:
-    features: {{ cuda_version }}
-    string: {{ cuda_version }}
+    features: '{{ cuda_version }}'
+    string: '{{ cuda_version }}'
 
 requirements:
   build:
