@@ -2,7 +2,7 @@ language: python
 services:
 - docker
 python:
-- '3.7'
+- '3.6'
 script:
 - docker run cannylab/tsnecuda_build -e CONDA_USERNAME=$CONDA_USERNAME -e CONDA_PASSWORD=$CONDA_PASSWORD
 env:
