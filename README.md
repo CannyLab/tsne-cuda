@@ -53,11 +53,14 @@ For more information on running the library, or using it as a C++ library, see t
 Please cite the corresponding paper if it was useful for your research:
 
 ```
-@article{chan2018t,
-  title={t-SNE-CUDA: GPU-Accelerated t-SNE and its Applications to Modern Data},
+@article{chan2019gpu,
+  title={GPU accelerated t-distributed stochastic neighbor embedding},
   author={Chan, David M and Rao, Roshan and Huang, Forrest and Canny, John F},
-  journal={arXiv preprint arXiv:1807.11824},
-  year={2018}
+  journal={Journal of Parallel and Distributed Computing},
+  volume={131},
+  pages={1--13},
+  year={2019},
+  publisher={Elsevier}
 }
 ```
 
