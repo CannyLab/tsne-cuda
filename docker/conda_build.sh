@@ -6,5 +6,5 @@ conda build . -c serge-sans-paille
 # Upload the conda package to anaconda cloud
 conda install anaconda-client
 anaconda login --username $CONDA_USERNAME --password $CONDA_PASSWORD
-anaconda upload /home/root/miniconda3/conda-bld/linux-64/tsnecuda*.tar.bz2
+anaconda upload --user $CONDA_UPLOAD_USERNAME /home/root/miniconda/conda-bld/noarch/tsnecuda*.tar.bz2 --force
 
