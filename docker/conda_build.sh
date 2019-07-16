@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Build the conda package
+echo "Building version 2.1"
 conda build . -c serge-sans-paille
 
 # Upload the conda package to anaconda cloud
