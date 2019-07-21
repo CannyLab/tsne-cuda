@@ -31,8 +31,6 @@ Left: MULTICORE-4 (501s), Middle: BH-TSNE (1156s), Right: t-SNE-CUDA (Ours, 6.98
 
 To install our library, follow the instructions in the [installation section](https://github.com/CannyLab/tsne-cuda/wiki/Installation) of the wiki.
 
-#### Note: There appear to be some compilation instability issues when using parallel compilation. Running Make twice seems to fix it, as does running make without parallel compile. We believe this should be fixed in the most recent release.
-
 ### Run
 
 Like many of the libraries available, the python wrappers subscribe to the same API as [sklearn.manifold.TSNE](http://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html).
