@@ -10,8 +10,10 @@ source:
   git_rev: HEAD
 
 build:
-    features: {{ cuda_version }}
-    string: {{ cuda_version }}
+    features:
+        - '{{ cuda_version }}'
+    string: '{{ cuda_version }}'
+    noarch_python: True
 
 requirements:
   build:
