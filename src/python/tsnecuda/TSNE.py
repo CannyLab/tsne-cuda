@@ -48,7 +48,7 @@ class TSNE(object):
                  epssq=0.0025,
                  n_iter=1000,
                  n_iter_without_progress=1000,
-                 min_grad_norm=1e-7,
+                 min_grad_norm=0.0,
                  perplexity_epsilon=1e-3,
                  metric='euclidean',
                  init='random',
@@ -169,7 +169,7 @@ class TSNE(object):
             X {array} -- Input array, shape: (n_points, n_dimensions)
 
         Keyword Arguments:
-            y {None} -- Ignored (default: {None})
+            y {None} -- The initialization to use for the T-SNE (default: {None})
         """
 
         # Setup points/embedding requirements
