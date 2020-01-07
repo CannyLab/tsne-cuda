@@ -8,17 +8,17 @@ You can install binaries with anaconda for CUDA versions 9.0, 9.2, 10.0, and 10.
 
 # Benchmarks
 ### Simulated Data
-![](docs/simulated_speedup.pdf)
+![](docs/simulated_speedup.png)
 
 Time taken compared to other state of the art algorithms on synthetic datasets with 50 dimensions and four clusters for varying numbers of points. Note the log scale on both the points and time axis, and that the scale of the x-axis is in thousands of points (thus, the values on the x-axis range from 1K to 10M points. Dashed lines on SkLearn, BH-TSNE, and MULTICORE-4 represent projected times. Projected scaling assumes an O(nlog(n)) implementation.
 
 ### MNIST
-![](docs/mnist_speedup.pdf)
+![](docs/mnist_speedup.png)
 
 The performance of t-SNE-CUDA compared to other state-of-the-art implementations on the MNIST dataset. t-SNE-CUDA runs on the raw pixels of the MNIST dataset (60000 images x 768 dimensions) in under 7 seconds.
 
 ### CIFAR
-![](docs/cifar_speedup.pdf)
+![](docs/cifar_speedup.png)
 
 The performance of t-SNE-CUDA compared to other state-of-the-art implementations on the CIFAR-10 dataset. t-SNE-CUDA runs on the output of a classifier on the CIFAR-10 training set (50000 images x 1024 dimensions) in under 6 seconds. While we can run on the full pixel set in under 12 seconds, Euclidean distance is a poor metric in raw pixel space leading to poor quality embeddings.
 
