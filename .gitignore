@@ -37,3 +37,10 @@ visualization/animation.gif
 # vim
 *.swp
 *.swo
+
+# FAISS third_party dependencies
+third_party/faiss/depend
+third_party/faiss/*.txt
+third_party/faiss/*.txt.in
+third_party/faiss/src/faiss_core-*
+

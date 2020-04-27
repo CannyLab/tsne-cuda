@@ -115,7 +115,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     // TODO: See if we can gain some time here by updating FAISS, and building better indicies
     // TODO: Add suport for arbitrary metrics on GPU (Introduced by recent FAISS computation)
     // TODO: Expose Multi-GPU computation (+ Add streaming memory support for GPU optimization)
-    tsnecuda::util::KNearestNeighbors(gpu_opt, knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
+    tsnecuda::util::KNearestNeighbors(gpu_opt, opt, knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
     thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
     thrust::device_vector<int> knn_indices_device(num_points * num_neighbors);
     tsnecuda::util::PostprocessNeighborIndices(gpu_opt, knn_indices_device, knn_indices_long_device,
@@ -407,6 +407,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     {
 
         START_IL_TIMER();
+        // TODO: We might be able to write a kernel which does this more efficiently. It probably doesn't require much
+        // TODO: but it could be done.
         float fill_value = 0;
         thrust::fill(w_coefficients_device.begin(), w_coefficients_device.end(), fill_value);
         thrust::fill(potentialsQij_device.begin(), potentialsQij_device.end(), fill_value);
@@ -457,6 +459,9 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         END_IL_TIMER(_time_nbodyfft);
         START_IL_TIMER();
 
+        // TODO: We can overlap the computation of the attractive and repulsive forces, this requires changing the
+        // TODO: default streams of the code in both of these methods
+        // TODO: See: https://stackoverflow.com/questions/24368197/getting-cuda-thrust-to-use-a-cuda-stream-of-your-choice
         // Make the negative term, or F_rep in the equation 3 of the paper
         normalization = tsnecuda::ComputeRepulsiveForces(
             repulsive_forces_device, normalization_vec_device, points_device,
@@ -482,6 +487,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         END_IL_TIMER(_time_attr);
         START_IL_TIMER();
 
+        // TODO: Add stream synchronization here.
+
         // Apply Forces
         tsnecuda::ApplyForces(gpu_opt,
                               points_device,
@@ -497,16 +504,20 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                               num_blocks);
 
         // // Compute the gradient norm
+
+        // TODO: I think that these transforms can be combined in order to speed up the algorithm
         tsnecuda::util::SquareDeviceVector(attractive_forces_device, old_forces_device);
         thrust::transform(attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
                           attractive_forces_device.begin() + num_points, attractive_forces_device.begin(),
                           thrust::plus<float>());
         tsnecuda::util::SqrtDeviceVector(attractive_forces_device, attractive_forces_device);
+
+        // TODO: We probably don't have to wait on this reduction?
         float grad_norm = thrust::reduce(
                               attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
                               0.0f, thrust::plus<float>()) /
                           num_points;
-        thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
+        thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f); // TODO: We can probably make this faster
 
         if (grad_norm < opt.min_gradient_norm)
         {
@@ -548,7 +559,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
             }
         }
 
-        // // Handle snapshoting
+        // Handle snapshoting
         if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && step % snap_interval == 0 && opt.return_data != nullptr)
         {
             thrust::copy(points_device.begin(),
@@ -556,7 +567,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                          snap_num * opt.num_points * 2 + opt.return_data);
             snap_num += 1;
         }
-    }
+    } // End for loop
 
     CufftSafeCall(cufftDestroy(plan_kernel_tilde));
     CufftSafeCall(cufftDestroy(plan_dft));

@@ -194,6 +194,7 @@ __global__ void compute_kernel_tilde(
     i = TID / n_interpolation_points_1d;
     j = TID % n_interpolation_points_1d;
 
+    // TODO: Possibly issuing a memory pre-fetch here could help the code.
     tmp = squared_cauchy_2d(y_min + h / 2, x_min + h / 2, y_min + h / 2 + i * h, x_min + h / 2 + j * h);
     kernel_tilde[(n_interpolation_points_1d + i) * n_fft_coeffs + (n_interpolation_points_1d + j)] = tmp;
     kernel_tilde[(n_interpolation_points_1d - i) * n_fft_coeffs + (n_interpolation_points_1d + j)] = tmp;
@@ -347,6 +348,7 @@ void tsnecuda::NbodyFFT2D(
     /*
      * Step 1: Interpolate kernel using Lagrange polynomials and compute the w coefficients
      */
+    // TODO: We can stream-parallelize these two interpolation functions
     // Compute the interpolated values at each real point with each Lagrange polynomial in the `x` direction
     num_blocks = (N * n_interpolation_points + num_threads - 1) / num_threads;
     interpolate_device<<<num_blocks, num_threads>>>(
@@ -356,7 +358,7 @@ void tsnecuda::NbodyFFT2D(
         thrust::raw_pointer_cast(denominator_device.data()),
         n_interpolation_points,
         N);
-    GpuErrorCheck(cudaDeviceSynchronize());
+    GpuErrorCheck(cudaDeviceSynchronize()); // TODO: Remove the synchronization here
 
     // Compute the interpolated values at each real point with each Lagrange polynomial in the `y` direction
     interpolate_device<<<num_blocks, num_threads>>>(
@@ -368,6 +370,9 @@ void tsnecuda::NbodyFFT2D(
         N);
     GpuErrorCheck(cudaDeviceSynchronize());
 
+    //TODO: Synchronization required here
+
+    // TODO: This section has an atomic-add, can we remove it?
     num_blocks = (n_terms * n_interpolation_points * n_interpolation_points * N + num_threads - 1) / num_threads;
     compute_interpolated_indices<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(w_coefficients_device.data()),
@@ -400,6 +405,7 @@ void tsnecuda::NbodyFFT2D(
     GpuErrorCheck(cudaDeviceSynchronize());
 
     // Take the broadcasted Hadamard product of a complex matrix and a complex vector
+    // TODO: Check timing on this kernel
     tsnecuda::util::BroadcastMatrixVector(
         fft_w_coefficients, fft_kernel_tilde_device, n_fft_coeffs * (n_fft_coeffs / 2 + 1), n_terms,
         thrust::multiplies<thrust::complex<float>>(), 0, thrust::complex<float>(1.0));
@@ -420,6 +426,7 @@ void tsnecuda::NbodyFFT2D(
     /*
      * Step 3: Compute the potentials \tilde{\phi}
      */
+    // TODO: Depending on the profiling here, we should check to see if we can split this code
     num_blocks = (n_terms * n_interpolation_points * n_interpolation_points * N + num_threads - 1) / num_threads;
     compute_potential_indices<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(potentialsQij_device.data()),

@@ -14,8 +14,10 @@
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexIVFFlat.h>
 #include <faiss/IndexIVFPQ.h>
-#include <gpu/GpuIndex_c.h>
-#include <gpu/StandardGpuResources_c.h>
+#include <faiss/gpu/GpuIndexFlat.h>
+#include <faiss/gpu/GpuIndexIVFFlat.h>
+#include <faiss/gpu/GpuIndexIVFPQ.h>
+#include <faiss/gpu/StandardGpuResources.h>
 
 // CXX Includes
 #include <stdint.h>
@@ -79,6 +81,7 @@ void PairwiseDistance(cublasHandle_t &handle,
 * @brief Use FAISS to compute the k-nearest neighbors for the given points
 *
 * @param gpu_opt GPU Options object
+* @param base_opt Base Options object
 * @param indices The index array that goes with the distance array (N_POINTSxK) row-major (so I[K*i + j] gives the j'th nearest neighbor of the i'th point)
 * @param distances The euclidean distance array (true euclidean distance, not squared) (N_POINTSxK) row-major
 * @param points The points of which you want the k nearest neighbors (N_POINTSxN_DIMS) row-major (so points[N_DIM*i + j] gives the j'th dim of the i'th point)
@@ -86,7 +89,7 @@ void PairwiseDistance(cublasHandle_t &handle,
 * @param num_points The number of input points
 * @param K The number of nearest neighbors to return. If >=1024, this function uses the CPU instead of the GPU
 */
-void KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt, int64_t *indices, float *distances,
+void KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt, tsnecuda::Options &base_opt, int64_t *indices, float *distances,
                        const float *const points,
                        const int num_dims, const int num_points,
                        const int num_near_neighbots);
