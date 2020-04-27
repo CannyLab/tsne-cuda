@@ -6,8 +6,12 @@
 #include <chrono>
 
 #define START_IL_TIMER() start = std::chrono::high_resolution_clock::now();
-#define END_IL_TIMER(x) stop = std::chrono::high_resolution_clock::now(); duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); x += duration; total_time += duration;
-#define PRINT_IL_TIMER(x) std::cout << #x << ": " << ((float) x.count()) / 1000000.0 << "s" << std::endl
+#define END_IL_TIMER(x)                                                             \
+    stop = std::chrono::high_resolution_clock::now();                               \
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); \
+    x += duration;                                                                  \
+    total_time += duration;
+#define PRINT_IL_TIMER(x) std::cout << #x << ": " << ((float)x.count()) / 1000000.0 << "s" << std::endl
 
 void tsnecuda::RunTsne(tsnecuda::Options &opt,
                        tsnecuda::GpuOptions &gpu_opt)
@@ -31,41 +35,52 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     auto _time_apply_forces = duration;
 
     // Check the validity of the options file
-    if (!opt.validate()) {
+    if (!opt.validate())
+    {
         std::cout << "E: Invalid options file. Terminating." << std::endl;
         return;
     }
 
     START_IL_TIMER();
 
-    if (opt.verbosity > 0) {
+    if (opt.verbosity > 0)
+    {
         std::cout << "Initializing cuda handles... " << std::flush;
     }
 
     // Construct the handles
+    // TODO: Move this outside of the timing code, since RAPIDs is cheating by pre-initializing the handle.
+    // TODO: Allow for multi-stream on the computation, since we can overlap portions of our computation to be quicker.
     cublasHandle_t dense_handle;
     CublasSafeCall(cublasCreate(&dense_handle));
     cusparseHandle_t sparse_handle;
     CusparseSafeCall(cusparseCreate(&sparse_handle));
 
+    // TODO: Pre-allocate device memory, and look for the ability to reuse in our code
+
     // Set CUDA device properties
+    // TODO: Add new GPUs to the gpu_opt, and tune for that.
     const int num_blocks = gpu_opt.sm_count;
 
     // Construct sparse matrix descriptor
     cusparseMatDescr_t sparse_matrix_descriptor;
     cusparseCreateMatDescr(&sparse_matrix_descriptor);
     cusparseSetMatType(sparse_matrix_descriptor, CUSPARSE_MATRIX_TYPE_GENERAL);
-    cusparseSetMatIndexBase(sparse_matrix_descriptor,CUSPARSE_INDEX_BASE_ZERO);
+    cusparseSetMatIndexBase(sparse_matrix_descriptor, CUSPARSE_INDEX_BASE_ZERO);
 
     // Setup some return information if we're working on snapshots
+    // TODO: Add compile flag to remove snapshotting for timing parity
     int snap_num = 0;
     int snap_interval = 1;
-    if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT) {
+    if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT)
+    {
         snap_interval = opt.iterations / (opt.num_snapshots - 1);
     }
 
     // Get constants from options
     const int num_points = opt.num_points;
+
+    // TODO: Warn if the number of neighbors is more than the number of points
     const int num_neighbors = (opt.num_neighbors < num_points) ? opt.num_neighbors : num_points;
     const float *high_dim_points = opt.points;
     const int high_dim = opt.num_dims;
@@ -77,6 +92,9 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     float normalization;
 
     // Allocate host memory
+    // TODO: Pre-determine GPU/CPU memory requirements, since we will know them ahead of time, and can estimate
+    // if you're going to run out of GPU memory
+    // TODO: Investigate what it takes to use unified memory + Async fetch and execution
     float *knn_squared_distances = new float[num_points * num_neighbors];
     memset(knn_squared_distances, 0, num_points * num_neighbors * sizeof(float));
     long *knn_indices = new long[num_points * num_neighbors];
@@ -86,36 +104,40 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     // cudaFuncSetCacheConfig(tsnecuda::ComputePijxQijKernel, cudaFuncCachePreferShared);
     GpuErrorCheck(cudaDeviceSynchronize());
 
-
     END_IL_TIMER(_time_initialization);
     START_IL_TIMER();
 
-    if (opt.verbosity > 0) {
+    if (opt.verbosity > 0)
+    {
         std::cout << "done.\nKNN Computation... " << std::flush;
     }
     // Compute approximate K Nearest Neighbors and squared distances
+    // TODO: See if we can gain some time here by updating FAISS, and building better indicies
+    // TODO: Add suport for arbitrary metrics on GPU (Introduced by recent FAISS computation)
+    // TODO: Expose Multi-GPU computation (+ Add streaming memory support for GPU optimization)
     tsnecuda::util::KNearestNeighbors(gpu_opt, knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
     thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
     thrust::device_vector<int> knn_indices_device(num_points * num_neighbors);
     tsnecuda::util::PostprocessNeighborIndices(gpu_opt, knn_indices_device, knn_indices_long_device,
-                                                        num_points, num_neighbors);
+                                               num_points, num_neighbors);
 
     // Max-norm the distances to avoid exponentiating by large numbers
     thrust::device_vector<float> knn_squared_distances_device(knn_squared_distances,
-                                            knn_squared_distances + (num_points * num_neighbors));
+                                                              knn_squared_distances + (num_points * num_neighbors));
     tsnecuda::util::MaxNormalizeDeviceVector(knn_squared_distances_device);
 
     END_IL_TIMER(_time_knn);
     START_IL_TIMER();
 
-    if (opt.verbosity > 0) {
+    if (opt.verbosity > 0)
+    {
         std::cout << "done.\nComputing Pij matrix... " << std::flush;
     }
 
     // Search Perplexity
     thrust::device_vector<float> pij_non_symmetric_device(num_points * num_neighbors);
     tsnecuda::SearchPerplexity(gpu_opt, dense_handle, pij_non_symmetric_device, knn_squared_distances_device,
-                                    perplexity, perplexity_search_epsilon, num_points, num_neighbors);
+                               perplexity, perplexity_search_epsilon, num_points, num_neighbors);
 
     // Clean up memory
     knn_squared_distances_device.clear();
@@ -130,8 +152,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<int> pij_row_ptr_device;
     thrust::device_vector<int> pij_col_ind_device;
     tsnecuda::util::SymmetrizeMatrix(sparse_handle, sparse_pij_device, pij_row_ptr_device,
-                                        pij_col_ind_device, pij_non_symmetric_device, knn_indices_device,
-                                        opt.magnitude_factor, num_points, num_neighbors);
+                                     pij_col_ind_device, pij_non_symmetric_device, knn_indices_device,
+                                     opt.magnitude_factor, num_points, num_neighbors);
 
     const int num_nonzero = sparse_pij_device.size();
 
@@ -148,7 +170,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<float> old_forces_device(opt.num_points * 2, 0); // for momentum
     thrust::device_vector<float> normalization_vec_device(opt.num_points);
     thrust::device_vector<float> ones_device(opt.num_points * 2, 1); // This is for reduce summing, etc.
-    thrust::device_vector<int> coo_indices_device(sparse_pij_device.size()*2);
+    thrust::device_vector<int> coo_indices_device(sparse_pij_device.size() * 2);
 
     tsnecuda::util::Csr2Coo(gpu_opt, coo_indices_device, pij_row_ptr_device,
                             pij_col_ind_device, num_points, num_nonzero);
@@ -156,7 +178,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     END_IL_TIMER(_time_symmetry);
     START_IL_TIMER();
 
-    if (opt.verbosity > 0) {
+    if (opt.verbosity > 0)
+    {
         std::cout << "done.\nInitializing low dim points... " << std::flush;
     }
 
@@ -168,35 +191,51 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     std::normal_distribution<float> distribution1(0.0, 1.0);
     thrust::host_vector<float> h_points_device(num_points * 2);
 
-
     // Initialize random noise vector
-    for (int i = 0; i < h_points_device.size(); i++) h_points_device[i] = 0.001 * distribution1(generator);
+    for (int i = 0; i < h_points_device.size(); i++)
+        h_points_device[i] = 0.001 * distribution1(generator);
     thrust::copy(h_points_device.begin(), h_points_device.end(), random_vector_device.begin());
 
     // TODO: this will only work with gaussian init
-    if (opt.initialization == tsnecuda::TSNE_INIT::UNIFORM) { // Random uniform initialization
+    if (opt.initialization == tsnecuda::TSNE_INIT::UNIFORM)
+    { // Random uniform initialization
         points_device = tsnecuda::util::RandomDeviceVectorInRange(generator, points_device.size(), -5, 5);
-    } else if (opt.initialization == tsnecuda::TSNE_INIT::GAUSSIAN) { // Random gaussian initialization
+    }
+    else if (opt.initialization == tsnecuda::TSNE_INIT::GAUSSIAN)
+    { // Random gaussian initialization
         // Generate some Gaussian noise for the points
-        for (int i = 0; i < h_points_device.size(); i++) h_points_device[i] = 0.0001 * distribution1(generator);
+        for (int i = 0; i < h_points_device.size(); i++)
+            h_points_device[i] = 0.0001 * distribution1(generator);
         thrust::copy(h_points_device.begin(), h_points_device.end(), points_device.begin());
-    } else if (opt.initialization == tsnecuda::TSNE_INIT::RESUME) { // Preinit from vector
+    }
+    else if (opt.initialization == tsnecuda::TSNE_INIT::RESUME)
+    { // Preinit from vector
         // Load from vector
-        if(opt.preinit_data != nullptr) {
-          thrust::copy(opt.preinit_data, opt.preinit_data + points_device.size(), points_device.begin());
-        } else {
-          std::cerr << "E: Invalid initialization. Initialization points are null." << std::endl;
-          exit(1);
+        if (opt.preinit_data != nullptr)
+        {
+            thrust::copy(opt.preinit_data, opt.preinit_data + points_device.size(), points_device.begin());
         }
-    } else if (opt.initialization == tsnecuda::TSNE_INIT::VECTOR) { // Preinit from vector points only
+        else
+        {
+            std::cerr << "E: Invalid initialization. Initialization points are null." << std::endl;
+            exit(1);
+        }
+    }
+    else if (opt.initialization == tsnecuda::TSNE_INIT::VECTOR)
+    { // Preinit from vector points only
         // Copy the pre-init data
-        if(opt.preinit_data != nullptr) {
-          thrust::copy(opt.preinit_data, opt.preinit_data + points_device.size(), points_device.begin());
-        } else {
-          std::cerr << "E: Invalid initialization. Initialization points are null." << std::endl;
-          exit(1);
+        if (opt.preinit_data != nullptr)
+        {
+            thrust::copy(opt.preinit_data, opt.preinit_data + points_device.size(), points_device.begin());
         }
-    } else { // Invalid initialization
+        else
+        {
+            std::cerr << "E: Invalid initialization. Initialization points are null." << std::endl;
+            exit(1);
+        }
+    }
+    else
+    { // Invalid initialization
         std::cerr << "E: Invalid initialization type specified." << std::endl;
         exit(1);
     }
@@ -204,7 +243,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     END_IL_TIMER(_time_init_low_dim);
     START_IL_TIMER();
 
-    if (opt.verbosity > 0) {
+    if (opt.verbosity > 0)
+    {
         std::cout << "done.\nInitializing CUDA memory... " << std::flush;
     }
 
@@ -221,11 +261,13 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     // FFTW works faster on numbers that can be written as  2^a 3^b 5^c 7^d
     // 11^e 13^f, where e+f is either 0 or 1, and the other exponents are
     // arbitrary
-    int allowed_n_boxes_per_dim[20] = {25,36, 50, 55, 60, 65, 70, 75, 80, 85, 90, 96, 100, 110, 120, 130, 140,150, 175, 200};
-    if ( n_boxes_per_dim < allowed_n_boxes_per_dim[19] ) {
+    int allowed_n_boxes_per_dim[20] = {25, 36, 50, 55, 60, 65, 70, 75, 80, 85, 90, 96, 100, 110, 120, 130, 140, 150, 175, 200};
+    if (n_boxes_per_dim < allowed_n_boxes_per_dim[19])
+    {
         //Round up to nearest grid point
         int chosen_i;
-        for (chosen_i =0; allowed_n_boxes_per_dim[chosen_i]< n_boxes_per_dim; chosen_i++);
+        for (chosen_i = 0; allowed_n_boxes_per_dim[chosen_i] < n_boxes_per_dim; chosen_i++)
+            ;
         n_boxes_per_dim = allowed_n_boxes_per_dim[chosen_i];
     }
 
@@ -262,17 +304,21 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<float> fft_output(n_terms * n_fft_coeffs * n_fft_coeffs);
 
     // Easier to compute denominator on CPU, so we should just calculate y_tilde_spacing on CPU also
-    float h = 1 / (float) n_interpolation_points;
+    float h = 1 / (float)n_interpolation_points;
     float y_tilde_spacings[n_interpolation_points];
     y_tilde_spacings[0] = h / 2;
-    for (int i = 1; i < n_interpolation_points; i++) {
+    for (int i = 1; i < n_interpolation_points; i++)
+    {
         y_tilde_spacings[i] = y_tilde_spacings[i - 1] + h;
     }
     float denominator[n_interpolation_points];
-    for (int i = 0; i < n_interpolation_points; i++) {
+    for (int i = 0; i < n_interpolation_points; i++)
+    {
         denominator[i] = 1;
-        for (int j = 0; j < n_interpolation_points; j++) {
-            if (i != j) {
+        for (int j = 0; j < n_interpolation_points; j++)
+        {
+            if (i != j)
+            {
                 denominator[i] *= y_tilde_spacings[i] - y_tilde_spacings[j];
             }
         }
@@ -281,7 +327,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<float> denominator_device(denominator, denominator + n_interpolation_points);
 
     // Create the FFT Handles
-    cufftHandle plan_kernel_tilde, plan_dft, plan_idft;;
+    cufftHandle plan_kernel_tilde, plan_dft, plan_idft;
+    ;
     CufftSafeCall(cufftCreate(&plan_kernel_tilde));
     CufftSafeCall(cufftCreate(&plan_dft));
     CufftSafeCall(cufftCreate(&plan_idft));
@@ -298,74 +345,78 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                                     NULL, 1, n_fft_coeffs * n_fft_coeffs,
                                     CUFFT_C2R, n_terms, &work_size_idft));
 
-
-
     // Dump file
     float *host_ys = nullptr;
     std::ofstream dump_file;
-    if (opt.get_dump_points()) {
+    if (opt.get_dump_points())
+    {
         dump_file.open(opt.get_dump_file());
         host_ys = new float[num_points * 2];
         dump_file << num_points << " " << 2 << std::endl;
     }
 
-    #ifndef NO_ZMQ
-        bool send_zmq = opt.get_use_interactive();
-        zmq::context_t context(1);
-        zmq::socket_t publisher(context, ZMQ_REQ);
-        if (opt.get_use_interactive()) {
+#ifndef NO_ZMQ
+    bool send_zmq = opt.get_use_interactive();
+    zmq::context_t context(1);
+    zmq::socket_t publisher(context, ZMQ_REQ);
+    if (opt.get_use_interactive())
+    {
 
         // Try to connect to the socket
+        if (opt.verbosity >= 1)
+            std::cout << "Initializing Connection...." << std::endl;
+        publisher.setsockopt(ZMQ_RCVTIMEO, opt.get_viz_timeout());
+        publisher.setsockopt(ZMQ_SNDTIMEO, opt.get_viz_timeout());
+        if (opt.verbosity >= 1)
+            std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
+        publisher.connect(opt.get_viz_server());
+
+        // Send the number of points we should be expecting to the server
+        std::string message = std::to_string(opt.num_points);
+        send_zmq = publisher.send(message.c_str(), message.length());
+
+        // Wait for server reply
+        zmq::message_t request;
+        send_zmq = publisher.recv(&request);
+
+        // If there's a time-out, don't bother.
+        if (send_zmq)
+        {
             if (opt.verbosity >= 1)
-                std::cout << "Initializing Connection...." << std::endl;
-            publisher.setsockopt(ZMQ_RCVTIMEO, opt.get_viz_timeout());
-            publisher.setsockopt(ZMQ_SNDTIMEO, opt.get_viz_timeout());
-            if (opt.verbosity >= 1)
-                std::cout << "Waiting for connection to visualization for 10 secs...." << std::endl;
-            publisher.connect(opt.get_viz_server());
-
-            // Send the number of points we should be expecting to the server
-            std::string message = std::to_string(opt.num_points);
-            send_zmq = publisher.send(message.c_str(), message.length());
-
-            // Wait for server reply
-            zmq::message_t request;
-            send_zmq = publisher.recv (&request);
-
-            // If there's a time-out, don't bother.
-            if (send_zmq) {
-                if (opt.verbosity >= 1)
-                    std::cout << "Visualization connected!" << std::endl;
-            } else {
-                std::cout << "No Visualization Terminal, continuing..." << std::endl;
-                send_zmq = false;
-            }
+                std::cout << "Visualization connected!" << std::endl;
         }
-    #else
-        if (opt.get_use_interactive())
-            std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
-    #endif
+        else
+        {
+            std::cout << "No Visualization Terminal, continuing..." << std::endl;
+            send_zmq = false;
+        }
+    }
+#else
+    if (opt.get_use_interactive())
+        std::cout << "This version is not built with ZMQ for interative viz. Rebuild with WITH_ZMQ=TRUE for viz." << std::endl;
+#endif
 
-    if (opt.verbosity > 0) {
+    if (opt.verbosity > 0)
+    {
         std::cout << "done." << std::endl;
     }
 
     END_IL_TIMER(_time_init_fft);
     // Support for infinite iteration
-    for (size_t step = 0; step != opt.iterations; step++) {
+    for (size_t step = 0; step != opt.iterations; step++)
+    {
 
         START_IL_TIMER();
         float fill_value = 0;
         thrust::fill(w_coefficients_device.begin(), w_coefficients_device.end(), fill_value);
         thrust::fill(potentialsQij_device.begin(), potentialsQij_device.end(), fill_value);
         // Setup learning rate schedule
-        if (step == opt.force_magnify_iters) {
+        if (step == opt.force_magnify_iters)
+        {
             momentum = opt.post_exaggeration_momentum;
             attr_exaggeration = 1.0f;
         }
         END_IL_TIMER(_time_other);
-
-
 
         // Prepare the terms that we'll use to compute the sum i.e. the repulsive forces
         START_IL_TIMER();
@@ -386,11 +437,10 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
             box_lower_bounds_device, box_upper_bounds_device, kernel_tilde_device,
             fft_kernel_tilde_device);
 
-        float box_width = ((max_coord - min_coord) / (float) n_boxes_per_dim);
+        float box_width = ((max_coord - min_coord) / (float)n_boxes_per_dim);
 
         END_IL_TIMER(_time_precompute_2d);
         START_IL_TIMER();
-
 
         tsnecuda::NbodyFFT2D(
             plan_dft, plan_idft,
@@ -415,98 +465,105 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         END_IL_TIMER(_time_norm);
         START_IL_TIMER();
 
-
         // Calculate Attractive Forces
         tsnecuda::ComputeAttractiveForces(gpu_opt,
-                                              sparse_handle,
-                                              sparse_matrix_descriptor,
-                                              attractive_forces_device,
-                                              sparse_pij_device,
-                                              pij_row_ptr_device,
-                                              pij_col_ind_device,
-                                              coo_indices_device,
-                                              points_device,
-                                              ones_device,
-                                              num_points,
-                                              num_nonzero);
+                                          sparse_handle,
+                                          sparse_matrix_descriptor,
+                                          attractive_forces_device,
+                                          sparse_pij_device,
+                                          pij_row_ptr_device,
+                                          pij_col_ind_device,
+                                          coo_indices_device,
+                                          points_device,
+                                          ones_device,
+                                          num_points,
+                                          num_nonzero);
 
         END_IL_TIMER(_time_attr);
         START_IL_TIMER();
 
         // Apply Forces
         tsnecuda::ApplyForces(gpu_opt,
-                                  points_device,
-                                  attractive_forces_device,
-                                  repulsive_forces_device,
-                                  gains_device,
-                                  old_forces_device,
-                                  eta,
-                                  normalization,
-                                  momentum,
-                                  attr_exaggeration,
-                                  num_points,
-                                  num_blocks);
+                              points_device,
+                              attractive_forces_device,
+                              repulsive_forces_device,
+                              gains_device,
+                              old_forces_device,
+                              eta,
+                              normalization,
+                              momentum,
+                              attr_exaggeration,
+                              num_points,
+                              num_blocks);
 
         // // Compute the gradient norm
         tsnecuda::util::SquareDeviceVector(attractive_forces_device, old_forces_device);
-        thrust::transform(attractive_forces_device.begin(), attractive_forces_device.begin()+num_points,
-                          attractive_forces_device.begin()+num_points, attractive_forces_device.begin(),
+        thrust::transform(attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
+                          attractive_forces_device.begin() + num_points, attractive_forces_device.begin(),
                           thrust::plus<float>());
         tsnecuda::util::SqrtDeviceVector(attractive_forces_device, attractive_forces_device);
         float grad_norm = thrust::reduce(
-            attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
-            0.0f, thrust::plus<float>()) / num_points;
+                              attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
+                              0.0f, thrust::plus<float>()) /
+                          num_points;
         thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
 
-        if (grad_norm < opt.min_gradient_norm) {
-            if (opt.verbosity >= 1) std::cout << "Reached minimum gradient norm: " << grad_norm << std::endl;
+        if (grad_norm < opt.min_gradient_norm)
+        {
+            if (opt.verbosity >= 1)
+                std::cout << "Reached minimum gradient norm: " << grad_norm << std::endl;
             break;
         }
 
-        if (opt.verbosity >= 1 && step % opt.print_interval == 0) {
+        if (opt.verbosity >= 1 && step % opt.print_interval == 0)
+        {
             std::cout << "[Step " << step << "] Avg. Gradient Norm: " << grad_norm << std::endl;
         }
 
         END_IL_TIMER(_time_apply_forces);
 
-
-        #ifndef NO_ZMQ
-            if (send_zmq) {
-            zmq::message_t message(sizeof(float)*opt.num_points*2);
-            thrust::copy(points_device.begin(), points_device.end(), static_cast<float*>(message.data()));
+#ifndef NO_ZMQ
+        if (send_zmq)
+        {
+            zmq::message_t message(sizeof(float) * opt.num_points * 2);
+            thrust::copy(points_device.begin(), points_device.end(), static_cast<float *>(message.data()));
             bool res = false;
             res = publisher.send(message);
             zmq::message_t request;
             res = publisher.recv(&request);
-            if (!res) {
+            if (!res)
+            {
                 std::cout << "Server Disconnected, Not sending anymore for this session." << std::endl;
             }
             send_zmq = res;
-            }
-        #endif
+        }
+#endif
 
-        if (opt.get_dump_points() && step % opt.get_dump_interval() == 0) {
+        if (opt.get_dump_points() && step % opt.get_dump_interval() == 0)
+        {
             thrust::copy(points_device.begin(), points_device.end(), host_ys);
-            for (int i = 0; i < opt.num_points; i++) {
+            for (int i = 0; i < opt.num_points; i++)
+            {
                 dump_file << host_ys[i] << " " << host_ys[i + num_points] << std::endl;
             }
         }
 
         // // Handle snapshoting
-        if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && step % snap_interval == 0 && opt.return_data != nullptr) {
-          thrust::copy(points_device.begin(),
-                       points_device.end(),
-                       snap_num*opt.num_points*2 + opt.return_data);
-          snap_num += 1;
+        if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && step % snap_interval == 0 && opt.return_data != nullptr)
+        {
+            thrust::copy(points_device.begin(),
+                         points_device.end(),
+                         snap_num * opt.num_points * 2 + opt.return_data);
+            snap_num += 1;
         }
-
     }
 
     CufftSafeCall(cufftDestroy(plan_kernel_tilde));
     CufftSafeCall(cufftDestroy(plan_dft));
     CufftSafeCall(cufftDestroy(plan_idft));
 
-    if (opt.verbosity > 0) {
+    if (opt.verbosity > 0)
+    {
         PRINT_IL_TIMER(_time_initialization);
         PRINT_IL_TIMER(_time_knn);
         PRINT_IL_TIMER(_time_symmetry);
@@ -522,21 +579,23 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         PRINT_IL_TIMER(total_time);
     }
 
-
     // Clean up the dump file if we are dumping points
-    if (opt.get_dump_points()){
-      delete[] host_ys;
-      dump_file.close();
+    if (opt.get_dump_points())
+    {
+        delete[] host_ys;
+        dump_file.close();
     }
 
     // Handle a once off return type
-    if (opt.return_style == tsnecuda::RETURN_STYLE::ONCE && opt.return_data != nullptr) {
-      thrust::copy(points_device.begin(), points_device.end(), opt.return_data);
+    if (opt.return_style == tsnecuda::RETURN_STYLE::ONCE && opt.return_data != nullptr)
+    {
+        thrust::copy(points_device.begin(), points_device.end(), opt.return_data);
     }
 
     // Handle snapshoting
-    if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && opt.return_data != nullptr) {
-      thrust::copy(points_device.begin(), points_device.end(), snap_num*opt.num_points*2 + opt.return_data);
+    if (opt.return_style == tsnecuda::RETURN_STYLE::SNAPSHOT && opt.return_data != nullptr)
+    {
+        thrust::copy(points_device.begin(), points_device.end(), snap_num * opt.num_points * 2 + opt.return_data);
     }
 
     // Return some final values

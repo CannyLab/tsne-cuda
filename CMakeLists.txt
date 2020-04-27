@@ -58,13 +58,13 @@ SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -O3
                     -Xptxas -dlcm=cg
-                    -gencode=arch=compute_30,code=sm_30
-                    -gencode=arch=compute_35,code=sm_35
-                    -gencode=arch=compute_50,code=sm_50
+                    # -gencode=arch=compute_30,code=sm_30
+                    # -gencode=arch=compute_35,code=sm_35
+                    # -gencode=arch=compute_50,code=sm_50
                     -gencode=arch=compute_52,code=sm_52
-                    -gencode=arch=compute_60,code=sm_60
+                    # -gencode=arch=compute_60,code=sm_60
                     -gencode=arch=compute_61,code=sm_61
-                    -gencode=arch=compute_70,code=sm_70
+                    # -gencode=arch=compute_70,code=sm_70
                     -std=c++11
                     -Xcompiler '-O3'
                     -Xcompiler '-fPIC'
@@ -73,7 +73,6 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
                     -Xcompiler '-m64'
                     -Xcompiler '-mpopcnt'
                     -Xcompiler '-g'
-
                     )
 get_filename_component(CUDA_LIB_PATH ${CUDA_CUDART_LIBRARY} DIRECTORY)
 find_library(CUDA_cudadevrt_LIBRARY cudadevrt PATHS ${CUDA_LIB_PATH})
@@ -109,17 +108,37 @@ add_subdirectory(third_party/gtest)
 
 # FAISS Configuration
 #-------------------------------------------------------------------------------
-add_subdirectory(third_party/faiss)
-if(WITH_FAISS_GPU_STANDALONE)
-    add_subdirectory(third_party/faiss/gpu)
-endif()
-
-# specify header and cpp files
-file(GLOB_RECURSE faiss_gpu_headers third_party/faiss/gpu/*.h)
-file(GLOB_RECURSE faiss_gpu_cpp third_party/faiss/gpu/*.cpp)
-file(GLOB_RECURSE faiss_gpu_cuh third_party/faiss/gpu/*.cuh)
-file(GLOB_RECURSE faiss_gpu_cu third_party/faiss/gpu/*.cu)
-#-------------------------------------------------------------------------------
+include(ExternalProject)
+ExternalProject_Add(
+  faiss_core
+  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss
+  INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/faiss/
+  CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/configure --prefix=${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss --with-cuda=${CUDA_TOOLKIT_ROOT_DIR}
+  PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss
+  BUILD_COMMAND make -j
+  INSTALL_COMMAND make install
+  BUILD_IN_SOURCE 1
+)
+ExternalProject_Add(
+  faiss_capi
+  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/c_api
+  INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/faiss/c_api
+  PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/c_api
+  BUILD_COMMAND make -j
+  INSTALL_COMMAND make install
+  BUILD_IN_SOURCE 1
+  DEPENDS faiss_core
+)
+ExternalProject_Add(
+  faiss_capi_gpu
+  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/c_api/gpu
+  INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/faiss/c_api/gpu
+  PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/c_api/gpu
+  BUILD_COMMAND make
+  INSTALL_COMMAND make install
+  BUILD_IN_SOURCE 1
+  DEPENDS faiss_capi
+)
 
 # Project Setup
 #-------------------------------------------------------------------------------
@@ -127,10 +146,10 @@ include_directories(
     src/
     src/include
     ${CUDA_INCLUDE_DIRECTORIES}
-    third_party/gtest/googletest/include
+    third_party/gtest/googletest/include/
     third_party/
-    third_party/faiss/
-    third_party/cxxopts/include
+    third_party/faiss/c_api/
+    third_party/cxxopts/include/
 )
 link_directories(
     ${CUDA_LIB_PATH}
@@ -180,14 +199,13 @@ if(BUILD_PYTHON)
     )
 
     cuda_add_library(tsnecuda SHARED
-        ${faiss_gpu_headers} ${faiss_gpu_cpp} ${faiss_gpu_cuh} ${faiss_gpu_cu}
         ${SOURCES}
     )
     set_target_properties(tsnecuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
     if(WITH_ZMQ)
         target_link_libraries(tsnecuda
             gtest
-            faiss
+            libgpufaiss
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
@@ -205,7 +223,7 @@ if(BUILD_PYTHON)
     else()
         target_link_libraries(tsnecuda
             gtest
-            faiss
+            libgpufaiss
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
@@ -246,16 +264,15 @@ endif()
 #-------------------------------------------------------------------------------
 if(BUILD_TEST)
     cuda_add_executable(tsne_test
-        ${faiss_gpu_headers} ${faiss_gpu_cpp} ${faiss_gpu_cuh} ${faiss_gpu_cu}
         ${SOURCES}
         src/test/test.cu
     )
-    add_dependencies(tsne_test gtest faiss)
+    add_dependencies(tsne_test gtest faiss_capi_gpu)
     if(WITH_ZMQ)
         target_link_libraries(tsne_test
             gtest
             gtest_main
-            faiss
+            libgpufaiss
             ${CUDA_LIBRARIES}
             ${OpenMP_CXX_FLAGS}
             ${CUDA_CUBLAS_LIBRARIES}
@@ -301,15 +318,14 @@ endif()
 # Main Executable
 #-------------------------------------------------------------------------------
 cuda_add_executable(tsne
-    ${faiss_gpu_headers} ${faiss_gpu_cpp} ${faiss_gpu_cuh} ${faiss_gpu_cu}
     ${SOURCES}
     src/exe/main.cu
 )
-add_dependencies(tsne gtest faiss)
+add_dependencies(tsne gtest faiss_capi_gpu)
 if(WITH_ZMQ)
     target_link_libraries(tsne
         gtest
-        faiss
+        libgpufaiss
         ${CUDA_LIBRARIES}
         ${OpenMP_CXX_FLAGS}
         ${CUDA_CUBLAS_LIBRARIES}
@@ -326,7 +342,7 @@ if(WITH_ZMQ)
 else()
     target_link_libraries(tsne
         gtest
-        faiss
+        libgpufaiss
         ${CUDA_LIBRARIES}
         ${OpenMP_CXX_FLAGS}
         ${CUDA_CUBLAS_LIBRARIES}
