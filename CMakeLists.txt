@@ -11,21 +11,7 @@ enable_language(CUDA)
 
 # Options
 #-------------------------------------------------------------------------------
-option(WITH_MKL "Build with MKL if ON (OpenBLAS if OFF)" OFF)
-option(BUILD_TEST "Build tests if ON" OFF)
 option(BUILD_PYTHON "Build python if ON" ON)
-option(WITH_ZMQ "Build with interactive viz if ON" OFF)
-option(WITH_FAISS_GPU_STANDALONE "Build standalone gpufaiss library ON" OFF)
-
-if(NOT WITH_ZMQ)
-    ADD_DEFINITIONS(-DNO_ZMQ)
-    message("-- Not building with ZMQ. Interactive visualization disabled. To build with ZMQ use -DWITH_ZMQ=ON")
-endif()
-
-# Do we want to build FAISS as a standalone library as well.
-if(NOT WITH_FAISS_GPU_STANDALONE)
-    message("-- Not building standalone gpufaiss lib. To build gpufaiss standalone use -DWITH_FAISS_GPU_STANDALONE=ON")
-endif()
 #-------------------------------------------------------------------------------
 
 # Build Number Generation
@@ -52,12 +38,11 @@ set(OPT_FLAGS
     -fopenmp
     -mpopcnt
     -msse4
-    # -fPIC
+    -fPIC
     -m64
     -Wno-sign-compare
     -g
-    -ggdb
-    -O0
+    -O3
     -Wall
     -Wextra
     -DFINTEGER=int
@@ -80,23 +65,20 @@ set(CUDA_ARCH
     # -gencode=arch=compute_60,code=sm_60
     -gencode=arch=compute_61,code=sm_61
     # -gencode=arch=compute_70,code=sm_70
+    # -gencode=arch=compute_71,code=sm_71
 )
 set(CUDA_OPTS
-    -O0
+    -O3
     -g
-    -ggdb
     -Xptxas '-dlcm=cg'
-    -std=c++11
-    -Xcompiler '-O0'
-    # -Xcompiler '-fPIC'
+    -Xcompiler '-O3'
+    -Xcompiler '-fPIC'
     -Xcompiler '-fopenmp'
     -Xcompiler '-msse4'
     -Xcompiler '-m64'
     -Xcompiler '-mpopcnt'
     -Xcompiler '-g'
-    -Xcompiler '-ggdb'
     -Xlinker 'muldefs'
-    # -fPIC
 )
 string (REPLACE ";" " " NVCC_FLAGS_STR "${CUDA_ARCH} ${CUDA_OPTS}")
 set(CMAKE_CUDA_FLAGS "${NVCC_FLAGS_STR}")
@@ -116,6 +98,15 @@ find_package(BLAS REQUIRED)
 # GTEST Configuration
 #-------------------------------------------------------------------------------
 add_subdirectory(third_party/glog)
+#-------------------------------------------------------------------------------
+
+# ZMQ Configuration
+#-------------------------------------------------------------------------------
+find_package(ZMQ)
+if(NOT ${ZMQ_FOUND})
+    ADD_DEFINITIONS(-DNO_ZMQ)
+    message("-- Not building with ZMQ. Interactive visualization disabled. To build with ZMQ use -DWITH_ZMQ=ON")
+endif()
 #-------------------------------------------------------------------------------
 
 # GTEST Configuration
@@ -147,10 +138,10 @@ file(GLOB FAISS_SRC
 )
 
 # Add libraries
-add_library(gpufaiss STATIC ${FAISS_SRC})
-# set_property(TARGET gpufaiss PROPERTY POSITION_INDEPENDENT_CODE TRUE)
-target_include_directories(gpufaiss PRIVATE ${FAISS_HEADERS_DIRS})
-target_link_libraries(gpufaiss
+add_library(faiss_gpu STATIC ${FAISS_SRC})
+# set_property(TARGET faiss_gpu PROPERTY POSITION_INDEPENDENT_CODE TRUE)
+target_include_directories(faiss_gpu PRIVATE ${FAISS_HEADERS_DIRS})
+target_link_libraries(faiss_gpu
     ${BLAS_LIBRARIES}
     CUDA::cudart
     CUDA::cublas
@@ -165,6 +156,7 @@ include_directories(
     third_party/gtest/googletest/include/
     third_party/
     third_party/cxxopts/include/
+    ${ZMQ_INCLUDE_DIR}
 )
 link_directories(
     ${CUDAToolkit_LIBRARY_DIR}
@@ -193,13 +185,24 @@ set(SOURCES
     src/ext/pymodule_ext.cu
     src/fit_tsne.cu
 )
+set(PYTHON_SOURCES
+        src/python/CHANGES.txt
+        src/python/LICENSE.txt
+        src/python/MANIFEST.in
+        src/python/MANIFEST
+        src/python/README.txt
+        src/python/setup.py
+        src/python/tsnecuda/__init__.py
+        src/python/tsnecuda/TSNE.py
+        src/python/tsnecuda/test/__init__.py
+        src/python/docs/FAQ.txt
+    )
 
-add_library(tsnecuda STATIC ${SOURCES})
+add_library(tsnecuda SHARED ${SOURCES})
 # set_property(TARGET tsnecuda PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 target_link_libraries(tsnecuda
     gtest
     glog
-    gpufaiss
     CUDA::cudart
     CUDA::cublas
     CUDA::cufft
@@ -209,212 +212,35 @@ target_link_libraries(tsnecuda
     OpenMP::OpenMP_CXX
     pthread
     -Wl,--allow-multiple-definition
+    ${ZMQ_LIBRARIES}
+    faiss_gpu
 )
 
+#-------------------------------------------------------------------------------
+# Main executable
+#-------------------------------------------------------------------------------
 add_executable(tsne src/exe/main.cu)
 target_link_libraries(tsne tsnecuda)
 
 #-------------------------------------------------------------------------------
-
-# Shared Library for Python Binding
+# Python library copy and build
 #-------------------------------------------------------------------------------
-# if(BUILD_PYTHON)
-#     set(PYTHON_SOURCES
-#         src/python/CHANGES.txt
-#         src/python/LICENSE.txt
-#         src/python/MANIFEST.in
-#         src/python/MANIFEST
-#         src/python/README.txt
-#         src/python/setup.py
-#         src/python/tsnecuda/__init__.py
-#         src/python/tsnecuda/TSNE.py
-#         src/python/tsnecuda/test/__init__.py
-#         src/python/docs/FAQ.txt
-#     )
+if(BUILD_PYTHON)
+    add_custom_target(python_source_files ALL SOURCES ${PYTHON_SOURCES})
+    add_dependencies(python_source_files tsnecuda)
+    add_custom_command(TARGET python_source_files POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory
+                        ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:tsnecuda>/python
+                    )
+    add_custom_command(TARGET python_source_files POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:tsnecuda> $<TARGET_FILE_DIR:tsnecuda>/python/tsnecuda)
+    add_custom_target(write_version_string_to_python ALL SOURCES ${PYTHON_SOURCES})
 
-#     cuda_add_library(tsnecuda SHARED
-#         ${SOURCES}
-#     )
-#     set_target_properties(tsnecuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
-#     if(WITH_ZMQ)
-#         target_link_libraries(tsnecuda
-#             gtest
-#             libgpufaiss
-#             ${CUDA_LIBRARIES}
-#             ${OpenMP_CXX_FLAGS}
-#             ${CUDA_CUBLAS_LIBRARIES}
-#             ${CUDA_CUFFT_LIBRARIES}
-#             ${CUDA_cusparse_LIBRARY}
-#             #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-#             ${CUDA_cudadevrt_LIBRARY}
-#             pthread
-#             zmq
-#             ${BLAS_LIB}
-#             glog
-#             -Wl,--allow-multiple-definition
-#             -Wl,-shared
-#         )
-#     else()
-#         target_link_libraries(tsnecuda
-#             gtest
-#             libgpufaiss
-#             ${CUDA_LIBRARIES}
-#             ${OpenMP_CXX_FLAGS}
-#             ${CUDA_CUBLAS_LIBRARIES}
-#             ${CUDA_CUFFT_LIBRARIES}
-#             ${CUDA_cusparse_LIBRARY}
-#             #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-#             ${CUDA_cudadevrt_LIBRARY}
-#             pthread
-#             ${BLAS_LIB}
-#             glog
-#             -Wl,--allow-multiple-definition
-#             -Wl,-shared
-#         )
-#     endif()
-
-#     # Copy the source files across
-#     add_custom_target(python_source_files ALL SOURCES ${PYTHON_SOURCES})
-#     add_dependencies(python_source_files tsnecuda)
-#     add_custom_command(TARGET python_source_files POST_BUILD
-#                     COMMAND ${CMAKE_COMMAND} -E copy_directory
-#                         ${CMAKE_SOURCE_DIR}/src/python $<TARGET_FILE_DIR:tsnecuda>/python
-#                     )
-#     add_custom_command(TARGET python_source_files POST_BUILD
-#         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:tsnecuda> $<TARGET_FILE_DIR:tsnecuda>/python/tsnecuda)
-#     add_custom_target(write_version_string_to_python ALL SOURCES ${PYTHON_SOURCES})
-
-#     # Write the version string
-#     add_dependencies(write_version_string_to_python python_source_files)
-#     add_custom_command(TARGET write_version_string_to_python POST_BUILD
-#         COMMAND ${CMAKE_COMMAND} -DVERSION_STRING=${VERSION_STRING} -DBUILD_NUMBER=${BUILD_NUMBER} -P
-#         ${CMAKE_CURRENT_BINARY_DIR}/../cmake/write_python_version_string.cmake)
-# else()
-#     message("-- Not building python libraries. To build python libraries use -DBUILD_PYTHON=ON")
-# endif()
-# #-------------------------------------------------------------------------------
-
-# # Test Target
-# #-------------------------------------------------------------------------------
-# if(BUILD_TEST)
-#     cuda_add_executable(tsne_test
-#         ${SOURCES}
-#         src/test/test.cu
-#     )
-#     add_dependencies(tsne_test gtest faiss_core)
-#     if(WITH_ZMQ)
-#         target_link_libraries(tsne_test
-#             gtest
-#             gtest_main
-#             libgpufaiss
-#             ${CUDA_LIBRARIES}
-#             ${OpenMP_CXX_FLAGS}
-#             ${CUDA_CUBLAS_LIBRARIES}
-#             ${CUDA_CUFFT_LIBRARIES}
-#             ${CUDA_cusparse_LIBRARY}
-#             #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-#             ${CUDA_cudadevrt_LIBRARY}
-#             pthread
-#             zmq
-#             ${BLAS_LIB}
-#             glog
-#             -Wl,--allow-multiple-definition
-#         )
-#     else()
-#         target_link_libraries(tsne_test
-#             gtest
-#             gtest_main
-#             faiss
-#             ${CUDA_LIBRARIES}
-#             ${OpenMP_CXX_FLAGS}
-#             ${CUDA_CUBLAS_LIBRARIES}
-#             ${CUDA_CUFFT_LIBRARIES}
-#             ${CUDA_cusparse_LIBRARY}
-#             #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-#             ${CUDA_cudadevrt_LIBRARY}
-#             pthread
-#             ${BLAS_LIB}
-#             glog
-#             -Wl,--allow-multiple-definition
-#         )
-# endif()
-#     enable_testing()
-#     add_test(
-#         NAME tsne_test
-#         COMMAND tsne_test
-#     )
-# else()
-#     message("-- Not building tests. To build tests use -DBUILD_TEST=ON")
-# endif()
-# #-------------------------------------------------------------------------------
-
-# #-------------------------------------------------------------------------------
-# # Main Executable
-# #-------------------------------------------------------------------------------
-# cuda_add_executable(tsne
-#     ${SOURCES}
-#     src/exe/main.cu
-# )
-# add_dependencies(tsne gtest faiss_core)
-# if(WITH_ZMQ)
-#     target_link_libraries(tsne
-#         gtest
-#         libgpufaiss
-#         ${CUDA_LIBRARIES}
-#         ${OpenMP_CXX_FLAGS}
-#         ${CUDA_CUBLAS_LIBRARIES}
-#         ${CUDA_CUFFT_LIBRARIES}
-#         ${CUDA_cusparse_LIBRARY}
-#         #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-#         ${CUDA_cudadevrt_LIBRARY}
-#         pthread
-#         zmq
-#         ${BLAS_LIB}
-#         glog
-#         -Wl,--allow-multiple-definition
-#     )
-# else()
-#     target_link_libraries(tsne
-#         gtest
-#         libgpufaiss
-#         ${CUDA_LIBRARIES}
-#         ${OpenMP_CXX_FLAGS}
-#         ${CUDA_CUBLAS_LIBRARIES}
-#         ${CUDA_CUFFT_LIBRARIES}
-#         ${CUDA_cusparse_LIBRARY}
-#         #/usr/local/cuda-8.0/lib64/libcudaevrt.a
-#         ${CUDA_cudadevrt_LIBRARY}
-#         pthread
-#         ${BLAS_LIB}
-#         glog
-#         -Wl,--allow-multiple-definition
-#     )
-# endif()
-# #-------------------------------------------------------------------------------
-
-# # Documentation
-# #-------------------------------------------------------------------------------
-# # first we can indicate the documentation build as an option and set it to ON by default
-# option(BUILD_DOC "Build documentation" OFF)
-
-# # check if Doxygen is installed
-# find_package(Doxygen)
-# if (DOXYGEN_FOUND AND BUILD_DOC)
-#     # set input and output files
-#     set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
-#     set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
-
-#     # request to configure the file
-#     configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-#     # note the option ALL which allows to build the docs together with the application
-#     add_custom_target( doc_doxygen ALL
-#         COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-#         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-#         COMMENT "Generating API documentation with Doxygen"
-#         VERBATIM )
-# elseif(NOT DOXYGEN_FOUND AND BUILD_DOC)
-#     message("-- Doxygen need to be installed to generate the doxygen documentation")
-# else (DOXYGEN_FOUND AND BUILD_DOC)
-#     message("-- Not building documentation. To build documentation use -DBUILD_DOC=ON")
-# endif (DOXYGEN_FOUND AND BUILD_DOC)
-# #-------------------------------------------------------------------------------
+    # Write the version string
+    add_dependencies(write_version_string_to_python python_source_files)
+    add_custom_command(TARGET write_version_string_to_python POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -DVERSION_STRING=${VERSION_STRING} -DBUILD_NUMBER=${BUILD_NUMBER} -P
+        ${CMAKE_CURRENT_BINARY_DIR}/../cmake/write_python_version_string.cmake)
+else()
+    message("-- Not building python libraries. To build python libraries use -DBUILD_PYTHON=ON")
+endif()
