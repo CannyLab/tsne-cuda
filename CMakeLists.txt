@@ -226,6 +226,8 @@ target_link_libraries(tsne tsnecuda)
 # Python library copy and build
 #-------------------------------------------------------------------------------
 if(BUILD_PYTHON)
+    find_package(PythonInterp REQUIRED)
+    find_package(PythonLibs REQUIRED)
     add_custom_target(python_source_files ALL SOURCES ${PYTHON_SOURCES})
     add_dependencies(python_source_files tsnecuda)
     add_custom_command(TARGET python_source_files POST_BUILD

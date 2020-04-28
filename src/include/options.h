@@ -11,6 +11,7 @@
 
 #include <random>
 #include <time.h>
+#include <faiss/MetricType.h>
 
 namespace tsnecuda
 {
@@ -78,7 +79,7 @@ public:
     float min_gradient_norm = 0.0;
 
     // Distances
-    DISTANCE_METRIC distance_metric = DISTANCE_METRIC::INNER_PRODUCT;
+    faiss::MetricType distance_metric = faiss::METRIC_L2;
 
     // Initialization
     TSNE_INIT initialization = TSNE_INIT::GAUSSIAN;
@@ -111,33 +112,34 @@ public:
             bool dump_points, int dump_interval,
             RETURN_STYLE return_style, float *return_data, int num_snapshots,
             bool use_interactive, std::string viz_server,
-            int verbosity, int print_interval) : points(points),
-                                                 num_points(num_points),
-                                                 num_dims(num_dims),
-                                                 perplexity(perplexity),
-                                                 learning_rate(learning_rate),
-                                                 magnitude_factor(magnitude_factor),
-                                                 num_neighbors(num_neighbors),
-                                                 iterations(iterations),
-                                                 iterations_no_progress(iterations_no_progress),
-                                                 force_magnify_iters(force_magnify_iters),
-                                                 perplexity_search_epsilon(perplexity_search_epsilon),
-                                                 pre_exaggeration_momentum(pre_exaggeration_momentum),
-                                                 post_exaggeration_momentum(post_exaggeration_momentum),
-                                                 theta(theta),
-                                                 epssq(epssq),
-                                                 min_gradient_norm(min_gradient_norm),
-                                                 initialization(initialization),
-                                                 preinit_data(preinit_data),
-                                                 dump_points(dump_points),
-                                                 dump_interval(dump_interval),
-                                                 return_style(return_style),
-                                                 return_data(return_data),
-                                                 num_snapshots(num_snapshots),
-                                                 use_interactive(use_interactive),
-                                                 viz_server(viz_server),
-                                                 verbosity(verbosity),
-                                                 print_interval(print_interval)
+            int verbosity, int print_interval, faiss::MetricType distance_metric) : points(points),
+                                                                                    num_points(num_points),
+                                                                                    num_dims(num_dims),
+                                                                                    perplexity(perplexity),
+                                                                                    learning_rate(learning_rate),
+                                                                                    magnitude_factor(magnitude_factor),
+                                                                                    num_neighbors(num_neighbors),
+                                                                                    iterations(iterations),
+                                                                                    iterations_no_progress(iterations_no_progress),
+                                                                                    force_magnify_iters(force_magnify_iters),
+                                                                                    perplexity_search_epsilon(perplexity_search_epsilon),
+                                                                                    pre_exaggeration_momentum(pre_exaggeration_momentum),
+                                                                                    post_exaggeration_momentum(post_exaggeration_momentum),
+                                                                                    theta(theta),
+                                                                                    epssq(epssq),
+                                                                                    min_gradient_norm(min_gradient_norm),
+                                                                                    initialization(initialization),
+                                                                                    preinit_data(preinit_data),
+                                                                                    dump_points(dump_points),
+                                                                                    dump_interval(dump_interval),
+                                                                                    return_style(return_style),
+                                                                                    return_data(return_data),
+                                                                                    num_snapshots(num_snapshots),
+                                                                                    use_interactive(use_interactive),
+                                                                                    viz_server(viz_server),
+                                                                                    verbosity(verbosity),
+                                                                                    print_interval(print_interval),
+                                                                                    distance_metric(distance_metric)
     {
         this->random_seed = time(NULL);
     }

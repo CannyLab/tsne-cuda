@@ -4,7 +4,7 @@
 #include "ext/pymodule_ext.h"
 
 void pymodule_tsne(float *result,
-                   float* points,
+                   float *points,
                    ssize_t *dims,
                    float perplexity,
                    float learning_rate,
@@ -21,18 +21,19 @@ void pymodule_tsne(float *result,
                    float epssq,
                    float min_gradient_norm,
                    int initialization_type,
-                   float* preinit_data,
+                   float *preinit_data,
                    bool dump_points,
-                   char* dump_file,
+                   char *dump_file,
                    int dump_interval,
                    bool use_interactive,
-                   char* viz_server,
+                   char *viz_server,
                    int viz_timeout,
                    int verbosity,
                    int print_interval,
                    int gpu_device,
                    int return_style,
-                   int num_snapshots)
+                   int num_snapshots,
+                   int distance_metric)
 {
     // Extract the dimensions of the points array
     ssize_t num_points = dims[0];
@@ -62,49 +63,56 @@ void pymodule_tsne(float *result,
     opt.verbosity = verbosity;
     opt.print_interval = print_interval;
 
+    // Set distance metric
+    opt.distance_metric = faiss::MetricType(distance_metric);
+
     // Initialization
-    switch (initialization_type) {
-        case 0:
-            opt.initialization = tsnecuda::TSNE_INIT::UNIFORM;
-            break;
-        case 1:
-            opt.initialization = tsnecuda::TSNE_INIT::GAUSSIAN;
-            break;
-        case 2:
-            //opt.initialization = tsnecuda::TSNE_INIT::RESUME;
-            std::cerr << "E: RESUME initialization not yet supported fully..." << std::endl;
-            exit(1);
-        case 3:
-            opt.initialization = tsnecuda::TSNE_INIT::VECTOR;
-            opt.preinit_data = preinit_data;
-            break;
-        default:
-            std::cerr << "E: Invalid initialization supplied" << std::endl;
-            exit(1);
+    switch (initialization_type)
+    {
+    case 0:
+        opt.initialization = tsnecuda::TSNE_INIT::UNIFORM;
+        break;
+    case 1:
+        opt.initialization = tsnecuda::TSNE_INIT::GAUSSIAN;
+        break;
+    case 2:
+        //opt.initialization = tsnecuda::TSNE_INIT::RESUME;
+        std::cerr << "E: RESUME initialization not yet supported fully..." << std::endl;
+        exit(1);
+    case 3:
+        opt.initialization = tsnecuda::TSNE_INIT::VECTOR;
+        opt.preinit_data = preinit_data;
+        break;
+    default:
+        std::cerr << "E: Invalid initialization supplied" << std::endl;
+        exit(1);
     }
 
     // Point dumping
-    if (dump_points) {
+    if (dump_points)
+    {
         opt.enable_dump(std::string(dump_file), dump_interval);
     }
 
     // Enable Interactive Visualization
-    if (use_interactive) {
+    if (use_interactive)
+    {
         opt.enable_viz(std::string(viz_server), viz_timeout);
     }
 
     // Return data setup
-    switch(return_style) {
-        case 0:
-            opt.return_style = tsnecuda::RETURN_STYLE::ONCE;
-            break;
-        case 1:
-            opt.return_style = tsnecuda::RETURN_STYLE::SNAPSHOT;
-            opt.num_snapshots = num_snapshots;
-            break;
-        default:
-            std::cerr << "E: Invalid return style supplied" << std::endl;
-            exit(1);
+    switch (return_style)
+    {
+    case 0:
+        opt.return_style = tsnecuda::RETURN_STYLE::ONCE;
+        break;
+    case 1:
+        opt.return_style = tsnecuda::RETURN_STYLE::SNAPSHOT;
+        opt.num_snapshots = num_snapshots;
+        break;
+    default:
+        std::cerr << "E: Invalid return style supplied" << std::endl;
+        exit(1);
     }
 
     // Do the t-SNE

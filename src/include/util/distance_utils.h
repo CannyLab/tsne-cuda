@@ -18,6 +18,7 @@
 #include <faiss/gpu/GpuIndexIVFFlat.h>
 #include <faiss/gpu/GpuIndexIVFPQ.h>
 #include <faiss/gpu/StandardGpuResources.h>
+#include <faiss/gpu/GpuCloner.h>
 
 // CXX Includes
 #include <stdint.h>

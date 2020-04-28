@@ -86,120 +86,43 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
         std::sqrt(static_cast<float>(num_points)));
     const int32_t kNumCellsToProbe = 20;
 
-    if (true)
+    // Construct the CPU version of the index
+    faiss::IndexFlatL2 quantizer(num_dims);
+    faiss::IndexIVFFlat cpu_index(&quantizer, num_dims, kNumCells, base_options.distance_metric);
+    cpu_index.nprobe = kNumCellsToProbe;
+
+    if (num_near_neighbors < 1024)
     {
-        // const int32_t kSubQuant = 2;
-        // const int32_t kBPC = 8;
-        faiss::gpu::StandardGpuResources faiss_resources;
-        // faiss::gpu::StandardGpuResources faiss_resources_2;
-        // faiss_resources.noTempMemory();
-        // faiss_resources_2.noTempMemory();
+        int ngpus = faiss::gpu::getNumDevices();
+        std::vector<faiss::gpu::GpuResources *> res;
+        std::vector<int> devs;
+        for (int i = 0; i < ngpus; i++)
+        {
+            res.push_back(new faiss::gpu::StandardGpuResources);
+            devs.push_back(i);
+        }
 
-        // Construct the GPU configuration object
-        // faiss::gpu::GpuIndexIVFPQConfig faiss_config;
-        // faiss::gpu::GpuIndexIVFPQConfig faiss_config_2;
-        faiss::gpu::GpuIndexIVFFlatConfig faiss_config;
-        // faiss::gpu::GpuIndexIVFFlatConfig faiss_config_2;
+        // Convert the CPU index to GPU index
+        faiss::Index *search_index = faiss::gpu::index_cpu_to_gpu_multiple(res, devs, &cpu_index);
 
-        // // TODO(David): Allow for dynamic device placement
-        faiss_config.device = gpu_opt.device;
-        // faiss_config_2.device = 1;
+        search_index->train(num_points, points);
+        search_index->add(num_points, points);
+        search_index->search(num_points, points, num_near_neighbors, distances, indices);
 
-        faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
-        faiss_config.flatConfig.useFloat16 = false;
-
-        // faiss_config_2.indicesOptions = faiss::gpu::INDICES_32_BIT;
-        // faiss_config_2.flatConfig.useFloat16 = false;
-        // faiss_config_2.useFloat16IVFStorage = false;
-
-        // faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
-        // faiss_config.useFloat16LookupTables = true;
-        // faiss_config.usePrecomputedTables = true;
-
-        // faiss_config_2.indicesOptions = faiss::gpu::INDICES_32_BIT;
-        // faiss_config_2.useFloat16LookupTables = true;
-        // faiss_config_2.usePrecomputedTables = true;
-
-        // faiss_config.useFloat16IVFStorage = false;
-        faiss::gpu::GpuIndexIVFFlat search_index(&faiss_resources, num_dims, kNumCells, faiss::METRIC_L2, faiss_config);
-        // faiss::gpu::GpuIndexIVFFlat search_index_2(&faiss_resources_2, num_dims, kNumCells,faiss::METRIC_L2, faiss_config_2);
-
-        // faiss::gpu::GpuIndexIVFPQ search_index(&faiss_resources, num_dims, kNumCells, kSubQuant, kBPC, faiss::METRIC_L2, faiss_config);
-        // faiss::gpu::GpuIndexIVFPQ search_index_2(&faiss_resources, num_dims, kNumCells, kSubQuant, kBPC, faiss::METRIC_L2, faiss_config_2);
-        search_index.setNumProbes(kNumCellsToProbe);
-        // search_index_2.setNumProbes(kNumCellsToProbe);
-
-        // faiss::gpu::IndexProxy search_proxy;
-        // search_proxy.addIndex(&search_index);
-        // search_proxy.addIndex(&search_index_2);
-
-        // Add the points to the index
-        // search_index.train(num_points, points);
-        // search_index_2.train(num_points, points);
-        // auto h1 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::train, &search_index, num_points, points);
-        // auto h2 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::train, &search_index_2, num_points, points);
-        search_index.train(num_points, points);
-        // h1.get();
-        // h2.get();
-        // search_index.add(num_points, points);
-        // search_index_2.add(num_points, points);
-        // search_proxy.add(num_points, points);
-        // h1 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::add, &search_index, num_points, points);
-        // h2 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::add, &search_index_2, num_points, points);
-        search_index.add(num_points, points);
-        // h1.get();
-        // h2.get();
-
-        // Perform the KNN query
-        // auto h1 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::search, &search_index, num_points/2, points, num_near_neighbors, distances, indices);
-        // auto h2 = std::async(std::launch::async, &faiss::gpu::GpuIndexIVFFlat::search, &search_index_2, num_points - num_points/2, points + num_dims*(num_points/2), num_near_neighbors, distances + num_near_neighbors*(num_points/2), indices + num_near_neighbors*(num_points/2));
-        // search_index_2.search(num_points - num_points/2, points + num_dims*(num_points/2), num_near_neighbors, distances + num_near_neighbors*(num_points/2), indices*(num_points/2));
-
-        // h1.get();
-        // h2.get();
-        search_index.search(num_points, points, num_near_neighbors, distances, indices);
-    }
-    else if (num_near_neighbors < 1024)
-    {
-        std::cout << "Starting NN calculation..." << std::endl;
-        // Construct the GPU resources necessary
-        faiss::gpu::StandardGpuResources faiss_resources;
-        // res.noTempMemory();
-
-        // Construct the GPU configuration object
-        faiss::gpu::GpuIndexIVFFlatConfig faiss_config;
-
-        // TODO(David): Allow for dynamic device placement
-        faiss_config.device = 0;
-
-        faiss_config.indicesOptions = faiss::gpu::INDICES_32_BIT;
-        faiss_config.flatConfig.useFloat16 = false;
-
-        faiss::gpu::GpuIndexIVFFlat search_index(&faiss_resources,
-                                                 num_dims, kNumCells, faiss::METRIC_L2, faiss_config);
-        search_index.setNumProbes(kNumCellsToProbe);
-
-        search_index.train(num_points, points);
-        search_index.add(num_points, points);
-
-        // Perform the KNN query
-        search_index.search(num_points, points, num_near_neighbors,
-                            distances, indices);
+        delete search_index;
+        for (int i = 0; i < ngpus; i++)
+        {
+            delete res[i];
+        }
     }
     else
     {
         // Construct the index table on the CPU (since the GPU
         // can only handle 1023 neighbors)
-        faiss::IndexFlatL2 quantizer(num_dims);
-        faiss::IndexIVFFlat search_index(&quantizer, num_dims, kNumCells,
-                                         faiss::METRIC_L2);
-        search_index.train(num_points, points);
-        search_index.add(num_points, points);
-
+        cpu_index.add(num_points, points);
         // Perform the KNN query
-        search_index.nprobe = kNumCellsToProbe;
-        search_index.search(num_points, points, num_near_neighbors,
-                            distances, indices);
+        cpu_index.search(num_points, points, num_near_neighbors,
+                         distances, indices);
     }
 }
 
