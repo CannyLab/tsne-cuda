@@ -46,7 +46,7 @@ class Options
 private:
     // Dump Points Output
     bool dump_points = false;
-    int dump_interval = -1;
+    int dump_interval = 100;
     std::string dump_file = "";
 
     // Visualization

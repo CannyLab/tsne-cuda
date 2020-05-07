@@ -13,21 +13,49 @@
 #include "options.h"
 #include "util/cuda_utils.h"
 
-namespace tsnecuda {
+namespace tsnecuda
+{
 
 void ComputeAttractiveForces(
-                    tsnecuda::GpuOptions &gpu_opt,
-                    cusparseHandle_t &handle,
-                    cusparseMatDescr_t &descr,
-                    thrust::device_vector<float> &attr_forces,
-                    thrust::device_vector<float> &sparse_pij,
-                    thrust::device_vector<int> &pij_row_ptr,
-                    thrust::device_vector<int> &pij_col_ind,
-                    thrust::device_vector<int> &coo_indices,
-                    thrust::device_vector<float> &points,
-                    thrust::device_vector<float> &ones,
-                    const int num_points,
-                    const int num_nonzero);
-}
+    tsnecuda::GpuOptions &gpu_opt,
+    cusparseHandle_t &handle,
+    cusparseMatDescr_t &descr,
+    thrust::device_vector<float> &attr_forces,
+    thrust::device_vector<float> &sparse_pij,
+    thrust::device_vector<int> &pij_row_ptr,
+    thrust::device_vector<int> &pij_col_ind,
+    thrust::device_vector<int> &coo_indices,
+    thrust::device_vector<float> &points,
+    thrust::device_vector<float> &ones,
+    const int num_points,
+    const int num_nonzero);
+
+void ComputeAttractiveForcesV2(
+    tsnecuda::GpuOptions &gpu_opt,
+    cusparseHandle_t &handle,
+    cusparseMatDescr_t &descr,
+    thrust::device_vector<float> &attr_forces,
+    thrust::device_vector<float> &sparse_pij,
+    thrust::device_vector<int> &pij_row_ptr,
+    thrust::device_vector<int> &pij_col_ind,
+    thrust::device_vector<int> &coo_indices,
+    thrust::device_vector<float> &points,
+    thrust::device_vector<float> &ones,
+    const int num_points,
+    const int num_nonzero);
+
+void ComputeAttractiveForcesV3(
+    cublasHandle_t &handle,
+    tsnecuda::GpuOptions &gpu_opt,
+    thrust::device_vector<float> &attr_forces,
+    thrust::device_vector<float> &pij_device,
+    thrust::device_vector<int> &pij_indices_device,
+    thrust::device_vector<float> &pij_workspace_device,
+    thrust::device_vector<float> &points_device,
+    thrust::device_vector<float> &ones_vec,
+    const int num_points,
+    const int num_neighbors);
+
+} // namespace tsnecuda
 
 #endif

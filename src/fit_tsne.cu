@@ -117,8 +117,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     // TODO: Expose Multi-GPU computation (+ Add streaming memory support for GPU optimization)
     tsnecuda::util::KNearestNeighbors(gpu_opt, opt, knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
     thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
-    thrust::device_vector<int> knn_indices_device(num_points * num_neighbors);
-    tsnecuda::util::PostprocessNeighborIndices(gpu_opt, knn_indices_device, knn_indices_long_device,
+    thrust::device_vector<int> pij_indices_device(num_points * num_neighbors);
+    tsnecuda::util::PostprocessNeighborIndices(gpu_opt, pij_indices_device, knn_indices_long_device,
                                                num_points, num_neighbors);
 
     // Max-norm the distances to avoid exponentiating by large numbers
@@ -131,13 +131,17 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     if (opt.verbosity > 0)
     {
-        std::cout << "done.\nComputing Pij matrix... " << std::flush;
+        std::cout << "done.\nComputing Pij matrix... " << std::endl;
     }
 
     // Search Perplexity
     thrust::device_vector<float> pij_non_symmetric_device(num_points * num_neighbors);
     tsnecuda::SearchPerplexity(gpu_opt, dense_handle, pij_non_symmetric_device, knn_squared_distances_device,
                                perplexity, perplexity_search_epsilon, num_points, num_neighbors);
+
+    std::cout << "npt " << num_points << std::endl;
+    std::cout << "knnsqd " << knn_squared_distances_device.size() << std::endl;
+    std::cout << "knnild " << knn_indices_long_device.size() << std::endl;
 
     // Clean up memory
     knn_squared_distances_device.clear();
@@ -148,32 +152,42 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     delete[] knn_indices;
 
     // Symmetrize the pij matrix
-    thrust::device_vector<float> sparse_pij_device;
-    thrust::device_vector<int> pij_row_ptr_device;
-    thrust::device_vector<int> pij_col_ind_device;
-    tsnecuda::util::SymmetrizeMatrix(sparse_handle, sparse_pij_device, pij_row_ptr_device,
-                                     pij_col_ind_device, pij_non_symmetric_device, knn_indices_device,
-                                     opt.magnitude_factor, num_points, num_neighbors);
+    // thrust::device_vector<float> sparse_pij_device;
+    // thrust::device_vector<int> pij_row_ptr_device;
+    // thrust::device_vector<int> pij_col_ind_device;
+    // tsnecuda::util::SymmetrizeMatrix(sparse_handle, sparse_pij_device, pij_row_ptr_device,
+    //                                  pij_col_ind_device, pij_non_symmetric_device, pij_indices_device,
+    //                                  opt.magnitude_factor, num_points, num_neighbors);
 
-    const int num_nonzero = sparse_pij_device.size();
+    thrust::device_vector<float> pij_device(num_points * num_neighbors);
+    tsnecuda::util::SymmetrizeMatrixV2(pij_device, pij_non_symmetric_device, pij_indices_device, num_points, num_neighbors);
+
+    const int num_nonzero = pij_device.size();
+    std::cout << "pijns " << pij_non_symmetric_device.size() << std::endl;
+    std::cout << "nnz " << num_nonzero << std::endl;
+    std::cout << "nptnn " << num_points * num_neighbors << std::endl;
+    std::cout << "nn " << num_neighbors << std::endl;
+    assert(num_nonzero == num_points * num_neighbors);
 
     // Clean up memory
-    knn_indices_device.clear();
-    knn_indices_device.shrink_to_fit();
+    // pij_indices_device.clear();
+    // pij_indices_device.shrink_to_fit();
     pij_non_symmetric_device.clear();
     pij_non_symmetric_device.shrink_to_fit();
 
     // Declare memory
+    std::cout << "Declaring memory" << std::endl;
+    thrust::device_vector<float> pij_workspace_device(num_points * num_neighbors * 2);
     thrust::device_vector<float> repulsive_forces_device(opt.num_points * 2, 0);
     thrust::device_vector<float> attractive_forces_device(opt.num_points * 2, 0);
     thrust::device_vector<float> gains_device(opt.num_points * 2, 1);
     thrust::device_vector<float> old_forces_device(opt.num_points * 2, 0); // for momentum
     thrust::device_vector<float> normalization_vec_device(opt.num_points);
     thrust::device_vector<float> ones_device(opt.num_points * 2, 1); // This is for reduce summing, etc.
-    thrust::device_vector<int> coo_indices_device(sparse_pij_device.size() * 2);
+    // thrust::device_vector<int> coo_indices_device(sparse_pij_device.size() * 2);
 
-    tsnecuda::util::Csr2Coo(gpu_opt, coo_indices_device, pij_row_ptr_device,
-                            pij_col_ind_device, num_points, num_nonzero);
+    // tsnecuda::util::Csr2Coo(gpu_opt, coo_indices_device, pij_row_ptr_device,
+    //                         pij_col_ind_device, num_points, num_nonzero);
 
     END_IL_TIMER(_time_symmetry);
     START_IL_TIMER();
@@ -328,7 +342,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
     // Create the FFT Handles
     cufftHandle plan_kernel_tilde, plan_dft, plan_idft;
-    ;
+
     CufftSafeCall(cufftCreate(&plan_kernel_tilde));
     CufftSafeCall(cufftCreate(&plan_dft));
     CufftSafeCall(cufftCreate(&plan_idft));
@@ -471,18 +485,28 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         START_IL_TIMER();
 
         // Calculate Attractive Forces
-        tsnecuda::ComputeAttractiveForces(gpu_opt,
-                                          sparse_handle,
-                                          sparse_matrix_descriptor,
-                                          attractive_forces_device,
-                                          sparse_pij_device,
-                                          pij_row_ptr_device,
-                                          pij_col_ind_device,
-                                          coo_indices_device,
-                                          points_device,
-                                          ones_device,
-                                          num_points,
-                                          num_nonzero);
+        // tsnecuda::ComputeAttractiveForces(gpu_opt,
+        //                                   sparse_handle,
+        //                                   sparse_matrix_descriptor,
+        //                                   attractive_forces_device,
+        //                                   sparse_pij_device,
+        //                                   pij_row_ptr_device,
+        //                                   pij_col_ind_device,
+        //                                   coo_indices_device,
+        //                                   points_device,
+        //                                   ones_device,
+        //                                   num_points,
+        //                                   num_nonzero);
+        tsnecuda::ComputeAttractiveForcesV3(dense_handle,
+                                            gpu_opt,
+                                            attractive_forces_device,
+                                            pij_device,
+                                            pij_indices_device,
+                                            pij_workspace_device,
+                                            points_device,
+                                            ones_device,
+                                            num_points,
+                                            num_neighbors);
 
         END_IL_TIMER(_time_attr);
         START_IL_TIMER();
