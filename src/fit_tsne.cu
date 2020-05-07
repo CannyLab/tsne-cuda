@@ -139,11 +139,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     tsnecuda::SearchPerplexity(gpu_opt, dense_handle, pij_non_symmetric_device, knn_squared_distances_device,
                                perplexity, perplexity_search_epsilon, num_points, num_neighbors);
 
-    std::cout << "npt " << num_points << std::endl;
-    std::cout << "knnsqd " << knn_squared_distances_device.size() << std::endl;
-    std::cout << "knnild " << knn_indices_long_device.size() << std::endl;
-
     // Clean up memory
+    cudaDeviceSynchronize();
     knn_squared_distances_device.clear();
     knn_squared_distances_device.shrink_to_fit();
     knn_indices_long_device.clear();
@@ -152,26 +149,11 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     delete[] knn_indices;
 
     // Symmetrize the pij matrix
-    // thrust::device_vector<float> sparse_pij_device;
-    // thrust::device_vector<int> pij_row_ptr_device;
-    // thrust::device_vector<int> pij_col_ind_device;
-    // tsnecuda::util::SymmetrizeMatrix(sparse_handle, sparse_pij_device, pij_row_ptr_device,
-    //                                  pij_col_ind_device, pij_non_symmetric_device, pij_indices_device,
-    //                                  opt.magnitude_factor, num_points, num_neighbors);
-
+    std::cout << "Constructing pij device" << std::endl;
     thrust::device_vector<float> pij_device(num_points * num_neighbors);
     tsnecuda::util::SymmetrizeMatrixV2(pij_device, pij_non_symmetric_device, pij_indices_device, num_points, num_neighbors);
 
-    const int num_nonzero = pij_device.size();
-    std::cout << "pijns " << pij_non_symmetric_device.size() << std::endl;
-    std::cout << "nnz " << num_nonzero << std::endl;
-    std::cout << "nptnn " << num_points * num_neighbors << std::endl;
-    std::cout << "nn " << num_neighbors << std::endl;
-    assert(num_nonzero == num_points * num_neighbors);
-
     // Clean up memory
-    // pij_indices_device.clear();
-    // pij_indices_device.shrink_to_fit();
     pij_non_symmetric_device.clear();
     pij_non_symmetric_device.shrink_to_fit();
 
