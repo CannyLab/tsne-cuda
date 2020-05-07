@@ -87,8 +87,8 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
     const int32_t kNumCellsToProbe = 20;
 
     // Construct the CPU version of the index
-    faiss::IndexFlatL2 cpu_index(num_dims);
-    // faiss::IndexIVFFlat cpu_index(&quantizer, num_dims, kNumCells, base_options.distance_metric);
+    faiss::IndexFlatIP quantizer(num_dims);
+    faiss::IndexIVFFlat cpu_index(&quantizer, num_dims, kNumCellsToProbe, faiss::METRIC_INNER_PRODUCT);
     // cpu_index.nprobe = kNumCellsToProbe;
 
     if (num_near_neighbors < 1024)

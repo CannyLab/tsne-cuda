@@ -79,7 +79,7 @@ public:
     float min_gradient_norm = 0.0;
 
     // Distances
-    faiss::MetricType distance_metric = faiss::METRIC_L2;
+    faiss::MetricType distance_metric = faiss::METRIC_INNER_PRODUCT;
 
     // Initialization
     TSNE_INIT initialization = TSNE_INIT::GAUSSIAN;
