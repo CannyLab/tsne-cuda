@@ -5,7 +5,8 @@
 #include "options.h"
 #include "util/cuda_utils.h"
 
-namespace tsnecuda {
+namespace tsnecuda
+{
 
 float ComputeRepulsiveForces(
     thrust::device_vector<float> &repulsive_forces_device,
@@ -20,6 +21,6 @@ void ComputeChargesQij(
     thrust::device_vector<float> &points_device,
     const int num_points,
     const int n_terms);
-}
+} // namespace tsnecuda
 
 #endif

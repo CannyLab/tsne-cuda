@@ -8,20 +8,21 @@
 #include "util/cuda_utils.h"
 #include "util/matrix_broadcast_utils.h"
 
-namespace tsnecuda {
+namespace tsnecuda
+{
 
 void PrecomputeFFT2D(
-        cufftHandle &plan_kernel_tilde,
-        float x_max,
-        float x_min,
-        float y_max,
-        float y_min,
-        int n_boxes,
-        int n_interpolation_points,
-        thrust::device_vector<float> &box_lower_bounds_device,
-        thrust::device_vector<float> &box_upper_bounds_device,
-        thrust::device_vector<float> &kernel_tilde_device,
-        thrust::device_vector<thrust::complex<float> > &fft_kernel_tilde_device);
+    cufftHandle &plan_kernel_tilde,
+    float x_max,
+    float x_min,
+    float y_max,
+    float y_min,
+    int n_boxes,
+    int n_interpolation_points,
+    thrust::device_vector<float> &box_lower_bounds_device,
+    thrust::device_vector<float> &box_upper_bounds_device,
+    thrust::device_vector<float> &kernel_tilde_device,
+    thrust::device_vector<thrust::complex<float>> &fft_kernel_tilde_device);
 
 void NbodyFFT2D(
     cufftHandle &plan_dft,
@@ -58,6 +59,6 @@ void NbodyFFT2D(
     thrust::device_vector<float> &y_interpolated_values_device,
     thrust::device_vector<float> &potentialsQij_device);
 
-}
+} // namespace tsnecuda
 
 #endif

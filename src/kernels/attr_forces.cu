@@ -215,8 +215,8 @@ void tsnecuda::ComputeAttractiveForcesV3(
 
     GpuErrorCheck(cudaDeviceSynchronize());
 
-    const int NBLOCKS2 = iDivUp(num_points, BLOCKSIZE);
-    reduce_sum_kernel<<<NBLOCKS2, BLOCKSIZE>>>(
+    const int NBLOCKS2 = iDivUp(num_points, 512);
+    reduce_sum_kernel<<<NBLOCKS2, 512>>>(
         thrust::raw_pointer_cast(attr_forces.data()),
         thrust::raw_pointer_cast(pij_workspace_device.data()),                              // Workspace X
         thrust::raw_pointer_cast(pij_workspace_device.data()) + num_points * num_neighbors, // Workspace Y

@@ -1,12 +1,11 @@
 #include "include/kernels/rep_forces.h"
 
-
 __global__ void compute_repulsive_forces_kernel(
-    volatile float * __restrict__ repulsive_forces_device,
-    volatile float * __restrict__ normalization_vec_device,
-    const float * const xs,
-    const float * const ys,
-    const float * const potentialsQij,
+    volatile float *__restrict__ repulsive_forces_device,
+    volatile float *__restrict__ normalization_vec_device,
+    const float *const xs,
+    const float *const ys,
+    const float *const potentialsQij,
     const int num_points,
     const int n_terms)
 {
@@ -55,9 +54,9 @@ float tsnecuda::ComputeRepulsiveForces(
 }
 
 __global__ void compute_chargesQij_kernel(
-    volatile float * __restrict__ chargesQij,
-    const float * const xs,
-    const float * const ys,
+    volatile float *__restrict__ chargesQij,
+    const float *const xs,
+    const float *const ys,
     const int num_points,
     const int n_terms)
 {
