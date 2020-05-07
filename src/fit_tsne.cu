@@ -143,8 +143,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     cudaDeviceSynchronize();
     knn_squared_distances_device.clear();
     knn_squared_distances_device.shrink_to_fit();
-    // knn_indices_long_device.clear();
-    // knn_indices_long_device.shrink_to_fit();
+    knn_indices_long_device.clear();
+    knn_indices_long_device.shrink_to_fit();
     delete[] knn_squared_distances;
     delete[] knn_indices;
 

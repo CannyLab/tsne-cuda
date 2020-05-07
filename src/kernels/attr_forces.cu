@@ -153,10 +153,6 @@ __global__ void ComputePijxQijKernelV3(
     dy = iy - jy; // Y distance
     pijqij = pij[TID] / (1 + dx * dx + dy * dy);
 
-    // Convert to atomics
-    // atomicAdd(attr_forces + i, pijqij * dx);              // Update with X distances
-    // atomicAdd(attr_forces + num_points + i, pijqij * dy); // Update with Y distances
-
     workspace_x[TID] = pijqij * dx;
     workspace_y[TID] = pijqij * dy;
 }
