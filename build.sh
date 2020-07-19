@@ -9,6 +9,10 @@ case ${cuda_version} in
         ;;
     cuda101) CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda-10.1
         ;;
+    cuda102) CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda-10.2
+        ;;
+    cuda110) CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda-11.0
+        ;;
     *) echo "cuda version not recognized: {cuda_version}"; exit 1
         ;;
 esac
