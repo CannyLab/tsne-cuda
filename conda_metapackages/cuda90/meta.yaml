@@ -1,0 +1,11 @@
+package:
+    name: cuda90
+    version: "1.0"
+
+build:
+    track_features:
+        - cuda90
+
+requirements:
+    run:
+        - cudatoolkit==9.0

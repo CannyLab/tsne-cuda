@@ -97,7 +97,9 @@ find_package(BLAS REQUIRED)
 
 # GTEST Configuration
 #-------------------------------------------------------------------------------
-add_subdirectory(third_party/glog)
+find_package(gflags REQUIRED)
+find_package(glog REQUIRED)
+find_package(gtest REQUIRED)
 #-------------------------------------------------------------------------------
 
 # ZMQ Configuration
@@ -109,11 +111,6 @@ if(NOT ${ZMQ_FOUND})
     set(ZMQ_LIBRARIES "")
     message("-- Not building with ZMQ. Interactive visualization disabled. To build with ZMQ use -DWITH_ZMQ=ON")
 endif()
-#-------------------------------------------------------------------------------
-
-# GTEST Configuration
-#-------------------------------------------------------------------------------
-add_subdirectory(third_party/gtest)
 #-------------------------------------------------------------------------------
 
 # FAISS Configuration
@@ -147,6 +144,9 @@ target_link_libraries(faiss_gpu
     ${BLAS_LIBRARIES}
     CUDA::cudart
     CUDA::cublas
+    gflags
+    glog
+    gtest
 )
 
 # Project Setup
@@ -155,7 +155,6 @@ include_directories(
     src/
     src/include
     ${CUDAToolkit_INCLUDE_DIRS}
-    third_party/gtest/googletest/include/
     third_party/
     third_party/cxxopts/include/
     ${ZMQ_INCLUDE_DIR}
@@ -203,6 +202,7 @@ set(PYTHON_SOURCES
 add_library(tsnecuda SHARED ${SOURCES})
 # set_property(TARGET tsnecuda PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 target_link_libraries(tsnecuda
+    gflags
     gtest
     glog
     CUDA::cudart

@@ -24,6 +24,8 @@ requirements:
     - setuptools
     - libstdcxx-ng
     - gflags
+    - glog
+    - gtest
   host:
     - python
     - openblas
@@ -32,6 +34,9 @@ requirements:
     - libopenblas
     - libgcc-ng
     - libstdcxx-ng
+    - gflags
+    - glog
+    - gtest
   run:
     - python
     - openblas
@@ -39,6 +44,9 @@ requirements:
     - libopenblas
     - libgcc-ng
     - libstdcxx-ng
+    - gflags
+    - glog
+    - gtest
 
 about:
   home: https://github.com/CannyLab/tsne-cuda

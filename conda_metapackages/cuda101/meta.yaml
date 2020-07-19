@@ -1,0 +1,11 @@
+package:
+    name: cuda101
+    version: "1.0"
+
+build:
+    track_features:
+        - cuda101
+
+requirements:
+    run:
+        - cudatoolkit==10.1
