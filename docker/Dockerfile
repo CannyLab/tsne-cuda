@@ -1,5 +1,5 @@
 # This sets up a docker file which can be used for the conda build of the TSNE-Cuda
-# repository. 
+# repository.
 
 # Base the build file on ubuntu
 FROM ubuntu:16.04
@@ -16,6 +16,53 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     echo "$NVIDIA_GPGKEY_SUM  cudasign.pub" | sha256sum -c --strict - && rm cudasign.pub && \
     echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
     echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
+
+
+# CUDA 11
+ENV CUDA_VERSION 11.0.2
+ENV CUDA_PKG_VERSION 11-0=$CUDA_VERSION-1
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends \
+        cuda-cudart-$CUDA_PKG_VERSION \
+        cuda-compat-11-0
+
+ENV NCCL_VERSION 2.7.6
+RUN apt-get install -y --no-install-recommends \
+        cuda-libraries-$CUDA_PKG_VERSION \
+        cuda-nvtx-$CUDA_PKG_VERSION \
+        libnccl2=$NCCL_VERSION-1+cuda11.0 && \
+    apt-mark hold libnccl2
+
+RUN apt-get install -y --no-install-recommends \
+        cuda-libraries-dev-$CUDA_PKG_VERSION \
+        cuda-nvml-dev-$CUDA_PKG_VERSION \
+        cuda-minimal-build-$CUDA_PKG_VERSION \
+        cuda-command-line-tools-$CUDA_PKG_VERSION \
+        libnccl-dev=$NCCL_VERSION-1+cuda11.0
+
+
+# CUDA 10.2
+ENV CUDA_VERSION 10.2.89
+ENV CUDA_PKG_VERSION 10-2=$CUDA_VERSION-1
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends \
+        cuda-cudart-$CUDA_PKG_VERSION \
+        cuda-compat-10-2
+
+ENV NCCL_VERSION 2.7.6
+RUN apt-get install -y --no-install-recommends \
+        cuda-libraries-$CUDA_PKG_VERSION \
+        cuda-nvtx-$CUDA_PKG_VERSION \
+        libnccl2=$NCCL_VERSION-1+cuda10.2 && \
+    apt-mark hold libnccl2
+
+RUN apt-get install -y --no-install-recommends \
+        cuda-libraries-dev-$CUDA_PKG_VERSION \
+        cuda-nvml-dev-$CUDA_PKG_VERSION \
+        cuda-minimal-build-$CUDA_PKG_VERSION \
+        cuda-command-line-tools-$CUDA_PKG_VERSION \
+        libnccl-dev=$NCCL_VERSION-1+cuda10.2
+
 
 # CUDA 10.1
 ENV CUDA_VERSION 10.1.168
