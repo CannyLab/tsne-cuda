@@ -22,6 +22,8 @@ requirements:
     - gcc_49
     - cmake
     - setuptools
+    - libstdcxx-ng
+    - gflags
   host:
     - python
     - openblas

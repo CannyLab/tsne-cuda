@@ -34,7 +34,7 @@ ADD_DEFINITIONS(-DVERSION_STRING=${VERSION_STRING})
 # CXX Configuration
 #-------------------------------------------------------------------------------
 set(OPT_FLAGS
-    -std=c++11
+    -std=c++14
     -fopenmp
     -mpopcnt
     -msse4
@@ -60,12 +60,12 @@ set(CMAKE_CUDA_STANDARD 11)
 set(CUDA_ARCH
     -gencode=arch=compute_30,code=sm_30
     -gencode=arch=compute_35,code=sm_35
-    #-gencode=arch=compute_50,code=sm_50
+    -gencode=arch=compute_50,code=sm_50
     -gencode=arch=compute_52,code=sm_52
-    #-gencode=arch=compute_60,code=sm_60
+    -gencode=arch=compute_60,code=sm_60
     -gencode=arch=compute_61,code=sm_61
-    #-gencode=arch=compute_70,code=sm_70
-    #-gencode=arch=compute_75,code=sm_75
+    -gencode=arch=compute_70,code=sm_70
+    -gencode=arch=compute_75,code=sm_75
 )
 set(CUDA_OPTS
     -O3
