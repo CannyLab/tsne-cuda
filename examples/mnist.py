@@ -1,5 +1,4 @@
 from keras.datasets import mnist
-import time
 from tsnecuda import TSNE
 import matplotlib.pyplot as plt
 
@@ -8,8 +7,7 @@ import matplotlib.pyplot as plt
 print(y_train.shape)
 print(x_train.shape)
 
-time_start = time.time()
-tsne = TSNE(n_iter=700, verbose=1, num_neighbors=4)
+tsne = TSNE(n_iter=1000, verbose=1, num_neighbors=32)
 tsne_results = tsne.fit_transform(x_train.reshape(60000,-1))
 
 

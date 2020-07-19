@@ -247,7 +247,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     // FIT-TNSE Parameters
     int n_interpolation_points = 3;
     // float intervals_per_integer = 1;
-    int min_num_intervals = 50;
+    int min_num_intervals = 125;
     int N = num_points;
     // int D = 2;
     // The number of "charges" or s+2 sums i.e. number of kernel sums
@@ -257,8 +257,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     // FFTW works faster on numbers that can be written as  2^a 3^b 5^c 7^d
     // 11^e 13^f, where e+f is either 0 or 1, and the other exponents are
     // arbitrary
-    int allowed_n_boxes_per_dim[20] = {25, 36, 50, 55, 60, 65, 70, 75, 80, 85, 90, 96, 100, 110, 120, 130, 140, 150, 175, 200};
-    if (n_boxes_per_dim < allowed_n_boxes_per_dim[19])
+    int allowed_n_boxes_per_dim[21] = {25, 36, 50, 55, 60, 65, 70, 75, 80, 85, 90, 96, 100, 110, 120, 130, 140, 150, 175, 200, 1125};
+    if (n_boxes_per_dim < allowed_n_boxes_per_dim[20])
     {
         //Round up to nearest grid point
         int chosen_i;
@@ -298,6 +298,8 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<float> fft_input(n_terms * n_fft_coeffs * n_fft_coeffs);
     thrust::device_vector<thrust::complex<float>> fft_w_coefficients(n_terms * n_fft_coeffs * (n_fft_coeffs / 2 + 1));
     thrust::device_vector<float> fft_output(n_terms * n_fft_coeffs * n_fft_coeffs);
+
+    std::cout << "Floats allocated: " << n_terms * n_fft_coeffs * (n_fft_coeffs / 2 + 1) + 2 * n_terms * n_fft_coeffs * n_fft_coeffs + 2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d + n_fft_coeffs * n_fft_coeffs + 4 * n_total_boxes + 2 * N * n_terms + total_interpolation_points * n_terms + 2 * N * n_interpolation_points + total_interpolation_points * n_terms + N + N + N + 4 * n_terms * n_interpolation_points * n_interpolation_points * N << std::endl;
 
     // Easier to compute denominator on CPU, so we should just calculate y_tilde_spacing on CPU also
     float h = 1 / (float)n_interpolation_points;

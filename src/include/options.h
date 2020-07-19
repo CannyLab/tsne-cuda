@@ -222,11 +222,11 @@ public:
 
         // Set some base variables
         this->warp_size = device_properties.warpSize;
-        if (this->warp_size != 32)
-        {
-            std::cerr << "E: Device warp size not supported." << std::endl;
-            exit(1);
-        }
+        // if (this->warp_size != 32)
+        // {
+        //     std::cerr << "E: Device warp size not supported: " << this->warp_size << std::endl;
+        //     exit(1);
+        // }
         this->sm_count = device_properties.multiProcessorCount;
 
         // Set some per-architecture structures

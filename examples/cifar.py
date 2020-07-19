@@ -1,5 +1,4 @@
 from keras.datasets import cifar10
-import time
 import numpy as np
 from tsnecuda import TSNE
 import matplotlib.pyplot as plt
@@ -9,10 +8,8 @@ import matplotlib.pyplot as plt
 print(y_train.shape)
 print(x_train.shape)
 
-time_start = time.time()
 tsne = TSNE(n_iter=5000, verbose=1, perplexity=10000, num_neighbors=128)
 tsne_results = tsne.fit_transform(x_train.reshape(x_train.shape[0],np.prod(x_train.shape[1:])))
-
 
 print(tsne_results.shape)
 
