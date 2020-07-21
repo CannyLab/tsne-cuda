@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='tsnecuda',
-    version='2.1.0',
+    version='3.0.0',
     author='Chan, David M., Huang, Forrest., Rao, Roshan.',
     author_email='davidchan@berkeley.edu',
     packages=['tsnecuda', 'tsnecuda.test'],
@@ -17,6 +17,8 @@ setup(
     ],
     classifiers=[
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Operating System :: POSIX :: Linux',
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',

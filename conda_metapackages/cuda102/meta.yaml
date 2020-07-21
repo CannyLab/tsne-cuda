@@ -8,4 +8,4 @@ build:
 
 requirements:
     run:
-        - cudatoolkit==10.2
+        - cudatoolkit==10.2.89

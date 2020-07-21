@@ -17,14 +17,28 @@ case ${cuda_version} in
         ;;
 esac
 
+# Add the CUDA executable to the beginning of the path
+export PATH=$CUDA_TOOLKIT_ROOT_DIR/bin:$PATH
+
+# Note, for CUDA > 10.x, we have to worry about cublas not being found - we can fix this by linking cublas
+# sudo ln -s /usr/lib/x86_64-linux-gnu/libcublas.so.10.2.2.89 /usr/local/cuda-10.2/libcublas.so
+
+# Export the linux toolchain file
 CMAKE_PLATFORM_FLAGS+={-DCMAKE_TOOLCHAIN_FILE="${RECIPE_DIR}/cross-linux.cmake"}
+
+# Initialize the repository
 git submodule init
 git submodule update
+
+# Configure the library
 cd ./build
-cmake  .. -DBUILD_PYTHON=TRUE -DWITH_MKL=FALSE -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMAKE_PLATFORM_FLAGS[@]} ${SRC_DIR} -DCUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR} -DCMAKE_C_COMPILER=gcc-4.9 -DCMAKE_CXX_COMPILER=g++-4.9
-pwd
-make
+/snap/bin/cmake --version
+/snap/bin/cmake .. -DBUILD_PYTHON=TRUE -DWITH_MKL=FALSE -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMAKE_PLATFORM_FLAGS[@]} ${SRC_DIR} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT_ROOT_DIR} -DCMAKE_CUDA_HOST_COMPILER=${CXX}
+
+# Build the library
+make -j12
 cd python/
-pwd
+
+# Install the python files
 $PYTHON setup.py install --single-version-externally-managed --record=record.txt
 cp -r ../lib/* $PREFIX/lib/

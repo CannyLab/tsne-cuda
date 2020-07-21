@@ -1,8 +1,8 @@
-cmake_minimum_required (VERSION 3.10)
+cmake_minimum_required (VERSION 3.18)
 project(tsnecuda)
-set (CMAKE_PROJECT_VERSION 2)
-set (CMAKE_PROJECT_VERSION_MAJOR 2)
-set (CMAKE_PROJECT_VERSION_MINOR 2)
+set (CMAKE_PROJECT_VERSION 3)
+set (CMAKE_PROJECT_VERSION_MAJOR 0)
+set (CMAKE_PROJECT_VERSION_MINOR 0)
 set (CMAKE_PROJECT_VERSION_PATH 0)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
@@ -56,7 +56,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 # CUDA Configuration
 #-------------------------------------------------------------------------------
 find_package(CUDAToolkit REQUIRED)
-set(CMAKE_CUDA_STANDARD 11)
+if(NOT DEFINED CMAKE_CUDA_STANDARD)
+    set(CMAKE_CUDA_STANDARD 14)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+endif()
+
 set(CUDA_ARCH
     -gencode=arch=compute_30,code=sm_30
     -gencode=arch=compute_35,code=sm_35
@@ -98,8 +102,8 @@ find_package(BLAS REQUIRED)
 # GTEST Configuration
 #-------------------------------------------------------------------------------
 find_package(gflags REQUIRED)
-find_package(glog REQUIRED)
-find_package(gtest REQUIRED)
+# find_package(GLog REQUIRED)
+find_package(GTest REQUIRED)
 #-------------------------------------------------------------------------------
 
 # ZMQ Configuration
@@ -145,7 +149,7 @@ target_link_libraries(faiss_gpu
     CUDA::cudart
     CUDA::cublas
     gflags
-    glog
+    # glog
     gtest
 )
 
@@ -154,13 +158,14 @@ target_link_libraries(faiss_gpu
 include_directories(
     src/
     src/include
-    ${CUDAToolkit_INCLUDE_DIRS}
+    ${CUDA_INCLUDE_DIRS}
+    ${}
     third_party/
     third_party/cxxopts/include/
     ${ZMQ_INCLUDE_DIR}
 )
 link_directories(
-    ${CUDAToolkit_LIBRARY_DIR}
+    ${CUDA_LIBRARIES}
 )
 
 set(SOURCES
@@ -204,9 +209,10 @@ add_library(tsnecuda SHARED ${SOURCES})
 target_link_libraries(tsnecuda
     gflags
     gtest
-    glog
+    # glog
     CUDA::cudart
     CUDA::cublas
+    CUDA::cublasLt
     CUDA::cufft
     CUDA::cufftw
     CUDA::cusparse
