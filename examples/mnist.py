@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 print(y_train.shape)
 print(x_train.shape)
 
-tsne = TSNE(n_iter=1000, verbose=0, num_neighbors=64)
+tsne = TSNE(n_iter=1000, verbose=1, num_neighbors=64)
 tsne_results = tsne.fit_transform(x_train.reshape(60000,-1))
 
 

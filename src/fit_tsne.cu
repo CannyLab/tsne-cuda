@@ -509,21 +509,9 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                               num_points,
                               num_blocks);
 
-        // // Compute the gradient norm
-
-        // TODO: I think that these transforms can be combined in order to speed up the algorithm
-        tsnecuda::util::SquareDeviceVector(attractive_forces_device, old_forces_device);
-        thrust::transform(attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
-                          attractive_forces_device.begin() + num_points, attractive_forces_device.begin(),
-                          thrust::plus<float>());
-        tsnecuda::util::SqrtDeviceVector(attractive_forces_device, attractive_forces_device);
-
-        // TODO: We probably don't have to wait on this reduction?
-        float grad_norm = thrust::reduce(
-                              attractive_forces_device.begin(), attractive_forces_device.begin() + num_points,
-                              0.0f, thrust::plus<float>()) /
-                          num_points;
-        thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f); // TODO: We can probably make this faster
+        // Compute the gradient norm
+        float grad_norm = tsnecuda::util::L2NormDeviceVector(old_forces_device);
+        thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
 
         if (grad_norm < opt.min_gradient_norm)
         {
