@@ -149,7 +149,6 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     delete[] knn_indices;
 
     // Symmetrize the pij matrix
-    std::cout << "Constructing pij device" << std::endl;
     thrust::device_vector<float> pij_device(num_points * num_neighbors);
     tsnecuda::util::SymmetrizeMatrixV2(pij_device, pij_non_symmetric_device, pij_indices_device, num_points, num_neighbors);
 
@@ -158,7 +157,6 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     pij_non_symmetric_device.shrink_to_fit();
 
     // Declare memory
-    std::cout << "Declaring memory" << std::endl;
     thrust::device_vector<float> pij_workspace_device(num_points * num_neighbors * 2);
     thrust::device_vector<float> repulsive_forces_device(opt.num_points * 2, 0);
     thrust::device_vector<float> attractive_forces_device(opt.num_points * 2, 0);
@@ -299,7 +297,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     thrust::device_vector<thrust::complex<float>> fft_w_coefficients(n_terms * n_fft_coeffs * (n_fft_coeffs / 2 + 1));
     thrust::device_vector<float> fft_output(n_terms * n_fft_coeffs * n_fft_coeffs);
 
-    std::cout << "Floats allocated: " << n_terms * n_fft_coeffs * (n_fft_coeffs / 2 + 1) + 2 * n_terms * n_fft_coeffs * n_fft_coeffs + 2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d + n_fft_coeffs * n_fft_coeffs + 4 * n_total_boxes + 2 * N * n_terms + total_interpolation_points * n_terms + 2 * N * n_interpolation_points + total_interpolation_points * n_terms + N + N + N + 4 * n_terms * n_interpolation_points * n_interpolation_points * N << std::endl;
+    // std::cout << "Floats allocated: " << n_terms * n_fft_coeffs * (n_fft_coeffs / 2 + 1) + 2 * n_terms * n_fft_coeffs * n_fft_coeffs + 2 * n_interpolation_points_1d * 2 * n_interpolation_points_1d + n_fft_coeffs * n_fft_coeffs + 4 * n_total_boxes + 2 * N * n_terms + total_interpolation_points * n_terms + 2 * N * n_interpolation_points + total_interpolation_points * n_terms + N + N + N + 4 * n_terms * n_interpolation_points * n_interpolation_points * N << std::endl;
 
     // Easier to compute denominator on CPU, so we should just calculate y_tilde_spacing on CPU also
     float h = 1 / (float)n_interpolation_points;

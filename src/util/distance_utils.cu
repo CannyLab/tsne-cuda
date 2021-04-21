@@ -94,7 +94,7 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
     if (num_near_neighbors < 1024)
     {
         int ngpus = faiss::gpu::getNumDevices();
-        std::vector<faiss::gpu::GpuResources *> res;
+        std::vector<faiss::gpu::GpuResourcesProvider *> res;
         std::vector<int> devs;
         for (int i = 0; i < ngpus; i++)
         {

@@ -61,16 +61,18 @@ if(NOT DEFINED CMAKE_CUDA_STANDARD)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
-set(CUDA_ARCH
-    -gencode=arch=compute_30,code=sm_30
-    -gencode=arch=compute_35,code=sm_35
-    -gencode=arch=compute_50,code=sm_50
-    -gencode=arch=compute_52,code=sm_52
-    -gencode=arch=compute_60,code=sm_60
-    -gencode=arch=compute_61,code=sm_61
-    -gencode=arch=compute_70,code=sm_70
-    -gencode=arch=compute_75,code=sm_75
-)
+
+set(CUDA_ARCH -gencode=arch=compute_86,code=sm_86)
+    # -gencode=arch=compute_30,code=sm_30
+    # -gencode=arch=compute_35,code=sm_35
+    # -gencode=arch=compute_50,code=sm_50
+    # -gencode=arch=compute_52,code=sm_52
+    # -gencode=arch=compute_60,code=sm_60
+    # -gencode=arch=compute_61,code=sm_61
+    # -gencode=arch=compute_70,code=sm_70
+    # -gencode=arch=compute_75,code=sm_75
+    # -gencode=arch=compute_86,code=sm_86
+
 set(CUDA_OPTS
     -O3
     -g
@@ -97,6 +99,7 @@ find_package(OpenMP REQUIRED)
 # BLAS configuration
 #-------------------------------------------------------------------------------
 find_package(BLAS REQUIRED)
+find_package(LAPACK REQUIRED)
 #-------------------------------------------------------------------------------
 
 # GTEST Configuration
@@ -119,39 +122,12 @@ endif()
 
 # FAISS Configuration
 #-------------------------------------------------------------------------------
-set(FAISS_HEADERS_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/
-)
-file(GLOB FAISS_SRC
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/impl/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/utils/*.cpp
-
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/gpu/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/gpu/impl/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/gpu/utils/*.cpp
-
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/gpu/*.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/gpu/impl/*.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/gpu/utils/*.cu
-
-
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/gpu/utils/blockselect/*.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss/gpu/utils/warpselect/*.cu
-)
-
-# Add libraries
-add_library(faiss_gpu STATIC ${FAISS_SRC})
-# set_property(TARGET faiss_gpu PROPERTY POSITION_INDEPENDENT_CODE TRUE)
-target_include_directories(faiss_gpu PRIVATE ${FAISS_HEADERS_DIRS})
-target_link_libraries(faiss_gpu
-    ${BLAS_LIBRARIES}
-    CUDA::cudart
-    CUDA::cublas
-    gflags
-    # glog
-    gtest
-)
+# set(FAISS_OPT_LEVEL "avx2" CACHE STRING "" FORCE)
+# set(FAISS_ENABLE_GPU ON CACHE BOOL "" FORCE)
+# set(FAISS_ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
+# set(FAISS_ENABLE_C_API ON CACHE BOOL "" FORCE)
+# add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss)
+include_directories("/usr/local/include/")
 
 # Project Setup
 #-------------------------------------------------------------------------------
@@ -166,6 +142,7 @@ include_directories(
 )
 link_directories(
     ${CUDA_LIBRARIES}
+    ${CUDA_CUBLAS_LIBRARIES}
 )
 
 set(SOURCES
@@ -217,11 +194,13 @@ target_link_libraries(tsnecuda
     CUDA::cufftw
     CUDA::cusparse
     ${BLAS_LIBRARIES}
+    LAPACK::LAPACK
     OpenMP::OpenMP_CXX
     pthread
     -Wl,--allow-multiple-definition
     ${ZMQ_LIBRARIES}
-    faiss_gpu
+    faiss
+    # faiss_c
 )
 
 #-------------------------------------------------------------------------------
