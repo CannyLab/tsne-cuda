@@ -122,12 +122,11 @@ endif()
 
 # FAISS Configuration
 #-------------------------------------------------------------------------------
-# set(FAISS_OPT_LEVEL "avx2" CACHE STRING "" FORCE)
-# set(FAISS_ENABLE_GPU ON CACHE BOOL "" FORCE)
-# set(FAISS_ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
-# set(FAISS_ENABLE_C_API ON CACHE BOOL "" FORCE)
-# add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/faiss)
-include_directories("/usr/local/include/")
+find_package(FAISS REQUIRED)
+if(NOT ${GPU_FAISS_FOUND})
+    message("-- GPU FAISS not installed. Please install FAISS for GPU.")
+endif()
+include_directories(${FAISS_INCLUDE_DIR})
 
 # Project Setup
 #-------------------------------------------------------------------------------
@@ -135,7 +134,6 @@ include_directories(
     src/
     src/include
     ${CUDA_INCLUDE_DIRS}
-    ${}
     third_party/
     third_party/cxxopts/include/
     ${ZMQ_INCLUDE_DIR}
@@ -199,8 +197,7 @@ target_link_libraries(tsnecuda
     pthread
     -Wl,--allow-multiple-definition
     ${ZMQ_LIBRARIES}
-    faiss
-    # faiss_c
+    ${FAISS_LIBRARIES}
 )
 
 #-------------------------------------------------------------------------------
