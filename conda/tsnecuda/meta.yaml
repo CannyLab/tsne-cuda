@@ -1,0 +1,62 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+{% set name = "tsnecuda" %}
+{% set version = environ.get('GIT_DESCRIBE_TAG').lstrip('v') %}
+{% set number = GIT_DESCRIBE_NUMBER %}
+
+package:
+  name: '{{ name|lower }}'
+  version: '{{ version }}'
+
+source:
+  git_url: ../../
+
+build:
+    number: {{ number }}
+
+about:
+  home: https://github.com/CannyLab/tsne-cuda
+  license: LICENSE.txt
+  license_family: BSD
+  license_file: ''
+  summary: CUDA Implementation of T-SNE with Python bindings
+  description: "===========\ntsnecuda\n===========\n\ntsnecuda provides an optimized CUDA implementation of the T-SNE algorithm by L Van der Maaten. tsnecuda is able to compute the T-SNE of large numbers\
+    \ of points up to 1200 times faster than other leading libraries, and provides simple python bindings with a SKLearn style interface::\n\n    #!/usr/bin/env python\n\n    from tsnecuda import TSNE\n\
+    \    embeddedX = TSNE(n_components=2).fit_transform(X)\n\nFor more information, check out the repository at https://github.com/rmrao/tsne-cuda. \n\n\n"
+  doc_url: ''
+  dev_url: ''
+
+extra:
+  recipe-maintainers: ''
+
+outputs:
+  - name: tsnecuda
+    script: build-lib.sh
+    build:
+      string: "h{{ PKG_HASH }}_{{ number }}_cuda{{ cudatoolkit }}"
+      run_exports:
+        - {{ pin_compatible('tsnecuda', exact=True) }}
+    requirements:
+      build:
+        - {{ compiler('cxx') }}
+        - python {{ python }}
+        - cmake >=3.20
+        - make
+        - git
+      host:
+        - mkl-devel >=2018
+        - blas =*=mkl
+        - cudatoolkit {{ cudatoolkit }}
+        - faiss-gpu ==1.6.5
+        - python {{ python }}
+        - numpy >=1.14
+      run:
+        - mkl >=2018
+        - blas =*=mkl
+        - faiss-gpu ==1.6.5
+        - python {{ python }}
+        - {{ pin_compatible('cudatoolkit', max_pin='x.x') }}
+        - {{ pin_compatible('numpy') }}
