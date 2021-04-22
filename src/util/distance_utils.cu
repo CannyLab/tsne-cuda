@@ -119,6 +119,7 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
     {
         // Construct the index table on the CPU (since the GPU
         // can only handle 1023 neighbors)
+        cpu_index.train(num_points, points);
         cpu_index.add(num_points, points);
         // Perform the KNN query
         cpu_index.search(num_points, points, num_near_neighbors,
