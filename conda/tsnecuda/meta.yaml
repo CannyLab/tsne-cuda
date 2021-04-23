@@ -16,6 +16,7 @@ source:
 
 build:
     number: {{ number }}
+    noarch_python: True
 
 outputs:
   - name: tsnecuda
@@ -29,17 +30,17 @@ outputs:
         - {{ compiler('cxx') }}
         - make
         - git
-        - python >=3.6
+        - python
         - libxml2
       host:
         - conda
         - cmake >=3.20
+        - setuptools
         - mkl-devel >=2018
         - blas =*=mkl
-        - cudatoolkit-dev {{ cudatoolkit }}
         - cudatoolkit {{ cudatoolkit }}
         - faiss-gpu ==1.6.5
-        - python >=3.6
+        - python
         - numpy >=1.14
         - gflags
         - gtest

@@ -7,8 +7,8 @@ set -e
 set -x
 
 CMAKE_PLATFORM_FLAGS+=(-DCMAKE_TOOLCHAIN_FILE="${RECIPE_DIR}/cross-linux.cmake")
-cmake -B _build . -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMAKE_PLATFORM_FLAGS[@]}
+cmake -B _build . -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMAKE_PLATFORM_FLAGS[@]} ${SRC_DIR}
 make -C _build -j $CPU_COUNT
 
 cd _build/python/
-$PREFIX/bin/python3 setup.py install --single-version-externally-managed --record=record.txt --prefix=$PREFIX
+$PYTHON setup.py install --single-version-externally-managed --record=record.txt --prefix=$PREFIX
