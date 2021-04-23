@@ -176,7 +176,7 @@ set(PYTHON_SOURCES
 
 add_library(tsnecuda SHARED ${SOURCES})
 # set_property(TARGET tsnecuda PROPERTY POSITION_INDEPENDENT_CODE TRUE)
-target_link_libraries(tsnecuda
+target_link_libraries(tsnecuda PRIVATE
     gflags
     gtest
     CUDA::cudart
