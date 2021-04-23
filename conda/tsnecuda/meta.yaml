@@ -17,6 +17,49 @@ source:
 build:
     number: {{ number }}
 
+outputs:
+  - name: tsnecuda
+    script: build.sh
+    build:
+      string: "h{{ PKG_HASH }}_{{ number }}_cuda{{ cudatoolkit }}"
+      run_exports:
+        - {{ pin_compatible('tsnecuda', exact=True) }}
+    requirements:
+      build:
+        - {{ compiler('cxx') }}
+        - make
+        - git
+        - python >=3.6
+        - libxml2
+      host:
+        - conda
+        - cmake >=3.20
+        - mkl-devel >=2018
+        - blas =*=mkl
+        - cudatoolkit-dev {{ cudatoolkit }}
+        - faiss-gpu ==1.6.5
+        - python >=3.6
+        - numpy >=1.14
+        - gflags
+        - gtest
+        - gmock
+        - libxml2
+      run:
+        - mkl >=2018
+        - blas =*=mkl
+        - faiss-gpu ==1.6.5
+        - {{ pin_compatible('python', min_pin='3.6') }}
+        - {{ pin_compatible('cudatoolkit', max_pin='x.x') }}
+        - {{ pin_compatible('numpy') }}
+        - {{ pin_compatible('gflags') }}
+        - {{ pin_compatible('gtest') }}
+        - {{ pin_compatible('gmock') }}
+        - {{ pin_compatible('libxml2') }}
+    test:
+      imports:
+        - tsnecuda
+        - tsnecuda.TSNE
+
 about:
   home: https://github.com/CannyLab/tsne-cuda
   license: LICENSE.txt
@@ -30,43 +73,5 @@ about:
   dev_url: ''
 
 extra:
-  recipe-maintainers: ''
-
-outputs:
-  - name: tsnecuda
-    script: build.sh
-    build:
-      string: "h{{ PKG_HASH }}_{{ number }}_cuda{{ cudatoolkit }}"
-      run_exports:
-        - {{ pin_compatible('tsnecuda', exact=True) }}
-    requirements:
-      build:
-        - {{ compiler('cxx') }}
-        - make
-        - git
-        - python >=3.5
-        - libxml2
-      host:
-        - conda
-        - cmake >=3.20
-        - mkl-devel >=2018
-        - blas =*=mkl
-        - cudatoolkit-dev {{ cudatoolkit }}
-        - faiss-gpu ==1.6.5
-        - python >=3.5
-        - numpy >=1.14
-        - gflags
-        - gtest
-        - gmock
-        - libxml2
-      run:
-        - mkl >=2018
-        - blas =*=mkl
-        - faiss-gpu ==1.6.5
-        - python >=3.5
-        - {{ pin_compatible('cudatoolkit', max_pin='x.x') }}
-        - {{ pin_compatible('numpy') }}
-        - gflags
-        - gtest
-        - gmock
-        - libxml2
+  recipe-maintainers:
+    - DavidMChan
