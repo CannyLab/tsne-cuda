@@ -6,10 +6,8 @@
 set -e
 set -x
 
-git submodule init
-git submodule update
-
-cmake -B _build .
+CMAKE_PLATFORM_FLAGS+=(-DCMAKE_TOOLCHAIN_FILE="${RECIPE_DIR}/cross-linux.cmake")
+cmake -B _build . -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMAKE_PLATFORM_FLAGS[@]}
 make -C _build -j $CPU_COUNT
 
 cd _build/python/

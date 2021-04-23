@@ -39,24 +39,31 @@ outputs:
       string: "h{{ PKG_HASH }}_{{ number }}_cuda{{ cudatoolkit }}"
       run_exports:
         - {{ pin_compatible('tsnecuda', exact=True) }}
+
     requirements:
       build:
         - {{ compiler('cxx') }}
-        - python {{ python }}
-        - cmake >=3.20
         - make
         - git
-      host:
+        - cmake >=3.20
         - mkl-devel >=2018
         - blas =*=mkl
-        - cudatoolkit {{ cudatoolkit }}
+        - cudatoolkit-dev {{ cudatoolkit }}
         - faiss-gpu ==1.6.5
         - python {{ python }}
         - numpy >=1.14
+        - gflags
+        - gtest
+        - gmock
+        - libxml2
       run:
         - mkl >=2018
         - blas =*=mkl
         - faiss-gpu ==1.6.5
         - python {{ python }}
+        - gflags
+        - gtest
+        - gmock
+        - libxml2
         - {{ pin_compatible('cudatoolkit', max_pin='x.x') }}
         - {{ pin_compatible('numpy') }}

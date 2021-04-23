@@ -63,15 +63,15 @@ endif()
 
 
 set(CUDA_ARCH
-    # -gencode=arch=compute_35,code=sm_35
+    -gencode=arch=compute_35,code=sm_35
     # -gencode=arch=compute_50,code=sm_50
     # -gencode=arch=compute_52,code=sm_52
     # -gencode=arch=compute_60,code=sm_60
     # -gencode=arch=compute_61,code=sm_61
     # -gencode=arch=compute_70,code=sm_70
     # -gencode=arch=compute_75,code=sm_75
-    -gencode=arch=compute_80,code=sm_80
-    -gencode=arch=compute_86,code=sm_86
+    # -gencode=arch=compute_80,code=sm_80
+    # -gencode=arch=compute_86,code=sm_86
 )
 
 set(CUDA_OPTS
@@ -95,12 +95,6 @@ set(CMAKE_CUDA_FLAGS "${NVCC_FLAGS_STR}")
 # OpenMP configuration
 #-------------------------------------------------------------------------------
 find_package(OpenMP REQUIRED)
-#-------------------------------------------------------------------------------
-
-# BLAS configuration
-#-------------------------------------------------------------------------------
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
 #-------------------------------------------------------------------------------
 
 # GTEST Configuration
@@ -185,21 +179,32 @@ add_library(tsnecuda SHARED ${SOURCES})
 target_link_libraries(tsnecuda
     gflags
     gtest
-    # glog
     CUDA::cudart
     CUDA::cublas
     CUDA::cublasLt
     CUDA::cufft
     CUDA::cufftw
     CUDA::cusparse
-    ${BLAS_LIBRARIES}
-    LAPACK::LAPACK
     OpenMP::OpenMP_CXX
     pthread
     -Wl,--allow-multiple-definition
     ${ZMQ_LIBRARIES}
     ${FAISS_LIBRARIES}
 )
+
+# BLAS configuration
+#-------------------------------------------------------------------------------
+find_package(MKL)
+if(MKL_FOUND)
+  target_link_libraries(tsnecuda PRIVATE ${MKL_LIBRARIES})
+else()
+  find_package(BLAS REQUIRED)
+  target_link_libraries(tsnecuda PRIVATE ${BLAS_LIBRARIES})
+
+  find_package(LAPACK REQUIRED)
+  target_link_libraries(tsnecuda PRIVATE ${LAPACK_LIBRARIES})
+endif()
+#-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
 # Main executable
