@@ -46,6 +46,7 @@ outputs:
         - make
         - git
         - python {{ python }}
+        - libxml2
       host:
         - conda
         - cmake >=3.20
@@ -66,3 +67,7 @@ outputs:
         - python {{ python }}
         - {{ pin_compatible('cudatoolkit', max_pin='x.x') }}
         - {{ pin_compatible('numpy') }}
+        - gflags
+        - gtest
+        - gmock
+        - libxml2
