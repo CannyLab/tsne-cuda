@@ -1,10 +1,7 @@
 # TSNE-CUDA
-[![Build Status](https://travis-ci.org/CannyLab/tsne-cuda.svg?branch=docker-build)](https://travis-ci.org/CannyLab/tsne-cuda) 
-
-
 This repo is an optimized CUDA version of [FIt-SNE algorithm](https://github.com/KlugerLab/FIt-SNE) with associated python modules. We find that our implementation of t-SNE can be up to 1200x faster than Sklearn, or up to 50x faster than Multicore-TSNE when used with the right GPU. The paper describing our approach, as well as the results below, is available at [https://arxiv.org/abs/1807.11824](https://arxiv.org/abs/1807.11824).
 
-You can install binaries with anaconda for CUDA versions 9.0, 9.2, 10.0, and 10.1 using `conda install cuda<major><minor> tsnecuda -c cannylab`. For more details or to install from source, check out our wiki: [https://github.com/CannyLab/tsne-cuda/wiki/](https://github.com/CannyLab/tsne-cuda/wiki/)
+You can install binaries with anaconda for CUDA version 10.1, 10.2, 11.0 and 11.2 using `conda install tsnecuda -c cannylab`. Tsnecuda supports CUDA versions 9.0 and later through source installation, check out the wiki for up to date installation instructions. [https://github.com/CannyLab/tsne-cuda/wiki/](https://github.com/CannyLab/tsne-cuda/wiki/)
 
 # Benchmarks
 ### Simulated Data

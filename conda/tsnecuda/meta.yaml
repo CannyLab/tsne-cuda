@@ -26,21 +26,19 @@ outputs:
       run_exports:
         - {{ pin_compatible('tsnecuda', exact=True) }}
     requirements:
-      build:
+      host:
         - {{ compiler('cxx') }}
         - make
         - git
-        - python
+        - python >=3.6
         - libxml2
-      host:
         - conda
         - cmake >=3.20
-        - setuptools
         - mkl-devel >=2018
         - blas =*=mkl
+        - cudatoolkit-dev {{ cudatoolkit }}
         - cudatoolkit {{ cudatoolkit }}
         - faiss-gpu ==1.6.5
-        - python
         - numpy >=1.14
         - gflags
         - gtest
@@ -50,13 +48,9 @@ outputs:
         - mkl >=2018
         - blas =*=mkl
         - faiss-gpu ==1.6.5
-        - {{ pin_compatible('python', min_pin='3.6') }}
-        - {{ pin_compatible('cudatoolkit', max_pin='x.x') }}
-        - {{ pin_compatible('numpy') }}
-        - {{ pin_compatible('gflags') }}
-        - {{ pin_compatible('gtest') }}
-        - {{ pin_compatible('gmock') }}
-        - {{ pin_compatible('libxml2') }}
+        - python >=3.6
+        - cudatoolkit {{ cudatoolkit }}
+        - numpy >=1.14
     test:
       imports:
         - tsnecuda

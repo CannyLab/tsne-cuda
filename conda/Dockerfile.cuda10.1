@@ -22,4 +22,4 @@ RUN sh -c 'cp /usr/include/cublas*.h /usr/local/cuda/include/'
 ADD ./ /tsnecuda/
 WORKDIR /tsnecuda/conda
 
-ENTRYPOINT conda-build ./tsnecuda/ --variants '{ "cudatoolkit": "10.1", "python":"3.8" }' -c pytorch -c conda-forge
+CMD ["conda", "run", "conda-build ./tsnecuda/ --variants '{ \"cudatoolkit\": \"10.1\" }' -c pytorch -c conda-forge --debug"]

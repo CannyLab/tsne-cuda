@@ -19,4 +19,4 @@ RUN conda init
 ADD ./ /tsnecuda/
 WORKDIR /tsnecuda/conda
 
-# ENTRYPOINT conda-build ./tsnecuda/ --variants '{ "cudatoolkit": "11.0" }' -c pytorch -c conda-forge
+CMD ["conda", "run", "-n", "base", "--no-capture-output", "conda-build", "./tsnecuda/", "--variants '{ \"cudatoolkit\": \"11.0\" }'", "-c", "pytorch", "-c", "conda-forge"]
