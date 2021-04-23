@@ -37,6 +37,7 @@ outputs:
         - mkl-devel >=2018
         - blas =*=mkl
         - cudatoolkit-dev {{ cudatoolkit }}
+        - cudatoolkit {{ cudatoolkit }}
         - faiss-gpu ==1.6.5
         - python >=3.6
         - numpy >=1.14
