@@ -34,7 +34,7 @@ extra:
 
 outputs:
   - name: tsnecuda
-    script: build-lib.sh
+    script: build.sh
     build:
       string: "h{{ PKG_HASH }}_{{ number }}_cuda{{ cudatoolkit }}"
       run_exports:
