@@ -44,6 +44,7 @@ outputs:
         - gtest
         - gmock
         - libxml2
+        - pthread-stubs
       run:
         - mkl >=2018
         - blas =*=mkl
