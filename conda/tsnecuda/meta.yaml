@@ -1,7 +1,7 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
+# Copyright (c) 2021 Regents of the University of California
 #
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
+# This software is released under the MIT License.
+# https://opensource.org/licenses/MIT
 
 {% set name = "tsnecuda" %}
 {% set version = environ.get('GIT_DESCRIBE_TAG').lstrip('v') %}

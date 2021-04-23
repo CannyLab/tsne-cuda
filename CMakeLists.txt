@@ -75,7 +75,6 @@ if(CUDAToolkit_VERSION_MAJOR EQUAL "10")
     )
 elseif(CUDAToolkit_VERSION_MAJOR EQUAL "11" AND CUDAToolkit_VERSION_MINOR LESS "1")
     set(CUDA_ARCH
-        -gencode=arch=compute_30,code=sm_30
         -gencode=arch=compute_35,code=sm_35
         -gencode=arch=compute_37,code=sm_37
         -gencode=arch=compute_50,code=sm_50
@@ -88,7 +87,6 @@ elseif(CUDAToolkit_VERSION_MAJOR EQUAL "11" AND CUDAToolkit_VERSION_MINOR LESS "
     )
 elseif(CUDAToolkit_VERSION_MAJOR EQUAL "11")
     set(CUDA_ARCH
-        -gencode=arch=compute_30,code=sm_30
         -gencode=arch=compute_35,code=sm_35
         -gencode=arch=compute_37,code=sm_37
         -gencode=arch=compute_50,code=sm_50
