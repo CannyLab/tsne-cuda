@@ -2,3 +2,21 @@
 #
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
+
+FROM nvidia/cuda:11.2.3-devel-ubuntu18.04
+
+RUN apt-get update && apt-get install -y wget git libcublas-dev-11-0
+
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
+    bash Miniconda3-latest-Linux-x86_64.sh -b -p ~/miniconda3
+
+ENV PATH="/root/miniconda3/condabin:${PATH}"
+
+RUN conda install -y -q conda-build anaconda-client
+RUN conda config --set anaconda_upload yes
+RUN conda init
+
+ADD ./ /tsnecuda/
+WORKDIR /tsnecuda/conda
+
+# ENTRYPOINT conda-build ./tsnecuda/ --variants '{ "cudatoolkit": "11.2", "python":"3.8" }' -c pytorch -c conda-forge

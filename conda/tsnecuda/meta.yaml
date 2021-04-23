@@ -45,6 +45,9 @@ outputs:
         - {{ compiler('cxx') }}
         - make
         - git
+        - python {{ python }}
+      host:
+        - conda
         - cmake >=3.20
         - mkl-devel >=2018
         - blas =*=mkl
@@ -61,9 +64,5 @@ outputs:
         - blas =*=mkl
         - faiss-gpu ==1.6.5
         - python {{ python }}
-        - gflags
-        - gtest
-        - gmock
-        - libxml2
         - {{ pin_compatible('cudatoolkit', max_pin='x.x') }}
         - {{ pin_compatible('numpy') }}
