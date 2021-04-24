@@ -6,8 +6,7 @@
 set -e
 set -x
 
-CMAKE_PLATFORM_FLAGS+=(-DCMAKE_TOOLCHAIN_FILE="${RECIPE_DIR}/cross-linux.cmake")
-cmake -B _build . -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMAKE_PLATFORM_FLAGS[@]} ${SRC_DIR}
+cmake -B _build . -DCMAKE_INSTALL_PREFIX=${PREFIX}
 make -C _build -j $CPU_COUNT
 
 cd _build/python/
