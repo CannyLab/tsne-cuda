@@ -23,6 +23,8 @@ outputs:
     script: build.sh
     build:
       string: "h{{ PKG_HASH }}_{{ number }}_cuda{{ cudatoolkit }}"
+      run_exports:
+        - {{ pin_compatible('tsnecuda', exact=True) }}
     requirements:
       host:
         - {{ compiler('cxx') }}
@@ -34,6 +36,7 @@ outputs:
         - cmake >=3.20
         - mkl-devel >=2018
         - blas =*=mkl
+        - cudatoolkit-dev {{ cudatoolkit }}
         - cudatoolkit {{ cudatoolkit }}
         - faiss-gpu ==1.6.5
         - numpy >=1.14
@@ -42,12 +45,12 @@ outputs:
         - gmock
         - libxml2
       run:
-        - python
-        - numpy
         - mkl >=2018
         - blas =*=mkl
         - faiss-gpu ==1.6.5
-        - {{ pin_compatible('cudatoolkit') }}
+        - python >=3.6
+        - cudatoolkit {{ cudatoolkit }}
+        - numpy >=1.14
     test:
       imports:
         - tsnecuda
