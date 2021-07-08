@@ -27,37 +27,37 @@ conda-build -c pytorch ./packaging/conda/
 
 # Run the local pip packaging and upload
 cd ./build/build_10.1
-cat VERSION.txt | awk 'NF{print $0 "+cu10.1"}' > tmp && mv tmp VERSION.txt
+cat VERSION.txt | awk 'NF{print $0 "+cu101"}' > tmp && mv tmp VERSION.txt
 python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/
+mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
 cd ../../
 
 cd ./build/build_10.2
 python3 setup.py bdist_wheel
 python3 -m twine upload dist/*
-mv dist/*.whl ../../packaging/pypi_extra_hosts/
+mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
 cd ../../
 
 cd ./build/build_11.0
-cat VERSION.txt | awk 'NF{print $0 "+cu11.0"}' > tmp && mv tmp VERSION.txt
+cat VERSION.txt | awk 'NF{print $0 "+cu110"}' > tmp && mv tmp VERSION.txt
 python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/
+mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
 cd ../../
 
 cd ./build/build_11.1
-cat VERSION.txt | awk 'NF{print $0 "+cu11.1"}' > tmp && mv tmp VERSION.txt
+cat VERSION.txt | awk 'NF{print $0 "+cu111"}' > tmp && mv tmp VERSION.txt
 python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/
+mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
 cd ../../
 
 cd ./build/build_11.2
-cat VERSION.txt | awk 'NF{print $0 "+cu11.2"}' > tmp && mv tmp VERSION.txt
+cat VERSION.txt | awk 'NF{print $0 "+cu112"}' > tmp && mv tmp VERSION.txt
 python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/
+mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
 cd ../../
 
 cd ./build/build_11.3
-cat VERSION.txt | awk 'NF{print $0 "+cu11.3"}' > tmp && mv tmp VERSION.txt
+cat VERSION.txt | awk 'NF{print $0 "+cu113"}' > tmp && mv tmp VERSION.txt
 python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/
+mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
 cd ../../

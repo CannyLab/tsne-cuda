@@ -28,3 +28,5 @@ First, build all of the independent CUDA source files with the above. We can the
 cd build/build_10.2/ && python3 setup.py bdist_wheel
 python3 -m twine upload dist/*
 ```
+
+For the other files, the mirror servers at tsnecuda.isx.ai need to be updated.
