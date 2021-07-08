@@ -1,27 +1,30 @@
 # Installation
 
-(Binaries - Coming Soon)
-You can install tsne-cuda with pip, conda, or by installing from source. pip/conda binaries are available for CUDA 9.0, 9.2, 10.0, 10.1, 10.2 and 11.2.
+## Conda installation
+
+Conda binaries are available for Python 3.6, 3.7 and 3.8 on CUDA 10.1 and 10.2. To install tsne-cuda with conda, run `conda install -c CannyLab -c pytorch tsnecuda`.
 
 ## Pip installation
-To install tsne-cuda with pip, run `pip3 install tsnecuda`. This installs tsnecuda with a CUDA version of 11.2. For this to work, you MUST have FAISS
-installed already on your machine - see (https://github.com/facebookresearch/faiss/blob/v1.6.5/INSTALL.md)[here].
 
-If you do not have CUDA 11.2, or do not want to use 11.2, you can download using pip from our hosted sources:
+Pip binaries are available for Python >=3.6 and CUDA 10.1, 10.2, 11.0, 11.1, 11.2 and 11.3
+
+To install tsne-cuda with pip, run `pip3 install tsnecuda`. This installs tsnecuda with a CUDA version of 10.2. For this to work, you MUST have both FAISS
+and intel MKL installed already on your machine - see installation instructions for FAISS: [here](https://github.com/facebookresearch/faiss/blob/v1.6.5/INSTALL.md).
+and installation instructions for MKL on Ubuntu/debian [here](https://github.com/eddelbuettel/mkl4deb)
+
+If you do not want to use 10.2, you can download using pip from our hosted sources:
 ```
-# CUDA 11.1
-pip3 install tsnecuda==3.0.0+cu111 -f https://tsnecuda.isx.ai/whl/tsnecuda_stable.html
 # CUDA 11.0
 pip3 install tsnecuda==3.0.0+cu110 -f https://tsnecuda.isx.ai/whl/tsnecuda_stable.html
-# CUDA 10.2
-pip3 install tsnecuda==3.0.0+cu102 -f https://tsnecuda.isx.ai/whl/tsnecuda_stable.html
+# CUDA 11.1
+pip3 install tsnecuda==3.0.0+cu111 -f https://tsnecuda.isx.ai/whl/tsnecuda_stable.html
+# CUDA 11.2
+pip3 install tsnecuda==3.0.0+cu112 -f https://tsnecuda.isx.ai/whl/tsnecuda_stable.html
+# CUDA 11.3
+pip3 install tsnecuda==3.0.0+cu113 -f https://tsnecuda.isx.ai/whl/tsnecuda_stable.html
 # CUDA 10.1
 pip3 install tsnecuda==3.0.0+cu101 -f https://tsnecuda.isx.ai/whl/tsnecuda_stable.html
 ```
-
-## Conda installation
-
-To install tsne-cuda with conda, run `conda install -c CannyLab tsnecuda`. This will give you tsnecuda by default with
 
 
 ## From source

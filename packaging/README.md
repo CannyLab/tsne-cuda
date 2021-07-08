@@ -18,7 +18,7 @@ docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsn
 # Anaconda
 First, build all of the independent CUDA source files with the above. We can then deploy the conda packages with:
 ```
-conda-build ./packaging/conda/
+conda-build -c pytorch ./packaging/conda/
 anaconda upload $PACKAGE
 ```
 

@@ -18,15 +18,17 @@ build:
 outputs:
   - name: tsnecuda
     build:
-      string: "h{{ PKG_HASH }}_{{ number }}_cuda{{ cudatoolkit }}"
-      script: "cd ../../build/build_{{ cudatoolkit }} && $PYTHON setup.py install --single-version-externally-managed --record=record.txt --prefix=$PREFIX"
+      string: "h{{ PKG_HASH }}_py{{ python }}_{{ number }}_cuda{{ cudatoolkit }}"
+      script: "cd ./build/build_{{ cudatoolkit }} && $PYTHON setup.py install --single-version-externally-managed --record=record.txt --prefix=$PREFIX"
     requirements:
+      build:
+        - python {{ python }}
       run:
         - faiss-gpu ==1.6.5
         - mkl >=2018
         - blas =*=mkl
         - numpy >=1.16
-        - python {{ python }}
+        - python =={{ python }}.*
         - cudatoolkit =={{ cudatoolkit }}.*
     test:
       imports:
