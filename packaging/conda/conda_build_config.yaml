@@ -2,9 +2,9 @@ python:
   - 3.6
   - 3.7
   - 3.8
-  - 3.9
+  # - 3.9 (Not supported by FAISS 1.6.5)
 cudatoolkit:
   - 10.1
   - 10.2
-  - 11.0
-  - 11.3
+  # - 11.0 (Not supported by FAISS 1.6.5)
+  # - 11.3 (Not supported by FAISS 1.6.5)

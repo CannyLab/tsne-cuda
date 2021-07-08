@@ -10,7 +10,7 @@ package:
   version: "3.0.0"
 
 source:
-  git_url: ../../
+  path: ../../
 
 build:
   number: {{ number }}
@@ -22,11 +22,12 @@ outputs:
       script: "cd ../../build/build_{{ cudatoolkit }} && $PYTHON setup.py install --single-version-externally-managed --record=record.txt --prefix=$PREFIX"
     requirements:
       run:
-        - openblas
         - faiss-gpu ==1.6.5
-        - numpy >=1.14
+        - mkl >=2018
+        - blas =*=mkl
+        - numpy >=1.16
         - python {{ python }}
-        - cudatoolkit {{ cudatoolkit }}
+        - cudatoolkit =={{ cudatoolkit }}.*
     test:
       imports:
         - tsnecuda
