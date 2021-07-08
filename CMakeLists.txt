@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.18)
+cmake_minimum_required (VERSION 3.20)
 project(tsnecuda)
 set (CMAKE_PROJECT_VERSION 3)
 set (CMAKE_PROJECT_VERSION_MAJOR 0)

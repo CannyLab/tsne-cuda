@@ -1,0 +1,34 @@
+# Copyright (c) 2021 Regents of the University of California
+#
+# This software is released under the MIT License.
+# https://opensource.org/licenses/MIT
+
+
+FROM nvidia/cuda:10.1-devel-ubuntu18.04
+
+# Install required dependencies
+RUN apt-get update && apt-get install -y --allow-downgrades --allow-change-held-packages libxml2 libopenblas-dev libgflags-dev git build-essential  python3-dev python3-numpy python3-pip wget swig libgtest-dev
+
+# Install CMAKE
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.21.0-rc3/cmake-3.21.0-rc3-linux-x86_64.tar.gz
+RUN mkdir -p /usr/local/cmake && tar -xzf cmake-3.21.0-rc3-linux-x86_64.tar.gz -C /usr/local/cmake
+RUN ln -s /usr/local/cmake/cmake-3.21.0-rc3-linux-x86_64/bin/cmake /usr/bin/cmake
+
+# Unpack required sources
+RUN cd /usr/src/gtest/ && cmake . && make && cp *.a /usr/lib/
+RUN sh -c 'cp /usr/include/cublas*.h /usr/local/cuda/include/'
+
+# Install FAISS
+RUN git clone https://github.com/facebookresearch/faiss.git
+RUN cd faiss && git checkout v1.6.5 && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="30;35;37;50;52;60;61;70;75" && make -j8 && make install
+
+# Install python libraries
+RUN pip3 install twine
+
+# Build tsnecuda
+ADD ./ /tsnecuda/
+WORKDIR /tsnecuda/build
+
+# Build python package
+RUN chmod +x ../packaging/build_and_deploy.sh
+CMD /bin/bash -c "../packaging/build_and_deploy.sh 10.1"

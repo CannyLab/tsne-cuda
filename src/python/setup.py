@@ -1,8 +1,12 @@
 from setuptools import setup
 
+# Get version from version.txt
+with open('VERSION.txt', 'r') as vf:
+    version = vf.read().strip()
+
 setup(
     name='tsnecuda',
-    version='3.0.0',
+    version=version,
     author='Chan, David M., Huang, Forrest., Rao, Roshan.',
     author_email='davidchan@berkeley.edu',
     packages=['tsnecuda', 'tsnecuda.test'],
@@ -13,12 +17,15 @@ setup(
     description='CUDA Implementation of T-SNE with Python bindings',
     long_description=open('README.txt').read(),
     install_requires=[
-        'numpy >= 1.14.1',
+        'numpy>=1.14.1',
+        'faiss==1.6.5',
     ],
     classifiers=[
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Operating System :: POSIX :: Linux',
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',

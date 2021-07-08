@@ -3,54 +3,30 @@
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
-{% set name = "tsnecuda" %}
-{% set version = environ.get('GIT_DESCRIBE_TAG').lstrip('v') %}
 {% set number = GIT_DESCRIBE_NUMBER %}
 
 package:
-  name: '{{ name|lower }}'
-  version: '{{ version }}'
+  name: "tsnecuda"
+  version: "3.0.0"
 
 source:
   git_url: ../../
 
 build:
-    number: {{ number }}
-    noarch_python: True
+  number: {{ number }}
 
 outputs:
   - name: tsnecuda
-    script: build.sh
     build:
       string: "h{{ PKG_HASH }}_{{ number }}_cuda{{ cudatoolkit }}"
-      run_exports:
-        - {{ pin_compatible('tsnecuda', exact=True) }}
+      script: "cd ../../build/build_{{ cudatoolkit }} && $PYTHON setup.py install --single-version-externally-managed --record=record.txt --prefix=$PREFIX"
     requirements:
-      host:
-        - {{ compiler('cxx') }}
-        - make
-        - git
-        - python >=3.6
-        - libxml2
-        - conda
-        - cmake >=3.20
-        - mkl-devel >=2018
-        - blas =*=mkl
-        - cudatoolkit-dev {{ cudatoolkit }}
-        - cudatoolkit {{ cudatoolkit }}
-        - faiss-gpu ==1.6.5
-        - numpy >=1.14
-        - gflags
-        - gtest
-        - gmock
-        - libxml2
       run:
-        - mkl >=2018
-        - blas =*=mkl
+        - openblas
         - faiss-gpu ==1.6.5
-        - python >=3.6
-        - cudatoolkit {{ cudatoolkit }}
         - numpy >=1.14
+        - python {{ python }}
+        - cudatoolkit {{ cudatoolkit }}
     test:
       imports:
         - tsnecuda
@@ -60,13 +36,14 @@ about:
   home: https://github.com/CannyLab/tsne-cuda
   license: LICENSE.txt
   license_family: BSD
-  license_file: ''
+  license_file: "LICENSE.txt"
   summary: CUDA Implementation of T-SNE with Python bindings
-  description: "===========\ntsnecuda\n===========\n\ntsnecuda provides an optimized CUDA implementation of the T-SNE algorithm by L Van der Maaten. tsnecuda is able to compute the T-SNE of large numbers\
+  description:
+    "===========\ntsnecuda\n===========\n\ntsnecuda provides an optimized CUDA implementation of the T-SNE algorithm by L Van der Maaten. tsnecuda is able to compute the T-SNE of large numbers\
     \ of points up to 1200 times faster than other leading libraries, and provides simple python bindings with a SKLearn style interface::\n\n    #!/usr/bin/env python\n\n    from tsnecuda import TSNE\n\
     \    embeddedX = TSNE(n_components=2).fit_transform(X)\n\nFor more information, check out the repository at https://github.com/rmrao/tsne-cuda. \n\n\n"
-  doc_url: ''
-  dev_url: ''
+  doc_url: ""
+  dev_url: ""
 
 extra:
   recipe-maintainers:

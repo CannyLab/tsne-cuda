@@ -1,1 +1,1 @@
-For more information, please visit https://github.com/rmrao/tsne-cuda
+For more information, please visit https://github.com/CannyLab/tsne-cuda

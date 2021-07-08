@@ -1,1 +1,2 @@
+v3.0.0, 7/10/2021 -- Version 3.0 Release
 v0.1, 5/8/2018 -- Initial release.
