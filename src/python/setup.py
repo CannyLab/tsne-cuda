@@ -18,7 +18,7 @@ setup(
     long_description=open('README.txt').read(),
     install_requires=[
         'numpy>=1.14.1',
-        'faiss==1.6.5',
+        # NOTE: This package also requires FAISS, however we don't explicitly check for it on install.
     ],
     classifiers=[
         'Programming Language :: Python :: 3.6',

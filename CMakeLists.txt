@@ -218,7 +218,7 @@ target_link_libraries(tsnecuda PRIVATE
     gtest
     CUDA::cudart
     CUDA::cublas
-    CUDA::cublasLt
+    # CUDA::cublasLt
     CUDA::cufft
     CUDA::cufftw
     CUDA::cusparse
