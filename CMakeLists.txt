@@ -1,8 +1,9 @@
 cmake_minimum_required (VERSION 3.20)
 project(tsnecuda)
 set (CMAKE_PROJECT_VERSION 3)
-set (CMAKE_PROJECT_VERSION_MAJOR 0)
+set (CMAKE_PROJECT_VERSION_MAJOR 3)
 set (CMAKE_PROJECT_VERSION_MINOR 0)
+set (CMAKE_PROJECT_VERSION_PATCH 1)
 set (CMAKE_PROJECT_VERSION_PATH 0)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
@@ -17,17 +18,13 @@ option(BUILD_PYTHON "Build python if ON" ON)
 # Build Number Generation
 #-------------------------------------------------------------------------------
 SET(BUILD_NUMBER 0)
-SET(VERSION_STRING "${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}")
-find_package(Git)
-if(GIT_FOUND)
-    execute_process(
-            COMMAND ${GIT_EXECUTABLE} describe --match INITIAL_BUILD
-            OUTPUT_VARIABLE DESCRIBE_BUILD
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-    string(REGEX MATCH "[0-9]+" BUILD_NUMBER ${DESCRIBE_BUILD})
-endif()
+SET(VERSION_STRING "${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}.${CMAKE_PROJECT_VERSION_PATCH}")
 ADD_DEFINITIONS(-DBUILD_NUMBER=${BUILD_NUMBER})
 ADD_DEFINITIONS(-DVERSION_STRING=${VERSION_STRING})
+# src/exe/main.cu cannot inserting a three-part number (e.g. 3.0.0) in one go without throwing up
+ADD_DEFINITIONS(-DVERSION_MAJOR=${CMAKE_PROJECT_VERSION_MAJOR})
+ADD_DEFINITIONS(-DVERSION_MINOR=${CMAKE_PROJECT_VERSION_MINOR})
+ADD_DEFINITIONS(-DVERSION_PATCH=${CMAKE_PROJECT_VERSION_PATCH})
 #-------------------------------------------------------------------------------
 
 
@@ -268,8 +265,8 @@ if(BUILD_PYTHON)
     # Write the version string
     add_dependencies(write_version_string_to_python python_source_files)
     add_custom_command(TARGET write_version_string_to_python POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -DVERSION_STRING=${VERSION_STRING} -DBUILD_NUMBER=${BUILD_NUMBER} -P
-        ${CMAKE_CURRENT_BINARY_DIR}/../cmake/write_python_version_string.cmake)
+        COMMAND ${CMAKE_COMMAND} -DVERSION_MAJOR=${CMAKE_PROJECT_VERSION_MAJOR} -DVERSION_MINOR=${CMAKE_PROJECT_VERSION_MINOR} -DVERSION_PATCH=${CMAKE_PROJECT_VERSION_PATCH} -DBUILD_NUMBER=${BUILD_NUMBER} -P
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/write_python_version_string.cmake)
 else()
     message("-- Not building python libraries. To build python libraries use -DBUILD_PYTHON=ON")
 endif()
