@@ -12,7 +12,7 @@ http://homepage.tudelft.nl/19j49/t-SNE.html
 import numpy as N
 import ctypes
 from ctypes import c_int, c_float, c_bool, POINTER
-import pkg_resources
+import os
 from collections import namedtuple
 
 
@@ -135,8 +135,7 @@ class TSNE(object):
         self.num_snapshots = int(num_snapshots)
 
         # Build the hooks for the BH T-SNE library
-        self._path = pkg_resources.resource_filename(
-            'tsnecuda', '')  # Load from current location
+        self._path = os.path.dirname(__file__)
         self._lib = N.ctypeslib.load_library(
             'libtsnecuda', self._path)  # Load the ctypes library
 
