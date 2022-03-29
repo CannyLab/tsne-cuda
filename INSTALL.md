@@ -2,7 +2,7 @@
 
 ## Conda installation
 
-Conda binaries are available for Python 3.6, 3.7 and 3.8 on CUDA 10.1 and 10.2. To install tsne-cuda with conda, run `conda install -c CannyLab -c pytorch tsnecuda`.
+Conda binaries are available through conda-forge! To install tsne-cuda with conda, run `conda install tsnecuda -c conda-forge`.
 
 ## Pip installation
 
@@ -17,15 +17,17 @@ When installing FAISS from source, it is necessary to build and install both the
 If you do not want to use 10.2, you can download using pip from our hosted sources:
 ```
 # CUDA 11.0
-pip3 install tsnecuda==3.0.0+cu110 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+pip3 install tsnecuda==3.0.1+cu110 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 # CUDA 11.1
-pip3 install tsnecuda==3.0.0+cu111 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+pip3 install tsnecuda==3.0.1+cu111 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 # CUDA 11.2
-pip3 install tsnecuda==3.0.0+cu112 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+pip3 install tsnecuda==3.0.1+cu112 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 # CUDA 11.3
-pip3 install tsnecuda==3.0.0+cu113 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+pip3 install tsnecuda==3.0.1+cu113 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 # CUDA 10.1
-pip3 install tsnecuda==3.0.0+cu101 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+pip3 install tsnecuda==3.0.1+cu101 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 10.0
+pip3 install tsnecuda==3.0.1+cu100 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 ```
 
 
