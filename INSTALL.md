@@ -6,7 +6,7 @@ Conda binaries are available through conda-forge! To install tsne-cuda with cond
 
 ## Pip installation
 
-Pip binaries are available for Python >=3.6 and CUDA 10.1, 10.2, 11.0, 11.1, 11.2 and 11.3 and FAISS version 1.6.5 and Intel MKL 2018.
+Pip binaries are available for Python >=3.6 and CUDA 10.1, 10.2, 11.0, 11.1, 11.2, 11.3, 11.8 and 12.2 and FAISS version 1.7.4 and Intel MKL 2018.
 
 To install tsne-cuda with pip, run `pip3 install tsnecuda`. This installs tsnecuda with a CUDA version of 10.2. For this to work, you MUST have both FAISS version 1.6.5
 and intel MKL installed already on your machine - see installation instructions for FAISS: [here](https://github.com/facebookresearch/faiss/blob/v1.6.5/INSTALL.md).
@@ -16,22 +16,22 @@ When installing FAISS from source, it is necessary to build and install both the
 
 If you do not want to use 10.2, you can download using pip from our hosted sources:
 ```
-# CUDA 12.2
-pip3 install tsnecuda==3.0.2+cu122 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.8
-pip3 install tsnecuda==3.0.2+cu118 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.3
-pip3 install tsnecuda==3.0.2+cu113 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.2
-pip3 install tsnecuda==3.0.2+cu112 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.1
-pip3 install tsnecuda==3.0.2+cu111 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.0
-pip3 install tsnecuda==3.0.2+cu110 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 10.1
-pip3 install tsnecuda==3.0.2+cu101 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 10.0
-pip3 install tsnecuda==3.0.2+cu100 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 12.2 (FAISS 1.7.4)
+pip3 install tsnecuda==3.0.1+cu122 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 11.8 (FAISS 1.7.4)
+pip3 install tsnecuda==3.0.1+cu118 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 11.3 (FAISS 1.6.5)
+pip3 install tsnecuda==3.0.1+cu113 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 11.2 (FAISS 1.6.5)
+pip3 install tsnecuda==3.0.1+cu112 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 11.1 (FAISS 1.6.5)
+pip3 install tsnecuda==3.0.1+cu111 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 11.0 (FAISS 1.6.5)
+pip3 install tsnecuda==3.0.1+cu110 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 10.1 (FAISS 1.6.5)
+pip3 install tsnecuda==3.0.1+cu101 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 10.0 (FAISS 1.6.5)
+pip3 install tsnecuda==3.0.1+cu100 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 ```
 
 

@@ -34,7 +34,7 @@ Left: MULTICORE-4 (501s), Middle: BH-TSNE (1156s), Right: t-SNE-CUDA (Ours, 6.98
 
 # Installation
 
-To install our library, follow the [installation instructions](https://github.com/CannyLab/tsne-cuda/blob/master/INSTALL.md).
+To install our library, follow the [installation instructions](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md).
 
 ### Run
 
