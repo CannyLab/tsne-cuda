@@ -3,7 +3,7 @@ project(tsnecuda)
 set (CMAKE_PROJECT_VERSION 3)
 set (CMAKE_PROJECT_VERSION_MAJOR 3)
 set (CMAKE_PROJECT_VERSION_MINOR 0)
-set (CMAKE_PROJECT_VERSION_PATCH 1)
+set (CMAKE_PROJECT_VERSION_PATCH 2)
 set (CMAKE_PROJECT_VERSION_PATH 0)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
@@ -94,6 +94,18 @@ elseif(CUDAToolkit_VERSION_MAJOR EQUAL "11")
         -gencode=arch=compute_75,code=sm_75
         -gencode=arch=compute_80,code=sm_80
         -gencode=arch=compute_86,code=sm_86
+    )
+elseif(CUDAToolkit_VERSION_MAJOR EQUAL "12")
+    set(CUDA_ARCH
+        -gencode=arch=compute_60,code=sm_60
+        -gencode=arch=compute_61,code=sm_61
+        -gencode=arch=compute_70,code=sm_70
+        -gencode=arch=compute_75,code=sm_75
+        -gencode=arch=compute_80,code=sm_80
+        -gencode=arch=compute_86,code=sm_86
+        -gencode=arch=compute_87,code=sm_87
+        -gencode=arch=compute_89,code=sm_89
+        -gencode=arch=compute_90,code=sm_90
     )
 else()
     set(CUDA_ARCH

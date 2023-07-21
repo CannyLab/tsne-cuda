@@ -16,18 +16,22 @@ When installing FAISS from source, it is necessary to build and install both the
 
 If you do not want to use 10.2, you can download using pip from our hosted sources:
 ```
-# CUDA 11.0
-pip3 install tsnecuda==3.0.1+cu110 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.1
-pip3 install tsnecuda==3.0.1+cu111 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.2
-pip3 install tsnecuda==3.0.1+cu112 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 12.2
+pip3 install tsnecuda==3.0.2+cu122 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 11.8
+pip3 install tsnecuda==3.0.2+cu118 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 # CUDA 11.3
-pip3 install tsnecuda==3.0.1+cu113 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+pip3 install tsnecuda==3.0.2+cu113 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 11.2
+pip3 install tsnecuda==3.0.2+cu112 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 11.1
+pip3 install tsnecuda==3.0.2+cu111 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+# CUDA 11.0
+pip3 install tsnecuda==3.0.2+cu110 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 # CUDA 10.1
-pip3 install tsnecuda==3.0.1+cu101 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+pip3 install tsnecuda==3.0.2+cu101 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 # CUDA 10.0
-pip3 install tsnecuda==3.0.1+cu100 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+pip3 install tsnecuda==3.0.2+cu100 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
 ```
 
 
