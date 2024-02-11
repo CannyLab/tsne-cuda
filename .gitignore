@@ -40,3 +40,7 @@ visualization/animation.gif
 
 # FAISS third_party dependencies
 !build/.gitkeep
+
+# WINDOWS
+.vs/
+

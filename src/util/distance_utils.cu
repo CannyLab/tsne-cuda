@@ -131,7 +131,7 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
 // TODO: Maybe think about getting FAISS to return integers (long-term todo)
 __global__ void tsnecuda::util::PostprocessNeighborIndicesKernel(
     volatile int *__restrict__ indices,
-    const long *__restrict__ long_indices,
+    const int64_t *__restrict__ long_indices,
     const int num_points,
     const int num_neighbors)
 {

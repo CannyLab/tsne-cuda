@@ -11,12 +11,14 @@
 
 include(FindPackageHandleStandardArgs)
 
-set(FAISS_ROOT_DIR "" CACHE PATH "Folder contains FAISS")
+if(NOT DEFINED FAISS_ROOT_DIR)
+    set(FAISS_ROOT_DIR "" CACHE PATH "Folder contains FAISS")
+endif()
 
 # We are testing only a couple of files in the include directories
-find_path(FAISS_INCLUDE_DIR faiss/Index.h PATHS ${FAISS_ROOT_DIR})
-find_path(FAISS_GPU_INCLUDE_DIR faiss/gpu/GpuIndex.h PATHS ${FAISS_ROOT_DIR})
-find_library(FAISS_LIBRARY faiss)
+find_path(FAISS_INCLUDE_DIR faiss/Index.h PATHS "${FAISS_ROOT_DIR}/include")
+find_path(FAISS_GPU_INCLUDE_DIR faiss/gpu/GpuIndex.h PATHS "${FAISS_ROOT_DIR}/include")
+find_library(FAISS_LIBRARY faiss PATHS "${FAISS_ROOT_DIR}/lib")
 
 find_package_handle_standard_args(FAISS DEFAULT_MSG FAISS_INCLUDE_DIR FAISS_GPU_INCLUDE_DIR FAISS_LIBRARY)
 

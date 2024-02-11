@@ -1,5 +1,6 @@
 cmake_minimum_required (VERSION 3.20)
-project(tsnecuda)
+project(tsnecuda LANGUAGES CXX)
+
 set (CMAKE_PROJECT_VERSION 3)
 set (CMAKE_PROJECT_VERSION_MAJOR 3)
 set (CMAKE_PROJECT_VERSION_MINOR 0)
@@ -37,11 +38,11 @@ set(OPT_FLAGS
     -msse4
     -fPIC
     -m64
-    -Wno-sign-compare
+    #-Wno-sign-compare
     -g
     -O3
     -Wall
-    -Wextra
+    #-Wextra
     -DFINTEGER=int
 )
 string(REPLACE ";" " " CXX_FLAGS_STR "${CMAKE_CXX_FLAGS} ${OPT_FLAGS}")
@@ -120,18 +121,25 @@ else()
 endif()
 
 
+#set(CUDA_OPTS
+#    -O3
+#    -g
+#    -Xptxas '-dlcm=cg'
+#    -Xcompiler '-O3'
+#    -Xcompiler '-fPIC'
+#    -Xcompiler '-fopenmp'
+#    -Xcompiler '-msse4'
+#    -Xcompiler '-m64'
+#    -Xcompiler '-mpopcnt'
+#    -Xcompiler '-g'
+#    -Xlinker 'muldefs'
+#)
 set(CUDA_OPTS
     -O3
     -g
-    -Xptxas '-dlcm=cg'
-    -Xcompiler '-O3'
-    -Xcompiler '-fPIC'
-    -Xcompiler '-fopenmp'
-    -Xcompiler '-msse4'
-    -Xcompiler '-m64'
-    -Xcompiler '-mpopcnt'
-    -Xcompiler '-g'
-    -Xlinker 'muldefs'
+    -Xptxas -dlcm=cg
+    -Xcompiler /Ox,/DYNAMICBASE,/openmp,/arch:AVX,/Zi #-mpopcnt,
+    -Xlinker muldefs
 )
 string (REPLACE ";" " " NVCC_FLAGS_STR "${CUDA_ARCH} ${CUDA_OPTS}")
 set(CMAKE_CUDA_FLAGS "${NVCC_FLAGS_STR}")
@@ -163,6 +171,7 @@ endif()
 
 # FAISS Configuration
 #-------------------------------------------------------------------------------
+set(FAISS_ROOT_DIR "C:/Users/Michael/miniconda3/pkgs/libfaiss-1.7.4-cuda112h33bf9e0_0_cuda/Library")
 find_package(FAISS REQUIRED)
 if(NOT ${GPU_FAISS_FOUND})
     message("-- GPU FAISS not installed. Please install FAISS for GPU.")
@@ -244,7 +253,7 @@ find_package(MKL)
 if(MKL_FOUND)
   target_link_libraries(tsnecuda PRIVATE ${MKL_LIBRARIES})
 else()
-  find_package(BLAS REQUIRED)
+  find_package(OpenBLAS REQUIRED)
   target_link_libraries(tsnecuda PRIVATE ${BLAS_LIBRARIES})
 
   find_package(LAPACK REQUIRED)

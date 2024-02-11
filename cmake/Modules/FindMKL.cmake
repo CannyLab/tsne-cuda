@@ -58,10 +58,10 @@ find_path(MKL_ROOT_DIR
     /opt/intel/mkl/
     /opt/intel/cmkl/
     /Library/Frameworks/Intel_MKL.framework/Versions/Current/lib/universal
-    "Program Files (x86)/Intel/ComposerXE-2011/mkl"
+    "C:/Program Files (x86)/Intel/oneAPI/mkl/latest"
 )
 
-#MESSAGE("-- MKL_ROOT_DIR : ${MKL_ROOT_DIR}") # for debug
+MESSAGE("-- MKL_ROOT_DIR : ${MKL_ROOT_DIR}") # for debug
 
 find_path(MKL_INCLUDE_DIR
   mkl_cblas.h
