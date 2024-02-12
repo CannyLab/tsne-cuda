@@ -1,5 +1,6 @@
 cmake_minimum_required (VERSION 3.20)
 project(tsnecuda LANGUAGES CXX)
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS 1) # https://stackoverflow.com/questions/37128555/getting-cmake-to-build-shared-library-for-msvc
 
 set (CMAKE_PROJECT_VERSION 3)
 set (CMAKE_PROJECT_VERSION_MAJOR 3)
@@ -138,7 +139,7 @@ set(CUDA_OPTS
     -O3
     -g
     -Xptxas -dlcm=cg
-    -Xcompiler /Ox,/DYNAMICBASE,/openmp,/arch:AVX,/Zi #-mpopcnt,
+    -Xcompiler /DYNAMICBASE,/openmp,/arch:AVX,/Zi,/Ox #-mpopcnt,
     -Xlinker muldefs
 )
 string (REPLACE ";" " " NVCC_FLAGS_STR "${CUDA_ARCH} ${CUDA_OPTS}")
@@ -153,9 +154,13 @@ find_package(OpenMP REQUIRED)
 
 # GTEST Configuration
 #-------------------------------------------------------------------------------
-find_package(gflags REQUIRED)
+find_package(GFlags REQUIRED)
+include_directories(${GFLAGS_INCLUDE_DIR})
+
 # find_package(GLog REQUIRED)
 find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIR})
+
 #-------------------------------------------------------------------------------
 
 # ZMQ Configuration
@@ -171,7 +176,6 @@ endif()
 
 # FAISS Configuration
 #-------------------------------------------------------------------------------
-set(FAISS_ROOT_DIR "C:/Users/Michael/miniconda3/pkgs/libfaiss-1.7.4-cuda112h33bf9e0_0_cuda/Library")
 find_package(FAISS REQUIRED)
 if(NOT ${GPU_FAISS_FOUND})
     message("-- GPU FAISS not installed. Please install FAISS for GPU.")
@@ -232,8 +236,8 @@ set(PYTHON_SOURCES
 add_library(tsnecuda SHARED ${SOURCES})
 # set_property(TARGET tsnecuda PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 target_link_libraries(tsnecuda PRIVATE
-    gflags
-    gtest
+    ${GFLAGS_LIBRARIES}
+    ${GTEST_LIBRARIES}
     CUDA::cudart
     CUDA::cublas
     # CUDA::cublasLt
@@ -241,8 +245,8 @@ target_link_libraries(tsnecuda PRIVATE
     CUDA::cufftw
     CUDA::cusparse
     OpenMP::OpenMP_CXX
-    pthread
-    -Wl,--allow-multiple-definition
+    # pthread
+    # -Wl,--allow-multiple-definition
     ${ZMQ_LIBRARIES}
     ${FAISS_LIBRARIES}
 )
@@ -264,8 +268,8 @@ endif()
 #-------------------------------------------------------------------------------
 # Main executable
 #-------------------------------------------------------------------------------
-add_executable(tsne src/exe/main.cu)
-target_link_libraries(tsne tsnecuda)
+#add_executable(tsne src/exe/main.cu)
+#target_link_libraries(tsne tsnecuda)
 
 #-------------------------------------------------------------------------------
 # Python library copy and build

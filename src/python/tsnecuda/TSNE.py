@@ -136,8 +136,7 @@ class TSNE(object):
 
         # Build the hooks for the BH T-SNE library
         self._path = os.path.dirname(__file__)
-        self._lib = N.ctypeslib.load_library(
-            'libtsnecuda', self._path)  # Load the ctypes library
+        self._lib = ctypes.CDLL('tsnecuda.dll', winmode=0)
 
         # Hook the BH T-SNE function
         self._lib.pymodule_tsne.restype = None
