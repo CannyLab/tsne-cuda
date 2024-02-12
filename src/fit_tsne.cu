@@ -97,7 +97,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     // TODO: Investigate what it takes to use unified memory + Async fetch and execution
     float *knn_squared_distances = new float[num_points * num_neighbors];
     memset(knn_squared_distances, 0, num_points * num_neighbors * sizeof(float));
-    long *knn_indices = new long[num_points * num_neighbors];
+    int64_t *knn_indices = new int64_t[num_points * num_neighbors];
 
     // Set cache configs
     // cudaFuncSetCacheConfig(tsnecuda::IntegrationKernel, cudaFuncCachePreferL1);
@@ -116,7 +116,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     // TODO: Add suport for arbitrary metrics on GPU (Introduced by recent FAISS computation)
     // TODO: Expose Multi-GPU computation (+ Add streaming memory support for GPU optimization)
     tsnecuda::util::KNearestNeighbors(gpu_opt, opt, knn_indices, knn_squared_distances, high_dim_points, high_dim, num_points, num_neighbors);
-    thrust::device_vector<long> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
+    thrust::device_vector<int64_t> knn_indices_long_device(knn_indices, knn_indices + num_points * num_neighbors);
     thrust::device_vector<int> pij_indices_device(num_points * num_neighbors);
     tsnecuda::util::PostprocessNeighborIndices(gpu_opt, pij_indices_device, knn_indices_long_device,
                                                num_points, num_neighbors);
@@ -243,7 +243,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     }
 
     // FIT-TNSE Parameters
-    int n_interpolation_points = 3;
+    const int n_interpolation_points = 3;
     // float intervals_per_integer = 1;
     int min_num_intervals = 125;
     int N = num_points;

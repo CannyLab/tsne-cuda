@@ -1,0 +1,17 @@
+- conda install conda-forge::faiss-gpu
+- conda install conda-forge::gflags
+- conda install conda-forge::gtest
+
+cmake -G "Visual Studio 17 2022" -A x64  -DCMAKE_CONFIGURATION_TYPES:STRING="RelWithDebInfo" -DGFLAGS_ROOT_DIR="C:\Users\Michael\miniconda3\Library" -DFAISS_ROOT_DIR="C:/Users/Michael/miniconda3/Library" -DGTEST_ROOT_DIR="C:\Users\Michael\miniconda3\Library" -B  "C:\Users\Michael\CProjects\tsne-cuda\build" -T cuda=11.8  "C:\Users\Michael\CProjects\tsne-cuda"
+
+"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" "C:\Users\Michael\CProjects\tsne-cuda\build\tsnecuda.sln"
+
+pip install "C:\Users\Michael\CProjects\tsne-cuda\build\RelWithDebInfo\python"
+copy tsnecuda.dll into "C:\Users\Michael\miniconda3\envs\transformers\Library\bin\tsnecuda.dll"
+
+----Q----
+pthread?
+sys/time.h
+cxx compiler flag -mpopcnt
+-Wl,--allow-multiple-definition unrecognized options
+turn optimization back on

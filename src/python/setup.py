@@ -10,7 +10,7 @@ setup(
     author='Chan, David M., Huang, Forrest., Rao, Roshan.',
     author_email='davidchan@berkeley.edu',
     packages=['tsnecuda', 'tsnecuda.test'],
-    package_data={'tsnecuda': ['libtsnecuda.so']},
+    package_data={'tsnecuda': ['libtsnecuda.so', 'tsnecuda.dll']},
     scripts=[],
     url='https://github.com/CannyLab/tsne-cuda',
     license='LICENSE.txt',

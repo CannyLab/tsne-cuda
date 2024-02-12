@@ -97,7 +97,7 @@ void KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt, tsnecuda::Options &base_op
 
 __global__ void PostprocessNeighborIndicesKernel(
     volatile int *__restrict__ indices,
-    const long *__restrict__ long_indices,
+    const int64_t *__restrict__ long_indices,
     const int num_points,
     const int num_neighbors);
 

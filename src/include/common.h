@@ -44,7 +44,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include <sys/time.h>
+//#include <sys/time.h>
 
 // C++ Library includes
 #include <random>
@@ -57,4 +57,11 @@
 #include <iomanip>
 #include <cmath>
 
+#endif
+
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4127) // warning C4127: Conditional expression is constant
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
 #endif

@@ -1,5 +1,7 @@
 cmake_minimum_required (VERSION 3.20)
-project(tsnecuda)
+project(tsnecuda LANGUAGES CXX)
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS 1) # https://stackoverflow.com/questions/37128555/getting-cmake-to-build-shared-library-for-msvc
+
 set (CMAKE_PROJECT_VERSION 3)
 set (CMAKE_PROJECT_VERSION_MAJOR 3)
 set (CMAKE_PROJECT_VERSION_MINOR 0)
@@ -37,11 +39,11 @@ set(OPT_FLAGS
     -msse4
     -fPIC
     -m64
-    -Wno-sign-compare
+    #-Wno-sign-compare
     -g
     -O3
     -Wall
-    -Wextra
+    #-Wextra
     -DFINTEGER=int
 )
 string(REPLACE ";" " " CXX_FLAGS_STR "${CMAKE_CXX_FLAGS} ${OPT_FLAGS}")
@@ -120,18 +122,25 @@ else()
 endif()
 
 
+#set(CUDA_OPTS
+#    -O3
+#    -g
+#    -Xptxas '-dlcm=cg'
+#    -Xcompiler '-O3'
+#    -Xcompiler '-fPIC'
+#    -Xcompiler '-fopenmp'
+#    -Xcompiler '-msse4'
+#    -Xcompiler '-m64'
+#    -Xcompiler '-mpopcnt'
+#    -Xcompiler '-g'
+#    -Xlinker 'muldefs'
+#)
 set(CUDA_OPTS
     -O3
     -g
-    -Xptxas '-dlcm=cg'
-    -Xcompiler '-O3'
-    -Xcompiler '-fPIC'
-    -Xcompiler '-fopenmp'
-    -Xcompiler '-msse4'
-    -Xcompiler '-m64'
-    -Xcompiler '-mpopcnt'
-    -Xcompiler '-g'
-    -Xlinker 'muldefs'
+    -Xptxas -dlcm=cg
+    -Xcompiler /DYNAMICBASE,/openmp,/arch:AVX,/Zi,/Ox #-mpopcnt,
+    -Xlinker muldefs
 )
 string (REPLACE ";" " " NVCC_FLAGS_STR "${CUDA_ARCH} ${CUDA_OPTS}")
 set(CMAKE_CUDA_FLAGS "${NVCC_FLAGS_STR}")
@@ -145,9 +154,13 @@ find_package(OpenMP REQUIRED)
 
 # GTEST Configuration
 #-------------------------------------------------------------------------------
-find_package(gflags REQUIRED)
+find_package(GFlags REQUIRED)
+include_directories(${GFLAGS_INCLUDE_DIR})
+
 # find_package(GLog REQUIRED)
 find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIR})
+
 #-------------------------------------------------------------------------------
 
 # ZMQ Configuration
@@ -223,8 +236,8 @@ set(PYTHON_SOURCES
 add_library(tsnecuda SHARED ${SOURCES})
 # set_property(TARGET tsnecuda PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 target_link_libraries(tsnecuda PRIVATE
-    gflags
-    gtest
+    ${GFLAGS_LIBRARIES}
+    ${GTEST_LIBRARIES}
     CUDA::cudart
     CUDA::cublas
     # CUDA::cublasLt
@@ -232,8 +245,8 @@ target_link_libraries(tsnecuda PRIVATE
     CUDA::cufftw
     CUDA::cusparse
     OpenMP::OpenMP_CXX
-    pthread
-    -Wl,--allow-multiple-definition
+    # pthread
+    # -Wl,--allow-multiple-definition
     ${ZMQ_LIBRARIES}
     ${FAISS_LIBRARIES}
 )
@@ -244,7 +257,7 @@ find_package(MKL)
 if(MKL_FOUND)
   target_link_libraries(tsnecuda PRIVATE ${MKL_LIBRARIES})
 else()
-  find_package(BLAS REQUIRED)
+  find_package(OpenBLAS REQUIRED)
   target_link_libraries(tsnecuda PRIVATE ${BLAS_LIBRARIES})
 
   find_package(LAPACK REQUIRED)
@@ -255,8 +268,8 @@ endif()
 #-------------------------------------------------------------------------------
 # Main executable
 #-------------------------------------------------------------------------------
-add_executable(tsne src/exe/main.cu)
-target_link_libraries(tsne tsnecuda)
+#add_executable(tsne src/exe/main.cu)
+#target_link_libraries(tsne tsnecuda)
 
 #-------------------------------------------------------------------------------
 # Python library copy and build
