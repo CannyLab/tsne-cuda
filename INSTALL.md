@@ -39,19 +39,18 @@ pip3 install tsnecuda==3.0.1+cu100 -f https://tsnecuda.isx.ai/tsnecuda_stable.ht
 
 A number of requirements are necessary for building our code from source.
 
-- CUDA: You will need a working version of the CUDA toolkit which can be obtained from here. Our code has been tested compiling with CUDA versions 9.0, 9.1, 9.2, 10.0, 10.1, 10.2, 11.0 and 11.2. Other versions - may not be supported.
+- CUDA: You will need a working version of the CUDA toolkit which can be obtained from here. Our code has been tested compiling with CUDA versions 11.x, 12.x, and 13.x. The build targets modern datacenter GPUs out of the box (A100, H100/H200, B200) and honors an externally supplied `-DCMAKE_CUDA_ARCHITECTURES=...`. Other versions may not be supported.
 - CMAKE: Version >= 3.20.0 which can be obtained by running sudo apt install cmake on ubuntu/debian systems.
 - MKL/OpenBLAS: If you're using MKL, install it using the intel provided installation scripts. If you're using OpenBLAS install it using sudo apt install libopenblas-dev on ubuntu/debian systems.
 - GCC/llvm-clang: This is likely already installed on your system. If not, on ubuntu you can run sudo apt install build-essential to get a version.
 - OpenMP: On ubuntu this is likely already installed with your version of GCC. For other distributions, be sure your compiler has OpenMP support.
-- Python (for Python bindings) >= 3.6: Python is not required, however to build the python bindings you must install Python.
-- Gflags >= 2.2: On ubuntu, you can install with `sudo apt install lilbgflags-dev`
-- Gtest >= 1.10: On ubuntu, you can install with `sudo apt install libgtest-dev`
-- FAISS >= 1.6.5: This can be installed by following the instructions (https://github.com/facebookresearch/faiss/blob/v1.6.5/INSTALL.md)[here]
+- Python (for Python bindings) >= 3.10: Python is not required, however to build the python bindings you must install Python. The python module is the supported entry point.
+- FAISS (GPU) >= 1.7: This can be installed from conda-forge with `conda install -c conda-forge libfaiss` (recommended), or built from source per the FAISS instructions.
 
 Optional:
   - Doxygen: To build the documentation, a working version of doxygen is required (which can be obtained using sudo apt install doxygen on debian/ubuntu systems).
-  - ZMQ: Necessary for building the interactive visualization. On ubuntu you can obtain ZMQ by using sudo apt install libzmq-dev.
+
+The standalone C++ CLI and the ZMQ-based interactive visualization are no longer built (the `gflags`, `gtest`, `cxxopts`, and `zmq` dependencies have been dropped) to keep the build lean and portable; use the Python module instead.
 
 
 First, clone the repository, and change into the cloned directory using:
