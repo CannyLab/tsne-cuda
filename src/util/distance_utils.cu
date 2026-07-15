@@ -93,27 +93,20 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
 
     if (num_near_neighbors < 1024)
     {
-        int ngpus = faiss::gpu::getNumDevices();
-        std::vector<faiss::gpu::GpuResourcesProvider *> res;
-        std::vector<int> devs;
-        for (int i = 0; i < ngpus; i++)
-        {
-            res.push_back(new faiss::gpu::StandardGpuResources);
-            devs.push_back(i);
-        }
-
-        // Convert the CPU index to GPU index
-        faiss::Index *search_index = faiss::gpu::index_cpu_to_gpu_multiple(res, devs, &cpu_index);
+        // Build and search the index on the single selected GPU. The previous
+        // implementation sharded the index across every visible GPU via
+        // index_cpu_to_gpu_multiple, which for t-SNE's modest point counts is
+        // pure coordination overhead and, on a shared multi-GPU machine, grabs
+        // resources on every GPU rather than the one the caller asked for.
+        faiss::gpu::StandardGpuResources res;
+        faiss::Index *search_index =
+            faiss::gpu::index_cpu_to_gpu(&res, gpu_opt.device, &cpu_index);
 
         search_index->train(num_points, points);
         search_index->add(num_points, points);
         search_index->search(num_points, points, num_near_neighbors, distances, indices);
 
         delete search_index;
-        for (int i = 0; i < ngpus; i++)
-        {
-            delete res[i];
-        }
     }
     else
     {

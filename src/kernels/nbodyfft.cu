@@ -265,6 +265,7 @@ void tsnecuda::PrecomputeFFT2D(
         thrust::raw_pointer_cast(box_upper_bounds_device.data()),
         thrust::raw_pointer_cast(box_lower_bounds_device.data()),
         box_width, x_min, y_min, n_boxes, n_total_boxes);
+    TSNE_MAYBE_SYNC();
 
     // Coordinates of all the equispaced interpolation points
     int n_interpolation_points_1d = n_interpolation_points * n_boxes;
@@ -281,6 +282,7 @@ void tsnecuda::PrecomputeFFT2D(
     compute_kernel_tilde<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(kernel_tilde_device.data()),
         x_min, y_min, h, n_interpolation_points_1d, n_fft_coeffs);
+    TSNE_MAYBE_SYNC();
 
     // Precompute the FFT of the kernel generating matrix
 
@@ -342,6 +344,7 @@ void tsnecuda::NbodyFFT2D(
         n_boxes,
         n_total_boxes,
         N);
+    TSNE_MAYBE_SYNC();
 
 
     /*
@@ -357,6 +360,7 @@ void tsnecuda::NbodyFFT2D(
         thrust::raw_pointer_cast(denominator_device.data()),
         n_interpolation_points,
         N);
+    TSNE_MAYBE_SYNC();
 
     // Compute the interpolated values at each real point with each Lagrange polynomial in the `y` direction
     interpolate_device<<<num_blocks, num_threads>>>(
@@ -366,6 +370,7 @@ void tsnecuda::NbodyFFT2D(
         thrust::raw_pointer_cast(denominator_device.data()),
         n_interpolation_points,
         N);
+    TSNE_MAYBE_SYNC();
 
     //TODO: Synchronization required here
 
@@ -381,6 +386,7 @@ void tsnecuda::NbodyFFT2D(
         n_interpolation_points,
         n_boxes,
         n_terms);
+    TSNE_MAYBE_SYNC();
 
     /*
      * Step 2: Compute the values v_{m, n} at the equispaced nodes, multiply the kernel matrix with the coefficients w
@@ -393,6 +399,7 @@ void tsnecuda::NbodyFFT2D(
         n_fft_coeffs,
         n_fft_coeffs_half,
         n_terms);
+    TSNE_MAYBE_SYNC();
     // Compute fft values at interpolated nodes
     cufftExecR2C(plan_dft,
                  reinterpret_cast<cufftReal *>(thrust::raw_pointer_cast(fft_input.data())),
@@ -414,6 +421,7 @@ void tsnecuda::NbodyFFT2D(
         n_fft_coeffs,
         n_fft_coeffs_half,
         n_terms);
+    TSNE_MAYBE_SYNC();
 
     /*
      * Step 3: Compute the potentials \tilde{\phi}
@@ -430,4 +438,5 @@ void tsnecuda::NbodyFFT2D(
         n_interpolation_points,
         n_boxes,
         n_terms);
+    TSNE_MAYBE_SYNC();
 }
