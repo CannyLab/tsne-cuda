@@ -1,9 +1,9 @@
 cmake_minimum_required (VERSION 3.20)
 project(tsnecuda)
-set (CMAKE_PROJECT_VERSION 3)
-set (CMAKE_PROJECT_VERSION_MAJOR 3)
+set (CMAKE_PROJECT_VERSION 4)
+set (CMAKE_PROJECT_VERSION_MAJOR 4)
 set (CMAKE_PROJECT_VERSION_MINOR 0)
-set (CMAKE_PROJECT_VERSION_PATCH 2)
+set (CMAKE_PROJECT_VERSION_PATCH 0)
 set (CMAKE_PROJECT_VERSION_PATH 0)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
@@ -237,18 +237,10 @@ target_link_libraries(tsnecuda PRIVATE
     ${FAISS_LIBRARIES}
 )
 
-# BLAS configuration
-#-------------------------------------------------------------------------------
-find_package(MKL)
-if(MKL_FOUND)
-  target_link_libraries(tsnecuda PRIVATE ${MKL_LIBRARIES})
-else()
-  find_package(BLAS REQUIRED)
-  target_link_libraries(tsnecuda PRIVATE ${BLAS_LIBRARIES})
-
-  find_package(LAPACK REQUIRED)
-  target_link_libraries(tsnecuda PRIVATE ${LAPACK_LIBRARIES})
-endif()
+# No CPU BLAS/LAPACK is linked: the library's only GEMM is GPU cuBLAS
+# (cublasSgemm), and FAISS carries its own BLAS transitively. Dropping the
+# find_package(BLAS/LAPACK/MKL) removes a vestigial dependency and, on the
+# conda-forge side, the libblas/liblapack pin (incl. the *netlib pin) entirely.
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
