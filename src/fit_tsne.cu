@@ -418,7 +418,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
         // Prepare the terms that we'll use to compute the sum i.e. the repulsive forces
         START_IL_TIMER();
-        tsnecuda::ComputeChargesQij(chargesQij_device, points_device, num_points, n_terms);
+        tsnecuda::ComputeChargesQij(gpu_opt, chargesQij_device, points_device, num_points, n_terms);
         END_IL_TIMER(_time_compute_charges);
 
         // Compute Minimax elements
@@ -441,6 +441,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         START_IL_TIMER();
 
         tsnecuda::NbodyFFT2D(
+            gpu_opt,
             plan_dft, plan_idft,
             N, n_terms, n_boxes_per_dim, n_interpolation_points,
             fft_kernel_tilde_device, n_total_boxes,
@@ -460,7 +461,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         // TODO: See: https://stackoverflow.com/questions/24368197/getting-cuda-thrust-to-use-a-cuda-stream-of-your-choice
         // Make the negative term, or F_rep in the equation 3 of the paper
         normalization = tsnecuda::ComputeRepulsiveForces(
-            repulsive_forces_device, normalization_vec_device, points_device,
+            gpu_opt, repulsive_forces_device, normalization_vec_device, points_device,
             potentialsQij_device, num_points, n_terms);
 
         END_IL_TIMER(_time_norm);

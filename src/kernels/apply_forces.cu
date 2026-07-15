@@ -78,5 +78,4 @@ void tsnecuda::ApplyForces(tsnecuda::GpuOptions &gpu_opt,
         thrust::raw_pointer_cast(old_forces.data()),
         eta, normalization, momentum, exaggeration,
         num_points);
-    GpuErrorCheck(cudaDeviceSynchronize());
 }

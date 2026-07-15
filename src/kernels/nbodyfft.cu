@@ -281,7 +281,6 @@ void tsnecuda::PrecomputeFFT2D(
     compute_kernel_tilde<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(kernel_tilde_device.data()),
         x_min, y_min, h, n_interpolation_points_1d, n_fft_coeffs);
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     // Precompute the FFT of the kernel generating matrix
 
@@ -291,6 +290,7 @@ void tsnecuda::PrecomputeFFT2D(
 }
 
 void tsnecuda::NbodyFFT2D(
+    tsnecuda::GpuOptions &gpu_opt,
     cufftHandle &plan_dft,
     cufftHandle &plan_idft,
     int N,
@@ -326,7 +326,7 @@ void tsnecuda::NbodyFFT2D(
     thrust::device_vector<float> &potentialsQij_device)
 {
     // std::cout << "start" << std::endl;
-    const int num_threads = 128;
+    const int num_threads = gpu_opt.fft_kernel_threads;
     int num_blocks = (N + num_threads - 1) / num_threads;
 
     // Compute box indices and the relative position of each point in its box in the interval [0, 1]
@@ -343,7 +343,6 @@ void tsnecuda::NbodyFFT2D(
         n_total_boxes,
         N);
 
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     /*
      * Step 1: Interpolate kernel using Lagrange polynomials and compute the w coefficients
@@ -358,7 +357,6 @@ void tsnecuda::NbodyFFT2D(
         thrust::raw_pointer_cast(denominator_device.data()),
         n_interpolation_points,
         N);
-    GpuErrorCheck(cudaDeviceSynchronize()); // TODO: Remove the synchronization here
 
     // Compute the interpolated values at each real point with each Lagrange polynomial in the `y` direction
     interpolate_device<<<num_blocks, num_threads>>>(
@@ -368,7 +366,6 @@ void tsnecuda::NbodyFFT2D(
         thrust::raw_pointer_cast(denominator_device.data()),
         n_interpolation_points,
         N);
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     //TODO: Synchronization required here
 
@@ -384,7 +381,6 @@ void tsnecuda::NbodyFFT2D(
         n_interpolation_points,
         n_boxes,
         n_terms);
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     /*
      * Step 2: Compute the values v_{m, n} at the equispaced nodes, multiply the kernel matrix with the coefficients w
@@ -397,12 +393,10 @@ void tsnecuda::NbodyFFT2D(
         n_fft_coeffs,
         n_fft_coeffs_half,
         n_terms);
-    GpuErrorCheck(cudaDeviceSynchronize());
     // Compute fft values at interpolated nodes
     cufftExecR2C(plan_dft,
                  reinterpret_cast<cufftReal *>(thrust::raw_pointer_cast(fft_input.data())),
                  reinterpret_cast<cufftComplex *>(thrust::raw_pointer_cast(fft_w_coefficients.data())));
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     // Take the broadcasted Hadamard product of a complex matrix and a complex vector
     // TODO: Check timing on this kernel
@@ -414,14 +408,12 @@ void tsnecuda::NbodyFFT2D(
     cufftExecC2R(plan_idft,
                  reinterpret_cast<cufftComplex *>(thrust::raw_pointer_cast(fft_w_coefficients.data())),
                  reinterpret_cast<cufftReal *>(thrust::raw_pointer_cast(fft_output.data())));
-    GpuErrorCheck(cudaDeviceSynchronize());
     copy_from_fft_output<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(y_tilde_values.data()),
         thrust::raw_pointer_cast(fft_output.data()),
         n_fft_coeffs,
         n_fft_coeffs_half,
         n_terms);
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     /*
      * Step 3: Compute the potentials \tilde{\phi}
@@ -438,5 +430,4 @@ void tsnecuda::NbodyFFT2D(
         n_interpolation_points,
         n_boxes,
         n_terms);
-    GpuErrorCheck(cudaDeviceSynchronize());
 }

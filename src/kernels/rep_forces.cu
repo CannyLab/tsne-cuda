@@ -31,6 +31,7 @@ __global__ void compute_repulsive_forces_kernel(
 }
 
 float tsnecuda::ComputeRepulsiveForces(
+    tsnecuda::GpuOptions &gpu_opt,
     thrust::device_vector<float> &repulsive_forces_device,
     thrust::device_vector<float> &normalization_vec_device,
     thrust::device_vector<float> &points_device,
@@ -38,7 +39,7 @@ float tsnecuda::ComputeRepulsiveForces(
     const int num_points,
     const int n_terms)
 {
-    const int num_threads = 1024;
+    const int num_threads = gpu_opt.rep_kernel_threads;
     const int num_blocks = (num_points + num_threads - 1) / num_threads;
     compute_repulsive_forces_kernel<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(repulsive_forces_device.data()),
@@ -75,12 +76,13 @@ __global__ void compute_chargesQij_kernel(
 }
 
 void tsnecuda::ComputeChargesQij(
+    tsnecuda::GpuOptions &gpu_opt,
     thrust::device_vector<float> &chargesQij,
     thrust::device_vector<float> &points_device,
     const int num_points,
     const int n_terms)
 {
-    const int num_threads = 1024;
+    const int num_threads = gpu_opt.rep_kernel_threads;
     const int num_blocks = (num_points + num_threads - 1) / num_threads;
     compute_chargesQij_kernel<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(chargesQij.data()),

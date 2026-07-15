@@ -61,7 +61,6 @@ void tsnecuda::ComputeAttractiveForces(
         thrust::raw_pointer_cast(coo_indices.data()),
         num_points,
         num_nonzero);
-    GpuErrorCheck(cudaDeviceSynchronize());
 }
 
 __global__ void ComputePijxQijKernelV2(
@@ -123,7 +122,6 @@ void tsnecuda::ComputeAttractiveForcesV2(
         thrust::raw_pointer_cast(pij_row_ptr.data()),
         thrust::raw_pointer_cast(pij_col_ind.data()),
         num_points);
-    GpuErrorCheck(cudaDeviceSynchronize());
 }
 
 __global__ void ComputePijxQijKernelV3(
@@ -197,7 +195,7 @@ void tsnecuda::ComputeAttractiveForcesV3(
 {
     // Step 1: Store the independent pij values  for x and y in the workspace
     thrust::fill(pij_workspace_device.begin(), pij_workspace_device.end(), 0.0f);
-    const int BLOCKSIZE = 1024;
+    const int BLOCKSIZE = gpu_opt.attr_kernel_threads;
     const int NBLOCKS = iDivUp(num_points * num_neighbors, BLOCKSIZE);
     ComputePijxQijKernelV3<<<NBLOCKS, BLOCKSIZE>>>(
         // thrust::raw_pointer_cast(attr_forces.data()),
@@ -209,7 +207,6 @@ void tsnecuda::ComputeAttractiveForcesV3(
         num_points,
         num_neighbors);
 
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     const int NBLOCKS2 = iDivUp(num_points, 512);
     reduce_sum_kernel<<<NBLOCKS2, 512>>>(
@@ -219,7 +216,6 @@ void tsnecuda::ComputeAttractiveForcesV3(
         num_points,
         num_neighbors);
 
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     // // Setp 2: Reduce the X pij values into the attractive forces
     // float kAlpha = 1.0f;
