@@ -24,8 +24,12 @@ template <typename Iterator>
 class StridedRange {
  public:
     typedef typename thrust::iterator_difference<Iterator>::type DifferenceType;
-    struct StrideFunctor :
-        public thrust::unary_function<DifferenceType, DifferenceType> {
+    // NB: thrust::unary_function was deprecated and removed in the Thrust that
+    // ships with CUDA 13, so we declare the typedefs it used to provide directly
+    // (still consumed by older Thrust's transform_iterator; harmless on newer).
+    struct StrideFunctor {
+        typedef DifferenceType argument_type;
+        typedef DifferenceType result_type;
         DifferenceType stride;
         explicit StrideFunctor(DifferenceType stride)
             : stride(stride) {}
