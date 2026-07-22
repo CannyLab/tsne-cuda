@@ -1,88 +1,55 @@
 #!/bin/bash
+# Build tsne-cuda Python wheels for the supported CUDA toolkits and collect them
+# into ./wheelhouse. Each wheel is py3-none-any and tagged +cuXXX (the CUDA
+# runtime it needs); a single wheel serves every Python 3.x for that CUDA build.
+#
+# tsne-cuda 4.0.0 targets modern datacenter GPUs (A100/H100/H200/B200), so the
+# matrix drops the CUDA 10.x / early-11.x images and covers CUDA 11.8 -> 13.0.
+# Run from the repository root:  ./packaging/run_all_packaging.sh
+set -eo pipefail
 
-set -e
-set -x
+VERSION="$(cat src/python/VERSION.txt)"
+OUT="$(pwd)/wheelhouse"
+mkdir -p "$OUT"
 
-# Build all of the docker files
-# docker build . -f ./packaging/Dockerfile.cuda10.0 -t tsnecuda-docker-10.0
-# docker build . -f ./packaging/Dockerfile.cuda10.1 -t tsnecuda-docker-10.1
-# docker build . -f ./packaging/Dockerfile.cuda10.2 -t tsnecuda-docker-10.2
-docker build . -f ./packaging/Dockerfile.cuda11.0 -t tsnecuda-docker-11.0
-docker build . -f ./packaging/Dockerfile.cuda11.1 -t tsnecuda-docker-11.1
-docker build . -f ./packaging/Dockerfile.cuda11.2 -t tsnecuda-docker-11.2
-docker build . -f ./packaging/Dockerfile.cuda11.3 -t tsnecuda-docker-11.3
-docker build . -f ./packaging/Dockerfile.cuda11.8 -t tsnecuda-docker-11.8
-docker build . -f ./packaging/Dockerfile.cuda12.2 -t tsnecuda-docker-12.2
+# Each row: CUDA_VERSION  CUDA_TAG  UBUNTU        FAISS_TAG  FAISS_ARCHS
+# FAISS is built for Turing..Hopper; the trailing plain "90" also emits PTX so
+# FAISS JITs onto Blackwell (sm_100/sm_120), while tsne-cuda's own kernels get
+# native Blackwell cubins from its CUDA>=12.8 gencode ladder.
+MATRIX=(
+  "11.8.0  cu118  ubuntu22.04  v1.9.0  70;75;80;86;89;90"
+  "12.4.1  cu124  ubuntu22.04  v1.9.0  75;80;86;89;90"
+  "12.6.3  cu126  ubuntu22.04  v1.9.0  75;80;86;89;90"
+  "12.9.1  cu129  ubuntu22.04  v1.9.0  75;80;86;89;90"
+  "13.0.1  cu130  ubuntu24.04  v1.11.0 75;80;86;89;90"
+)
 
-# Run all of the docker files to get outputs
-# docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsnecuda-docker-10.0:latest
-# docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsnecuda-docker-10.1:latest
-# docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsnecuda-docker-10.2:latest
-docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsnecuda-docker-11.0:latest
-docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsnecuda-docker-11.1:latest
-docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsnecuda-docker-11.2:latest
-docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsnecuda-docker-11.3:latest
-docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsnecuda-docker-11.8:latest
-docker run -it --mount src=$(realpath ./build),target='/artifacts',type=bind tsnecuda-docker-12.2:latest
+build_one() {
+  read -r CUDA_VERSION CUDA_TAG UBUNTU FAISS_TAG FAISS_ARCHS <<<"$1"
+  echo ">>> building wheel for CUDA ${CUDA_VERSION} (${CUDA_TAG})"
+  # --network=host + the legacy builder (DOCKER_BUILDKIT=0): some Docker setups
+  # have no DNS/egress on the default bridge during build steps (apt/git/wget),
+  # and BuildKit does not always honor host networking; the legacy builder does.
+  DOCKER_BUILDKIT=0 docker build --network=host -f packaging/Dockerfile \
+    --build-arg CUDA_VERSION="${CUDA_VERSION}" \
+    --build-arg UBUNTU="${UBUNTU}" \
+    --build-arg CUDA_TAG="${CUDA_TAG}" \
+    --build-arg FAISS_TAG="${FAISS_TAG}" \
+    --build-arg FAISS_ARCHS="${FAISS_ARCHS}" \
+    --build-arg TSNE_VERSION="${VERSION}" \
+    -t "tsnecuda-wheel:${CUDA_TAG}" .
+  # Extract the wheel baked into the image at /wheels.
+  local cid
+  cid="$(docker create "tsnecuda-wheel:${CUDA_TAG}")"
+  docker cp "${cid}:/wheels/." "${OUT}/"
+  docker rm "${cid}" >/dev/null
+}
 
-# Own all of the files
-sudo chown -R $(whoami):$(whoami) ./build
+for row in "${MATRIX[@]}"; do
+  if ! build_one "$row"; then
+    echo "!!! build failed for: $row (continuing)" >&2
+  fi
+done
 
-# Run the anaconda packaging and upload
-conda-build -c pytorch ./packaging/conda/
-
-# # Run the local pip packaging and upload
-# cd ./build/build_10.0
-# cat VERSION.txt | awk 'NF{print $0 "+cu100"}' > tmp && mv tmp VERSION.txt
-# python3 setup.py bdist_wheel
-# mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
-# cd ../../
-
-# # Run the local pip packaging and upload
-# cd ./build/build_10.1
-# cat VERSION.txt | awk 'NF{print $0 "+cu101"}' > tmp && mv tmp VERSION.txt
-# python3 setup.py bdist_wheel
-# mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
-# cd ../../
-
-# cd ./build/build_10.2
-# python3 setup.py bdist_wheel
-# python3 -m twine upload dist/*
-# mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
-# cd ../../
-
-cd ./build/build_11.0
-cat VERSION.txt | awk 'NF{print $0 "+cu110"}' > tmp && mv tmp VERSION.txt
-python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
-cd ../../
-
-cd ./build/build_11.1
-cat VERSION.txt | awk 'NF{print $0 "+cu111"}' > tmp && mv tmp VERSION.txt
-python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
-cd ../../
-
-cd ./build/build_11.2
-cat VERSION.txt | awk 'NF{print $0 "+cu112"}' > tmp && mv tmp VERSION.txt
-python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
-cd ../../
-
-cd ./build/build_11.3
-cat VERSION.txt | awk 'NF{print $0 "+cu113"}' > tmp && mv tmp VERSION.txt
-python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
-cd ../../
-
-cd ./build/build_11.8
-cat VERSION.txt | awk 'NF{print $0 "+cu118"}' > tmp && mv tmp VERSION.txt
-python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
-cd ../../
-
-cd ./build/build_12.2
-cat VERSION.txt | awk 'NF{print $0 "+cu122"}' > tmp && mv tmp VERSION.txt
-python3 setup.py bdist_wheel
-mv dist/*.whl ../../packaging/pypi_extra_hosts/dist/
-cd ../../
+echo "=== wheels in ${OUT} ==="
+ls -l "$OUT"
