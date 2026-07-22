@@ -40,3 +40,6 @@ visualization/animation.gif
 
 # FAISS third_party dependencies
 !build/.gitkeep
+
+# Built wheels
+wheelhouse/
