@@ -5,6 +5,7 @@
 #include <cufft.h>
 #include <thrust/complex.h>
 #include "common.h"
+#include "options.h"
 #include "util/cuda_utils.h"
 #include "util/matrix_broadcast_utils.h"
 
@@ -25,6 +26,7 @@ void PrecomputeFFT2D(
     thrust::device_vector<thrust::complex<float>> &fft_kernel_tilde_device);
 
 void NbodyFFT2D(
+    tsnecuda::GpuOptions &gpu_opt,
     cufftHandle &plan_dft,
     cufftHandle &plan_idft,
     int N,

@@ -11,6 +11,7 @@
 
 #include <random>
 #include <time.h>
+#include <cstdlib>
 #include <iostream>
 #include <faiss/MetricType.h>
 
@@ -198,6 +199,12 @@ namespace tsnecuda
         // Factor/thread optimization options
         int integration_kernel_threads;
         int integration_kernel_factor;
+        // Block sizes for the current FFT-interpolation kernels (tunable per arch).
+        int fft_kernel_threads;   // nbodyfft interpolation/copy kernels
+        int attr_kernel_threads;  // attractive-forces (Pij x Qij) kernel
+        int rep_kernel_threads;   // repulsive-forces / charges kernel
+        // NOTE: the *_kernel_* fields below are vestigial Barnes-Hut launch
+        // parameters, kept for ABI/source compatibility; no live kernel reads them.
         int repulsive_kernel_threads;
         int repulsive_kernel_factor;
         int bounding_kernel_threads;
@@ -230,9 +237,42 @@ namespace tsnecuda
             // }
             this->sm_count = device_properties.multiProcessorCount;
 
+            // Baseline block sizes for the FFT-interpolation kernels; a specific
+            // architecture branch below may override these, and an env var can
+            // override at runtime (for benchmarking / tuning).
+            this->fft_kernel_threads = 128;
+            this->attr_kernel_threads = 1024;
+            this->rep_kernel_threads = 1024;
+
             // Set some per-architecture structures
-            if (device_properties.major >= 7)
-            { // TURING
+            if (device_properties.major == 8)
+            { // AMPERE / ADA (A100 = sm_80, A10/RTX30 = sm_86, L4/RTX40 = sm_89)
+                // Launch parameters were swept on an A100-SXM4-80GB with
+                // cmake/benchmarks/tune_kernels.py: every hot kernel is
+                // occupancy/bandwidth-bound and flat across the whole valid block
+                // range (32..1024) and grid factor (1..64x SM count), so the
+                // legacy defaults are already optimal here. (The large A100 win
+                // came instead from removing redundant per-kernel device syncs in
+                // the FFT/attractive/apply-forces path.) Kept explicit so future
+                // datacenter parts (Hopper/Blackwell) can be retuned in isolation.
+                this->integration_kernel_threads = 1024;
+                this->integration_kernel_factor = 1;
+                this->fft_kernel_threads = 128;
+                this->attr_kernel_threads = 1024;
+                this->rep_kernel_threads = 1024;
+                this->repulsive_kernel_threads = 256;
+                this->repulsive_kernel_factor = 5;
+                this->bounding_kernel_threads = 512;
+                this->bounding_kernel_factor = 3;
+                this->tree_kernel_threads = 1024;
+                this->tree_kernel_factor = 2;
+                this->sort_kernel_threads = 64;
+                this->sort_kernel_factor = 6;
+                this->summary_kernel_threads = 128;
+                this->summary_kernel_factor = 6;
+            }
+            else if (device_properties.major >= 7)
+            { // TURING / VOLTA / HOPPER / BLACKWELL
                 this->integration_kernel_threads = 1024;
                 this->integration_kernel_factor = 1;
                 this->repulsive_kernel_threads = 256;
@@ -308,6 +348,30 @@ namespace tsnecuda
                 this->summary_kernel_threads = 128;
                 this->summary_kernel_factor = 6;
             }
+
+            // Optional runtime overrides, used by the kernel-tuning benchmark
+            // (cmake/benchmarks/tune_kernels.py) to sweep launch parameters
+            // without recompiling. Absent env vars leave the per-arch defaults.
+            if (const char *v = std::getenv("TSNE_INTEG_THREADS")) this->integration_kernel_threads = std::atoi(v);
+            if (const char *v = std::getenv("TSNE_INTEG_FACTOR"))  this->integration_kernel_factor  = std::atoi(v);
+            if (const char *v = std::getenv("TSNE_FFT_THREADS"))   this->fft_kernel_threads  = std::atoi(v);
+            if (const char *v = std::getenv("TSNE_ATTR_THREADS"))  this->attr_kernel_threads = std::atoi(v);
+            if (const char *v = std::getenv("TSNE_REP_THREADS"))   this->rep_kernel_threads  = std::atoi(v);
+
+            // Threads-per-block is hard-capped by the hardware (1024 on all
+            // current NVIDIA GPUs); a larger value makes the kernel launch fail
+            // with cudaErrorInvalidConfiguration and poisons the context. Clamp
+            // so a bad default/override degrades gracefully. (The blocks-per-SM
+            // *factor* is a grid multiplier and is not capped here - the grid may
+            // hold up to maxGridSize.x ~ 2^31 blocks, so it is the dimension that
+            // scales for a grid-stride kernel like IntegrationKernel.)
+            const int max_tpb = device_properties.maxThreadsPerBlock;
+            auto clamp_tpb = [max_tpb](int t) { return t < 1 ? 1 : (t > max_tpb ? max_tpb : t); };
+            this->integration_kernel_threads = clamp_tpb(this->integration_kernel_threads);
+            this->fft_kernel_threads  = clamp_tpb(this->fft_kernel_threads);
+            this->attr_kernel_threads = clamp_tpb(this->attr_kernel_threads);
+            this->rep_kernel_threads  = clamp_tpb(this->rep_kernel_threads);
+            if (this->integration_kernel_factor < 1) this->integration_kernel_factor = 1;
         }
     }; // End GPU Options
 

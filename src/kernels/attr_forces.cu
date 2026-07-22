@@ -61,7 +61,7 @@ void tsnecuda::ComputeAttractiveForces(
         thrust::raw_pointer_cast(coo_indices.data()),
         num_points,
         num_nonzero);
-    GpuErrorCheck(cudaDeviceSynchronize());
+    TSNE_MAYBE_SYNC();
 }
 
 __global__ void ComputePijxQijKernelV2(
@@ -123,7 +123,7 @@ void tsnecuda::ComputeAttractiveForcesV2(
         thrust::raw_pointer_cast(pij_row_ptr.data()),
         thrust::raw_pointer_cast(pij_col_ind.data()),
         num_points);
-    GpuErrorCheck(cudaDeviceSynchronize());
+    TSNE_MAYBE_SYNC();
 }
 
 __global__ void ComputePijxQijKernelV3(
@@ -195,9 +195,11 @@ void tsnecuda::ComputeAttractiveForcesV3(
     const int num_points,
     const int num_neighbors)
 {
-    // Step 1: Store the independent pij values  for x and y in the workspace
-    thrust::fill(pij_workspace_device.begin(), pij_workspace_device.end(), 0.0f);
-    const int BLOCKSIZE = 1024;
+    // Step 1: Store the independent pij values  for x and y in the workspace.
+    // Async memset (not thrust::fill) to avoid a per-iteration host sync.
+    cudaMemsetAsync(thrust::raw_pointer_cast(pij_workspace_device.data()), 0,
+                    pij_workspace_device.size() * sizeof(float));
+    const int BLOCKSIZE = gpu_opt.attr_kernel_threads;
     const int NBLOCKS = iDivUp(num_points * num_neighbors, BLOCKSIZE);
     ComputePijxQijKernelV3<<<NBLOCKS, BLOCKSIZE>>>(
         // thrust::raw_pointer_cast(attr_forces.data()),
@@ -208,8 +210,8 @@ void tsnecuda::ComputeAttractiveForcesV3(
         thrust::raw_pointer_cast(points_device.data()),                                     // points
         num_points,
         num_neighbors);
+    TSNE_MAYBE_SYNC();
 
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     const int NBLOCKS2 = iDivUp(num_points, 512);
     reduce_sum_kernel<<<NBLOCKS2, 512>>>(
@@ -218,8 +220,8 @@ void tsnecuda::ComputeAttractiveForcesV3(
         thrust::raw_pointer_cast(pij_workspace_device.data()) + num_points * num_neighbors, // Workspace Y
         num_points,
         num_neighbors);
+    TSNE_MAYBE_SYNC();
 
-    GpuErrorCheck(cudaDeviceSynchronize());
 
     // // Setp 2: Reduce the X pij values into the attractive forces
     // float kAlpha = 1.0f;

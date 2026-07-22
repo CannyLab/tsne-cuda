@@ -405,9 +405,13 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         START_IL_TIMER();
         // TODO: We might be able to write a kernel which does this more efficiently. It probably doesn't require much
         // TODO: but it could be done.
-        float fill_value = 0;
-        thrust::fill(w_coefficients_device.begin(), w_coefficients_device.end(), fill_value);
-        thrust::fill(potentialsQij_device.begin(), potentialsQij_device.end(), fill_value);
+        // Zero the FFT accumulation buffers. cudaMemsetAsync is used instead of
+        // thrust::fill so this does not force a host<->device synchronization
+        // every iteration (the buffers are consumed later on the same stream).
+        cudaMemsetAsync(thrust::raw_pointer_cast(w_coefficients_device.data()), 0,
+                        w_coefficients_device.size() * sizeof(float));
+        cudaMemsetAsync(thrust::raw_pointer_cast(potentialsQij_device.data()), 0,
+                        potentialsQij_device.size() * sizeof(float));
         // Setup learning rate schedule
         if (step == opt.force_magnify_iters)
         {
@@ -418,7 +422,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
 
         // Prepare the terms that we'll use to compute the sum i.e. the repulsive forces
         START_IL_TIMER();
-        tsnecuda::ComputeChargesQij(chargesQij_device, points_device, num_points, n_terms);
+        tsnecuda::ComputeChargesQij(gpu_opt, chargesQij_device, points_device, num_points, n_terms);
         END_IL_TIMER(_time_compute_charges);
 
         // Compute Minimax elements
@@ -441,6 +445,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         START_IL_TIMER();
 
         tsnecuda::NbodyFFT2D(
+            gpu_opt,
             plan_dft, plan_idft,
             N, n_terms, n_boxes_per_dim, n_interpolation_points,
             fft_kernel_tilde_device, n_total_boxes,
@@ -460,7 +465,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
         // TODO: See: https://stackoverflow.com/questions/24368197/getting-cuda-thrust-to-use-a-cuda-stream-of-your-choice
         // Make the negative term, or F_rep in the equation 3 of the paper
         normalization = tsnecuda::ComputeRepulsiveForces(
-            repulsive_forces_device, normalization_vec_device, points_device,
+            gpu_opt, repulsive_forces_device, normalization_vec_device, points_device,
             potentialsQij_device, num_points, n_terms);
 
         END_IL_TIMER(_time_norm);
@@ -509,11 +514,22 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
                               num_points,
                               num_blocks);
 
-        // Compute the gradient norm
-        float grad_norm = tsnecuda::util::L2NormDeviceVector(old_forces_device);
-        thrust::fill(attractive_forces_device.begin(), attractive_forces_device.end(), 0.0f);
+        // The gradient-norm reduce is a host-synchronizing transform_reduce, so
+        // only compute it when it is actually used: when a positive
+        // min_gradient_norm early-stop is configured, or when we are about to
+        // print it. min_gradient_norm defaults to 0, so by default (and with
+        // verbose off) this expensive per-iteration sync is skipped entirely.
+        const bool need_grad_norm =
+            (opt.min_gradient_norm > 0.0f) ||
+            (opt.verbosity >= 1 && step % opt.print_interval == 0);
+        float grad_norm = 0.0f;
+        if (need_grad_norm)
+            grad_norm = tsnecuda::util::L2NormDeviceVector(old_forces_device);
 
-        if (grad_norm < opt.min_gradient_norm)
+        cudaMemsetAsync(thrust::raw_pointer_cast(attractive_forces_device.data()), 0,
+                        attractive_forces_device.size() * sizeof(float));
+
+        if (opt.min_gradient_norm > 0.0f && grad_norm < opt.min_gradient_norm)
         {
             if (opt.verbosity >= 1)
                 std::cout << "Reached minimum gradient norm: " << grad_norm << std::endl;

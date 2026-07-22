@@ -1,9 +1,9 @@
 cmake_minimum_required (VERSION 3.20)
 project(tsnecuda)
-set (CMAKE_PROJECT_VERSION 3)
-set (CMAKE_PROJECT_VERSION_MAJOR 3)
+set (CMAKE_PROJECT_VERSION 4)
+set (CMAKE_PROJECT_VERSION_MAJOR 4)
 set (CMAKE_PROJECT_VERSION_MINOR 0)
-set (CMAKE_PROJECT_VERSION_PATCH 2)
+set (CMAKE_PROJECT_VERSION_PATCH 0)
 set (CMAKE_PROJECT_VERSION_PATH 0)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
@@ -31,19 +31,19 @@ ADD_DEFINITIONS(-DVERSION_PATCH=${CMAKE_PROJECT_VERSION_PATCH})
 # CXX Configuration
 #-------------------------------------------------------------------------------
 set(OPT_FLAGS
-    -std=c++14
+    -std=c++17
     -fopenmp
-    -mpopcnt
-    -msse4
     -fPIC
-    -m64
     -Wno-sign-compare
-    -g
     -O3
     -Wall
     -Wextra
     -DFINTEGER=int
 )
+# x86-only tuning flags; omitted on aarch64 (e.g. Grace/GB200) and other ISAs.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86)$")
+    list(APPEND OPT_FLAGS -m64 -mpopcnt -msse4)
+endif()
 string(REPLACE ";" " " CXX_FLAGS_STR "${CMAKE_CXX_FLAGS} ${OPT_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CXX_FLAGS_STR}")
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
@@ -54,87 +54,102 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 #-------------------------------------------------------------------------------
 find_package(CUDAToolkit REQUIRED)
 if(NOT DEFINED CMAKE_CUDA_STANDARD)
-    set(CMAKE_CUDA_STANDARD 14)
+    set(CMAKE_CUDA_STANDARD 17)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
-if(CUDAToolkit_VERSION_MAJOR EQUAL "10")
-    set(CUDA_ARCH
-        -gencode=arch=compute_30,code=sm_30
-        -gencode=arch=compute_35,code=sm_35
-        -gencode=arch=compute_37,code=sm_37
-        -gencode=arch=compute_50,code=sm_50
-        -gencode=arch=compute_52,code=sm_52
-        -gencode=arch=compute_60,code=sm_60
-        -gencode=arch=compute_61,code=sm_61
-        -gencode=arch=compute_70,code=sm_70
-        -gencode=arch=compute_75,code=sm_75
-    )
-elseif(CUDAToolkit_VERSION_MAJOR EQUAL "11" AND CUDAToolkit_VERSION_MINOR LESS "1")
-    set(CUDA_ARCH
-        -gencode=arch=compute_35,code=sm_35
-        -gencode=arch=compute_37,code=sm_37
-        -gencode=arch=compute_50,code=sm_50
-        -gencode=arch=compute_52,code=sm_52
-        -gencode=arch=compute_60,code=sm_60
-        -gencode=arch=compute_61,code=sm_61
-        -gencode=arch=compute_70,code=sm_70
-        -gencode=arch=compute_75,code=sm_75
-        -gencode=arch=compute_80,code=sm_80
-    )
-elseif(CUDAToolkit_VERSION_MAJOR EQUAL "11")
-    set(CUDA_ARCH
-        -gencode=arch=compute_35,code=sm_35
-        -gencode=arch=compute_37,code=sm_37
-        -gencode=arch=compute_50,code=sm_50
-        -gencode=arch=compute_52,code=sm_52
-        -gencode=arch=compute_60,code=sm_60
-        -gencode=arch=compute_61,code=sm_61
-        -gencode=arch=compute_70,code=sm_70
-        -gencode=arch=compute_75,code=sm_75
-        -gencode=arch=compute_80,code=sm_80
-        -gencode=arch=compute_86,code=sm_86
-    )
-elseif(CUDAToolkit_VERSION_MAJOR EQUAL "12")
-    set(CUDA_ARCH
-        -gencode=arch=compute_60,code=sm_60
-        -gencode=arch=compute_61,code=sm_61
-        -gencode=arch=compute_70,code=sm_70
-        -gencode=arch=compute_75,code=sm_75
-        -gencode=arch=compute_80,code=sm_80
-        -gencode=arch=compute_86,code=sm_86
-        -gencode=arch=compute_87,code=sm_87
-        -gencode=arch=compute_89,code=sm_89
-        -gencode=arch=compute_90,code=sm_90
-    )
+# Architecture selection
+# -----------------------------------------------------------------------------
+# The kernels use no architecture-specific intrinsics (no warp shuffle/vote,
+# no cooperative groups, no tensor-core / wgmma), so a plain `sm_XX` cubin per
+# target produces optimal SASS, and a single trailing PTX entry provides JIT
+# forward-compatibility for GPUs newer than the toolkit. The `sm_XXa`
+# accelerated variants are therefore intentionally omitted.
+#
+# If a packager or user supplies CMAKE_CUDA_ARCHITECTURES (conda-forge passes it
+# through CMAKE_ARGS), honor it and let CMake emit the -gencode flags; we only
+# add the non-arch optimization flags. Otherwise pick an optimal ladder for the
+# detected toolkit, covering current datacenter GPUs:
+#   A100 = sm_80, H100/H200 = sm_90, B200 = sm_100, GB202/RTX50 = sm_120.
+if(DEFINED CMAKE_CUDA_ARCHITECTURES
+   AND NOT CMAKE_CUDA_ARCHITECTURES STREQUAL ""
+   AND NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "OFF")
+    message(STATUS "tsnecuda: honoring CMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES}")
+    set(CUDA_ARCH "")
 else()
-    set(CUDA_ARCH
-        -gencode=arch=compute_30,code=sm_30
-        -gencode=arch=compute_35,code=sm_35
-        -gencode=arch=compute_37,code=sm_37
-        -gencode=arch=compute_50,code=sm_50
-        -gencode=arch=compute_52,code=sm_52
-        -gencode=arch=compute_60,code=sm_60
-        -gencode=arch=compute_61,code=sm_61
+    # Disable CMake's own arch handling so it does not add conflicting -gencode.
+    set(CMAKE_CUDA_ARCHITECTURES OFF)
+    if(CUDAToolkit_VERSION_MAJOR EQUAL "13")
+        # CUDA 13 removed Maxwell/Pascal/Volta; minimum supported arch is Turing.
+        set(CUDA_ARCH
+            -gencode=arch=compute_75,code=sm_75
+            -gencode=arch=compute_80,code=sm_80
+            -gencode=arch=compute_86,code=sm_86
+            -gencode=arch=compute_89,code=sm_89
+            -gencode=arch=compute_90,code=sm_90
+            -gencode=arch=compute_100,code=sm_100
+            -gencode=arch=compute_120,code=sm_120
+            -gencode=arch=compute_120,code=compute_120
         )
+    elseif(CUDAToolkit_VERSION_MAJOR EQUAL "12")
+        set(CUDA_ARCH
+            -gencode=arch=compute_70,code=sm_70
+            -gencode=arch=compute_75,code=sm_75
+            -gencode=arch=compute_80,code=sm_80
+            -gencode=arch=compute_86,code=sm_86
+            -gencode=arch=compute_89,code=sm_89
+            -gencode=arch=compute_90,code=sm_90
+        )
+        # Blackwell (sm_100 / sm_120) requires CUDA >= 12.8.
+        if(CUDAToolkit_VERSION_MINOR GREATER_EQUAL "8")
+            list(APPEND CUDA_ARCH
+                -gencode=arch=compute_100,code=sm_100
+                -gencode=arch=compute_120,code=sm_120
+                -gencode=arch=compute_120,code=compute_120
+            )
+        else()
+            list(APPEND CUDA_ARCH -gencode=arch=compute_90,code=compute_90)
+        endif()
+    elseif(CUDAToolkit_VERSION_MAJOR EQUAL "11")
+        set(CUDA_ARCH
+            -gencode=arch=compute_52,code=sm_52
+            -gencode=arch=compute_60,code=sm_60
+            -gencode=arch=compute_61,code=sm_61
+            -gencode=arch=compute_70,code=sm_70
+            -gencode=arch=compute_75,code=sm_75
+            -gencode=arch=compute_80,code=sm_80
+        )
+        # sm_86 available on CUDA >= 11.1; sm_90 only on 11.8+.
+        if(CUDAToolkit_VERSION_MINOR GREATER_EQUAL "1")
+            list(APPEND CUDA_ARCH -gencode=arch=compute_86,code=sm_86)
+        endif()
+        list(APPEND CUDA_ARCH -gencode=arch=compute_80,code=compute_80)
+    else()
+        # Unknown/older toolkit: safe modern default with PTX fallback.
+        set(CUDA_ARCH
+            -gencode=arch=compute_70,code=sm_70
+            -gencode=arch=compute_75,code=sm_75
+            -gencode=arch=compute_80,code=sm_80
+            -gencode=arch=compute_80,code=compute_80
+        )
+    endif()
 endif()
 
 
 set(CUDA_OPTS
     -O3
-    -g
     -Xptxas '-dlcm=cg'
     -Xcompiler '-O3'
     -Xcompiler '-fPIC'
     -Xcompiler '-fopenmp'
-    -Xcompiler '-msse4'
-    -Xcompiler '-m64'
-    -Xcompiler '-mpopcnt'
-    -Xcompiler '-g'
     -Xlinker 'muldefs'
 )
+# x86-only host tuning flags for nvcc's host compiler; omitted on other ISAs.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86)$")
+    list(APPEND CUDA_OPTS -Xcompiler '-msse4' -Xcompiler '-m64' -Xcompiler '-mpopcnt')
+endif()
 string (REPLACE ";" " " NVCC_FLAGS_STR "${CUDA_ARCH} ${CUDA_OPTS}")
-set(CMAKE_CUDA_FLAGS "${NVCC_FLAGS_STR}")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${NVCC_FLAGS_STR}")
 # list(APPEND CUDA_NVCC_FLAGS "--compiler-options -fPIC")
 #-------------------------------------------------------------------------------
 
@@ -143,22 +158,11 @@ set(CMAKE_CUDA_FLAGS "${NVCC_FLAGS_STR}")
 find_package(OpenMP REQUIRED)
 #-------------------------------------------------------------------------------
 
-# GTEST Configuration
+# Interactive-visualization (ZMQ) support is intentionally disabled: the ZMQ
+# publisher path in fit_tsne is compiled out via -DNO_ZMQ, dropping the zeromq /
+# cppzmq build and runtime dependency for a leaner, more portable package.
 #-------------------------------------------------------------------------------
-find_package(gflags REQUIRED)
-# find_package(GLog REQUIRED)
-find_package(GTest REQUIRED)
-#-------------------------------------------------------------------------------
-
-# ZMQ Configuration
-#-------------------------------------------------------------------------------
-find_package(ZMQ)
-if(NOT ${ZMQ_FOUND})
-    ADD_DEFINITIONS(-DNO_ZMQ)
-    set(ZMQ_INCLUDE_DIR "")
-    set(ZMQ_LIBRARIES "")
-    message("-- Not building with ZMQ. Interactive visualization disabled. To build with ZMQ use -DWITH_ZMQ=ON")
-endif()
+ADD_DEFINITIONS(-DNO_ZMQ)
 #-------------------------------------------------------------------------------
 
 # FAISS Configuration
@@ -176,8 +180,6 @@ include_directories(
     src/include
     ${CUDA_INCLUDE_DIRS}
     third_party/
-    third_party/cxxopts/include/
-    ${ZMQ_INCLUDE_DIR}
 )
 link_directories(
     ${CUDA_LIBRARIES}
@@ -223,8 +225,6 @@ set(PYTHON_SOURCES
 add_library(tsnecuda SHARED ${SOURCES})
 # set_property(TARGET tsnecuda PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 target_link_libraries(tsnecuda PRIVATE
-    gflags
-    gtest
     CUDA::cudart
     CUDA::cublas
     # CUDA::cublasLt
@@ -234,29 +234,19 @@ target_link_libraries(tsnecuda PRIVATE
     OpenMP::OpenMP_CXX
     pthread
     -Wl,--allow-multiple-definition
-    ${ZMQ_LIBRARIES}
     ${FAISS_LIBRARIES}
 )
 
-# BLAS configuration
-#-------------------------------------------------------------------------------
-find_package(MKL)
-if(MKL_FOUND)
-  target_link_libraries(tsnecuda PRIVATE ${MKL_LIBRARIES})
-else()
-  find_package(BLAS REQUIRED)
-  target_link_libraries(tsnecuda PRIVATE ${BLAS_LIBRARIES})
-
-  find_package(LAPACK REQUIRED)
-  target_link_libraries(tsnecuda PRIVATE ${LAPACK_LIBRARIES})
-endif()
+# No CPU BLAS/LAPACK is linked: the library's only GEMM is GPU cuBLAS
+# (cublasSgemm), and FAISS carries its own BLAS transitively. Dropping the
+# find_package(BLAS/LAPACK/MKL) removes a vestigial dependency and, on the
+# conda-forge side, the libblas/liblapack pin (incl. the *netlib pin) entirely.
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
-# Main executable
+# The standalone C++ CLI (src/exe/main.cu, which pulls in the cxxopts submodule)
+# is intentionally not built: the Python module is the supported entry point.
 #-------------------------------------------------------------------------------
-add_executable(tsne src/exe/main.cu)
-target_link_libraries(tsne tsnecuda)
 
 #-------------------------------------------------------------------------------
 # Python library copy and build
