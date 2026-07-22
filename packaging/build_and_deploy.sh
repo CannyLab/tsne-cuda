@@ -20,6 +20,8 @@ make -j"$(nproc)"
 cd python
 echo "${TSNE_VERSION}+${CUDA_TAG}" > VERSION.txt
 
-python3 -m pip install --upgrade --quiet pip wheel
+# Build the wheel with PEP 517 build isolation (pip fetches setuptools/wheel into
+# a throwaway env). This avoids installing into the base image's Python, which
+# newer distros (e.g. Ubuntu 24.04, PEP 668) mark externally-managed.
 python3 -m pip wheel . --no-deps -w /wheels
 ls -l /wheels
