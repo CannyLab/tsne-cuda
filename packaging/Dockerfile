@@ -24,7 +24,11 @@ ARG TSNE_VERSION=4.0.0
 ARG CMAKE_VERSION=3.28.3
 ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Force IPv4 (container IPv6 egress is often unroutable) and retry, so apt is
+# resilient to transient mirror timeouts.
+RUN printf 'Acquire::ForceIPv4 "true";\nAcquire::Retries "8";\n' \
+        > /etc/apt/apt.conf.d/99network && \
+    apt-get update && apt-get install -y --no-install-recommends \
         git build-essential python3-dev python3-numpy python3-pip \
         wget ca-certificates libopenblas-dev swig && \
     rm -rf /var/lib/apt/lists/*
