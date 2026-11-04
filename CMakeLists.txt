@@ -246,6 +246,10 @@ endif()
 
 add_library(tsnecuda SHARED ${SOURCES})
 # set_property(TARGET tsnecuda PROPERTY POSITION_INDEPENDENT_CODE TRUE)
+if(WIN32)
+    # The Python wrapper loads the library as libtsnecuda on every platform.
+    set_target_properties(tsnecuda PROPERTIES PREFIX "lib")
+endif()
 if(USE_HIP)
     # hip_compat/ provides the CUDA headers the sources include, mapped to HIP.
     target_include_directories(tsnecuda BEFORE PRIVATE ${PROJECT_SOURCE_DIR}/hip_compat)
