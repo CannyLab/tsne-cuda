@@ -31,7 +31,7 @@ void test_reduce_sum_col(int N, int M) {
     thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    std::vector<float> cpu_result(M, 0.0f);
+    std::vector<double> cpu_result(M, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[j] += points[i + j*N];
@@ -68,7 +68,7 @@ void test_reduce_sum_row(int N, int M) {
     thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    std::vector<float> cpu_result(N, 0.0f);
+    std::vector<double> cpu_result(N, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[i] += points[i + j*N];
@@ -105,7 +105,7 @@ void test_reduce_mean_col(int N, int M) {
     thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    std::vector<float> cpu_result(M, 0.0f);
+    std::vector<double> cpu_result(M, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[j] += points[i + j*N];
@@ -142,7 +142,7 @@ void test_reduce_mean_row(int N, int M) {
     thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    std::vector<float> cpu_result(N, 0.0f);
+    std::vector<double> cpu_result(N, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[i] += points[i + j*N];
@@ -179,7 +179,7 @@ void test_reduce_alpha_col(int N, int M, float alpha) {
     thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    std::vector<float> cpu_result(M, 0.0f);
+    std::vector<double> cpu_result(M, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[j] += points[i + j*N];
@@ -216,7 +216,7 @@ void test_reduce_alpha_row(int N, int M, float alpha) {
     thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    std::vector<float> cpu_result(N, 0.0f);
+    std::vector<double> cpu_result(N, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[i] += points[i + j*N];
