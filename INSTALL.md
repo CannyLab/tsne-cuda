@@ -108,7 +108,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_PREFIX_PATH="/opt/rocm;<faiss install prefix>"
 cmake --build build -j
 ```
-Replace `gfx942` with the architecture of your GPU (`rocm_agent_enumerator` lists it); several architectures can be given separated by semicolons. If CMake does not find the HIP compiler, add `-DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++`, or put `/opt/rocm/bin` on `PATH`. The Python package is then in `build/python` as for the CUDA build.
+Replace `gfx942` with the architecture of your GPU (`rocm_agent_enumerator` lists it); several architectures can be given separated by semicolons. If CMake does not find the HIP compiler, add `-DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++`, or put `/opt/rocm/bin` on `PATH`. The Python package is then in `build/python` as for the CUDA build. A FAISS built with the ROCm clang links LLVM's OpenMP runtime `libomp.so`, which the loader may not find when tsne-cuda itself is built with GCC; if using `tsnecuda` fails with `OSError: libomp.so: cannot open shared object file`, add `/opt/rocm/llvm/lib` to `LD_LIBRARY_PATH`.
 
 #### Windows
 
