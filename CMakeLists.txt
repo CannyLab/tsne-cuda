@@ -242,6 +242,7 @@ set(PYTHON_SOURCES
         src/python/tsnecuda/__init__.py
         src/python/tsnecuda/TSNE.py
         src/python/tsnecuda/test/__init__.py
+        src/python/tsnecuda/test/test_tsne.py
         src/python/docs/FAQ.txt
     )
 

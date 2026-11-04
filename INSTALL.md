@@ -132,10 +132,16 @@ pip install -e .
 ```
 ### Validating the Install
 
-Unfortunately, the current set of tests do not compile. The best way to determine that everything is working is to run
+The quickest way to determine that everything is working is to run
 
 ```python
 import tsnecuda
 tsnecuda.test()
 ```
 This does a t-SNE on 5000 points, so it should complete relatively quickly (1-2 seconds). If there are no error messages and it doesn't hang, you should be good to go.
+
+For a more thorough check of embedding quality on the GPU, install `pytest` and `scikit-learn` and run the Python tests:
+```
+python -m pytest -v build/python/tsnecuda/test
+```
+The large clustering test embeds 50000 points; set `TSNECUDA_TEST_BLOBS_N` to a smaller number on GPUs with little memory.
