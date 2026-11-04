@@ -53,8 +53,12 @@ endif()
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86)$")
     list(APPEND OPT_FLAGS -m64 -mpopcnt -msse4)
 endif()
-string(REPLACE ";" " " CXX_FLAGS_STR "${CMAKE_CXX_FLAGS} ${OPT_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CXX_FLAGS_STR}")
+# These are GNU-driver flags; clang-cl (MSVC) rejects them, and the library
+# sources are HIP, which does not use CMAKE_CXX_FLAGS.
+if(NOT MSVC)
+    string(REPLACE ";" " " CXX_FLAGS_STR "${CMAKE_CXX_FLAGS} ${OPT_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CXX_FLAGS_STR}")
+endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 #-------------------------------------------------------------------------------
