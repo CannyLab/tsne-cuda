@@ -76,8 +76,13 @@ def _blobs_ari(n_samples, num_neighbors=32):
 
 def _digits_in_subprocess(env_overrides):
     # Kernel synchronization is read once per process, so environment
-    # variants run in a fresh interpreter.
+    # variants run in a fresh interpreter. pytest may have put the package on
+    # sys.path itself, so pass its parent directory to the child explicitly.
     env = dict(os.environ, **env_overrides)
+    package_parent = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+    env["PYTHONPATH"] = os.pathsep.join(
+        filter(None, [package_parent, env.get("PYTHONPATH")]))
     code = ("import json; from tsnecuda.test import test_tsne as t; "
             "print(json.dumps(t._digits_metrics(t._embed_digits())))")
     result = subprocess.run([sys.executable, "-c", code], env=env,
