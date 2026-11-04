@@ -44,7 +44,9 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
 
 // C++ Library includes
 #include <random>
