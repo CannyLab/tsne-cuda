@@ -8,12 +8,18 @@ set (CMAKE_PROJECT_VERSION_PATH 0)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
-enable_language(CUDA)
 
 # Options
 #-------------------------------------------------------------------------------
 option(BUILD_PYTHON "Build python if ON" ON)
+option(USE_HIP "Build for AMD GPUs with HIP (ROCm) instead of CUDA" OFF)
 #-------------------------------------------------------------------------------
+
+if(USE_HIP)
+    enable_language(HIP)
+else()
+    enable_language(CUDA)
+endif()
 
 # Build Number Generation
 #-------------------------------------------------------------------------------
@@ -52,6 +58,17 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 # CUDA Configuration
 #-------------------------------------------------------------------------------
+if(USE_HIP)
+    if(NOT DEFINED CMAKE_HIP_STANDARD)
+        set(CMAKE_HIP_STANDARD 17)
+        set(CMAKE_HIP_STANDARD_REQUIRED ON)
+    endif()
+    find_package(hip REQUIRED)
+    find_package(hipblas REQUIRED)
+    find_package(hipfft REQUIRED)
+    find_package(hipsparse REQUIRED)
+    find_package(rocthrust REQUIRED)
+else()
 find_package(CUDAToolkit REQUIRED)
 if(NOT DEFINED CMAKE_CUDA_STANDARD)
     set(CMAKE_CUDA_STANDARD 17)
@@ -151,6 +168,7 @@ endif()
 string (REPLACE ";" " " NVCC_FLAGS_STR "${CUDA_ARCH} ${CUDA_OPTS}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${NVCC_FLAGS_STR}")
 # list(APPEND CUDA_NVCC_FLAGS "--compiler-options -fPIC")
+endif()
 #-------------------------------------------------------------------------------
 
 # OpenMP configuration
@@ -222,20 +240,42 @@ set(PYTHON_SOURCES
         src/python/docs/FAQ.txt
     )
 
+if(USE_HIP)
+    set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE HIP)
+endif()
+
 add_library(tsnecuda SHARED ${SOURCES})
 # set_property(TARGET tsnecuda PROPERTY POSITION_INDEPENDENT_CODE TRUE)
-target_link_libraries(tsnecuda PRIVATE
-    CUDA::cudart
-    CUDA::cublas
-    # CUDA::cublasLt
-    CUDA::cufft
-    CUDA::cufftw
-    CUDA::cusparse
-    OpenMP::OpenMP_CXX
-    pthread
-    -Wl,--allow-multiple-definition
-    ${FAISS_LIBRARIES}
-)
+if(USE_HIP)
+    # hip_compat/ provides the CUDA headers the sources include, mapped to HIP.
+    target_include_directories(tsnecuda BEFORE PRIVATE ${PROJECT_SOURCE_DIR}/hip_compat)
+    # clang rejects the 'register' storage class in C++17; nvcc ignores it.
+    target_compile_options(tsnecuda PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-Wno-register>)
+    target_link_libraries(tsnecuda PRIVATE
+        hip::host
+        roc::hipblas
+        hip::hipfft
+        roc::hipsparse
+        roc::rocthrust
+        OpenMP::OpenMP_CXX
+        pthread
+        -Wl,--allow-multiple-definition
+        ${FAISS_LIBRARIES}
+    )
+else()
+    target_link_libraries(tsnecuda PRIVATE
+        CUDA::cudart
+        CUDA::cublas
+        # CUDA::cublasLt
+        CUDA::cufft
+        CUDA::cufftw
+        CUDA::cusparse
+        OpenMP::OpenMP_CXX
+        pthread
+        -Wl,--allow-multiple-definition
+        ${FAISS_LIBRARIES}
+    )
+endif()
 
 # No CPU BLAS/LAPACK is linked: the library's only GEMM is GPU cuBLAS
 # (cublasSgemm), and FAISS carries its own BLAS transitively. Dropping the

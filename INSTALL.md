@@ -94,6 +94,22 @@ make -j<num cores>
 ```
 Using multiple threads may throw errors in the compilation due to nonexistent files. To fix this, just run a single threaded `make` after compilation completes.
 
+### Building for AMD GPUs (ROCm)
+
+tsne-cuda can also be built with HIP for AMD GPUs. In addition to the requirements above (without the CUDA toolkit), this needs:
+
+- ROCm with hipBLAS, hipFFT, hipSPARSE and rocThrust.
+- FAISS built with GPU support for ROCm (`-DFAISS_ENABLE_GPU=ON -DFAISS_ENABLE_ROCM=ON`) and installed, see the FAISS install instructions.
+
+Configure with `-DUSE_HIP=ON`, the target GPU architecture, and the ROCm and FAISS install prefixes, then build:
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx942 \
+  -DCMAKE_PREFIX_PATH="/opt/rocm;<faiss install prefix>"
+cmake --build build -j
+```
+Replace `gfx942` with the architecture of your GPU (`rocm_agent_enumerator` lists it); several architectures can be given separated by semicolons. If CMake does not find the HIP compiler, add `-DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++`, or put `/opt/rocm/bin` on `PATH`. The Python package is then in `build/python` as for the CUDA build.
+
 ### Installing the python bindings
 
 Once you have compiled the python bindings you can install the Python bindings by changing into the `build/python` directory, and running:
