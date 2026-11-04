@@ -38,14 +38,16 @@ ADD_DEFINITIONS(-DVERSION_PATCH=${CMAKE_PROJECT_VERSION_PATCH})
 #-------------------------------------------------------------------------------
 set(OPT_FLAGS
     -std=c++17
-    -fopenmp
-    -fPIC
     -Wno-sign-compare
     -O3
     -Wall
     -Wextra
     -DFINTEGER=int
 )
+# Windows has no -fPIC, and the sources do not use OpenMP.
+if(NOT WIN32)
+    list(APPEND OPT_FLAGS -fopenmp -fPIC)
+endif()
 # x86-only tuning flags; omitted on aarch64 (e.g. Grace/GB200) and other ISAs.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86)$")
     list(APPEND OPT_FLAGS -m64 -mpopcnt -msse4)
@@ -173,7 +175,9 @@ endif()
 
 # OpenMP configuration
 #-------------------------------------------------------------------------------
-find_package(OpenMP REQUIRED)
+if(NOT WIN32)
+    find_package(OpenMP REQUIRED)
+endif()
 #-------------------------------------------------------------------------------
 
 # Interactive-visualization (ZMQ) support is intentionally disabled: the ZMQ
@@ -261,11 +265,15 @@ if(USE_HIP)
         hip::hipfft
         roc::hipsparse
         roc::rocthrust
-        OpenMP::OpenMP_CXX
-        pthread
-        -Wl,--allow-multiple-definition
         ${FAISS_LIBRARIES}
     )
+    if(NOT WIN32)
+        target_link_libraries(tsnecuda PRIVATE
+            OpenMP::OpenMP_CXX
+            pthread
+            -Wl,--allow-multiple-definition
+        )
+    endif()
 else()
     target_link_libraries(tsnecuda PRIVATE
         CUDA::cudart

@@ -110,6 +110,20 @@ cmake --build build -j
 ```
 Replace `gfx942` with the architecture of your GPU (`rocm_agent_enumerator` lists it); several architectures can be given separated by semicolons. If CMake does not find the HIP compiler, add `-DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++`, or put `/opt/rocm/bin` on `PATH`. The Python package is then in `build/python` as for the CUDA build.
 
+#### Windows
+
+The HIP build also works on Windows with the ROCm SDK. Use the GNU-style `clang`/`clang++` from the ROCm SDK for the C, C++ and HIP compilers (not `clang-cl`), Ninja, and a FAISS built for ROCm on Windows:
+```
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ^
+  -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1151 ^
+  -DCMAKE_C_COMPILER=<rocm>/lib/llvm/bin/clang.exe ^
+  -DCMAKE_CXX_COMPILER=<rocm>/lib/llvm/bin/clang++.exe ^
+  -DCMAKE_HIP_COMPILER=<rocm>/lib/llvm/bin/clang++.exe ^
+  -DCMAKE_PREFIX_PATH="<rocm>;<faiss install prefix>"
+cmake --build build
+```
+This produces `libtsnecuda.dll`. Python does not search `PATH` for the DLLs it depends on, so make `faiss.dll` and the ROCm runtime DLLs loadable, for example by copying them next to `libtsnecuda.dll` or with `os.add_dll_directory()` before importing `tsnecuda`.
+
 ### Installing the python bindings
 
 Once you have compiled the python bindings you can install the Python bindings by changing into the `build/python` directory, and running:
