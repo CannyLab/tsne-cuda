@@ -71,11 +71,11 @@ cd build/
 
 From the build directory, we can configure our project. There are a number of options that may be necessary:
 - -DBUILD_PYTHON: (DEFAULT ON) Build the python package. This is necessary for the python bindings.
+- -DBUILD_TESTS: (DEFAULT OFF) Build the GPU unit tests (`tsnecuda_test`, run with `ctest`). GoogleTest is used from the system if found, otherwise downloaded at configure time.
 - -WITH_MKL: (DEFAULT OFF) Build with MKL support. If your MKL is installed in the default location "/opt/intel/mkl" then this is the only argument you need to change. If MKL is installed somewhere else, you must also pass the root MKL directory with -DMKL_DIR=<root directory> . If this is off, you must have OpenBLAS installed.
 - -DCMAKE_CXX_COMPILER,-DCMAKE_C_COMPILER (DEFAULT system default) It is possible on newer systems that you will get a compatability error "NVCC does not support GCC versions greater than 6.4.0". To fix this error, you can install an older compiler, and use these cmake options to build the library.
 
 Broken features (will cause cmake/compilation issues):
-- -DBUILD_TEST: (DEFAULT OFF) Build the test suite. To turn this on, use -DBUILD_TEST=TRUE
 - -DWITH_ZMQ: (DEFAULT OFF) There is a bug when using GCC version >= 6.0 with nvcc which means that ZMQ cannot be properly compiled. Thus, to avoid this bug which is present in Ubuntu versions 17.10 and 18.04 by default, you must use -DWITH_ZMQ=FALSE. CUDA 10.0 recently fixed this, so you can use this feature with CUDA 10.0 if you have installed ZMQ correctly.
 
 To configure, use the following CMAKE command:

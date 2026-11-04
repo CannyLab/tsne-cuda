@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 #-------------------------------------------------------------------------------
 option(BUILD_PYTHON "Build python if ON" ON)
 option(USE_HIP "Build for AMD GPUs with HIP (ROCm) instead of CUDA" OFF)
+option(BUILD_TESTS "Build the GPU unit tests (uses GoogleTest)" OFF)
 #-------------------------------------------------------------------------------
 
 if(USE_HIP)
@@ -299,6 +300,42 @@ endif()
 # The standalone C++ CLI (src/exe/main.cu, which pulls in the cxxopts submodule)
 # is intentionally not built: the Python module is the supported entry point.
 #-------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------
+# GPU unit tests
+#-------------------------------------------------------------------------------
+if(BUILD_TESTS)
+    find_package(GTest QUIET)
+    if(NOT GTest_FOUND)
+        include(FetchContent)
+        FetchContent_Declare(googletest
+            URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz)
+        set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(googletest)
+    endif()
+    enable_testing()
+
+    # The tests call library internals, so compile them in rather than linking
+    # the shared library, which exports only the Python entry point on Windows.
+    set(TEST_SOURCES
+        src/test/test.cu
+        src/util/cuda_utils.cu
+        src/util/reduce_utils.cu
+    )
+    add_executable(tsnecuda_test ${TEST_SOURCES})
+    if(USE_HIP)
+        set_source_files_properties(src/test/test.cu PROPERTIES LANGUAGE HIP)
+        target_include_directories(tsnecuda_test BEFORE PRIVATE ${PROJECT_SOURCE_DIR}/hip_compat)
+        target_compile_options(tsnecuda_test PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-Wno-register>)
+        target_link_libraries(tsnecuda_test PRIVATE
+            hip::host roc::hipblas hip::hipfft roc::hipsparse roc::rocthrust)
+    else()
+        target_link_libraries(tsnecuda_test PRIVATE
+            CUDA::cudart CUDA::cublas CUDA::cufft CUDA::cusparse)
+    endif()
+    target_link_libraries(tsnecuda_test PRIVATE GTest::gtest_main)
+    add_test(NAME tsnecuda_test COMMAND tsnecuda_test)
+endif()
 
 #-------------------------------------------------------------------------------
 # Python library copy and build
