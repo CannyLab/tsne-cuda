@@ -71,11 +71,11 @@ cd build/
 
 From the build directory, we can configure our project. There are a number of options that may be necessary:
 - -DBUILD_PYTHON: (DEFAULT ON) Build the python package. This is necessary for the python bindings.
+- -DBUILD_TESTS: (DEFAULT OFF) Build the GPU unit tests (`tsnecuda_test`, run with `ctest`). GoogleTest is used from the system if found, otherwise downloaded at configure time.
 - -WITH_MKL: (DEFAULT OFF) Build with MKL support. If your MKL is installed in the default location "/opt/intel/mkl" then this is the only argument you need to change. If MKL is installed somewhere else, you must also pass the root MKL directory with -DMKL_DIR=<root directory> . If this is off, you must have OpenBLAS installed.
 - -DCMAKE_CXX_COMPILER,-DCMAKE_C_COMPILER (DEFAULT system default) It is possible on newer systems that you will get a compatability error "NVCC does not support GCC versions greater than 6.4.0". To fix this error, you can install an older compiler, and use these cmake options to build the library.
 
 Broken features (will cause cmake/compilation issues):
-- -DBUILD_TEST: (DEFAULT OFF) Build the test suite. To turn this on, use -DBUILD_TEST=TRUE
 - -DWITH_ZMQ: (DEFAULT OFF) There is a bug when using GCC version >= 6.0 with nvcc which means that ZMQ cannot be properly compiled. Thus, to avoid this bug which is present in Ubuntu versions 17.10 and 18.04 by default, you must use -DWITH_ZMQ=FALSE. CUDA 10.0 recently fixed this, so you can use this feature with CUDA 10.0 if you have installed ZMQ correctly.
 
 To configure, use the following CMAKE command:
@@ -94,6 +94,36 @@ make -j<num cores>
 ```
 Using multiple threads may throw errors in the compilation due to nonexistent files. To fix this, just run a single threaded `make` after compilation completes.
 
+### Building for AMD GPUs (ROCm)
+
+tsne-cuda can also be built with HIP for AMD GPUs. In addition to the requirements above (without the CUDA toolkit), this needs:
+
+- ROCm with hipBLAS, hipFFT, hipSPARSE and rocThrust.
+- FAISS built with GPU support for ROCm (`-DFAISS_ENABLE_GPU=ON -DFAISS_ENABLE_ROCM=ON`) and installed, see the FAISS install instructions.
+
+Configure with `-DUSE_HIP=ON`, the target GPU architecture, and the ROCm and FAISS install prefixes, then build:
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx942 \
+  -DCMAKE_PREFIX_PATH="/opt/rocm;<faiss install prefix>"
+cmake --build build -j
+```
+Replace `gfx942` with the architecture of your GPU (`rocm_agent_enumerator` lists it); several architectures can be given separated by semicolons. If CMake does not find the HIP compiler, add `-DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++`, or put `/opt/rocm/bin` on `PATH`. The Python package is then in `build/python` as for the CUDA build. A FAISS built with the ROCm clang links LLVM's OpenMP runtime `libomp.so`, which the loader may not find when tsne-cuda itself is built with GCC; if using `tsnecuda` fails with `OSError: libomp.so: cannot open shared object file`, add `/opt/rocm/llvm/lib` to `LD_LIBRARY_PATH`.
+
+#### Windows
+
+The HIP build also works on Windows with the ROCm SDK. Use the GNU-style `clang`/`clang++` from the ROCm SDK for the C, C++ and HIP compilers (not `clang-cl`), Ninja, and a FAISS built for ROCm on Windows:
+```
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ^
+  -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1151 ^
+  -DCMAKE_C_COMPILER=<rocm>/lib/llvm/bin/clang.exe ^
+  -DCMAKE_CXX_COMPILER=<rocm>/lib/llvm/bin/clang++.exe ^
+  -DCMAKE_HIP_COMPILER=<rocm>/lib/llvm/bin/clang++.exe ^
+  -DCMAKE_PREFIX_PATH="<rocm>;<faiss install prefix>"
+cmake --build build
+```
+This produces `libtsnecuda.dll`. Python does not search `PATH` for the DLLs it depends on, so make `faiss.dll` and the ROCm runtime DLLs loadable, for example by copying them next to `libtsnecuda.dll` or with `os.add_dll_directory()` before importing `tsnecuda`.
+
 ### Installing the python bindings
 
 Once you have compiled the python bindings you can install the Python bindings by changing into the `build/python` directory, and running:
@@ -102,10 +132,16 @@ pip install -e .
 ```
 ### Validating the Install
 
-Unfortunately, the current set of tests do not compile. The best way to determine that everything is working is to run
+The quickest way to determine that everything is working is to run
 
 ```python
 import tsnecuda
 tsnecuda.test()
 ```
 This does a t-SNE on 5000 points, so it should complete relatively quickly (1-2 seconds). If there are no error messages and it doesn't hang, you should be good to go.
+
+For a more thorough check of embedding quality on the GPU, install `pytest` and `scikit-learn` and run the Python tests:
+```
+python -m pytest -v build/python/tsnecuda/test
+```
+The large clustering test embeds 50000 points; set `TSNECUDA_TEST_BLOBS_N` to a smaller number on GPUs with little memory.

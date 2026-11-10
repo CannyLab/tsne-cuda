@@ -12,12 +12,12 @@ void test_reduce_sum_col(int N, int M) {
     std::mt19937 eng; 
     eng.seed(time(NULL));
     std::normal_distribution<float> dist;  
-    float points[N * M];
+    std::vector<float> points(N * M);
     for (int i = 0; i < N * M; i++) points[i] = dist(eng);
 
     // Copy the matrix to the GPU
     thrust::device_vector<float> d_points(N*M);
-    thrust::copy(points, points+(N*M), d_points.begin());
+    thrust::copy(points.begin(), points.end(), d_points.begin());
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
@@ -27,12 +27,11 @@ void test_reduce_sum_col(int N, int M) {
     auto d_sums = tsnecuda::util::ReduceSum(handle, d_points, N, M, 0);
 
     // Copy the data back to the cpu
-    float gpu_result[M];
-    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result);
+    std::vector<float> gpu_result(M);
+    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    float cpu_result[M];
-    memset(cpu_result, 0, M*sizeof(float));
+    std::vector<double> cpu_result(M, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[j] += points[i + j*N];
@@ -50,12 +49,12 @@ void test_reduce_sum_row(int N, int M) {
     std::mt19937 eng; 
     eng.seed(time(NULL));
     std::normal_distribution<float> dist;  
-    float points[N * M];
+    std::vector<float> points(N * M);
     for (int i = 0; i < N * M; i++) points[i] = dist(eng);
 
     // Copy the matrix to the GPU
     thrust::device_vector<float> d_points(N*M);
-    thrust::copy(points, points+(N*M), d_points.begin());
+    thrust::copy(points.begin(), points.end(), d_points.begin());
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
@@ -65,12 +64,11 @@ void test_reduce_sum_row(int N, int M) {
     auto d_sums = tsnecuda::util::ReduceSum(handle, d_points, N, M, 1);
 
     // Copy the data back to the cpu
-    float gpu_result[N];
-    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result);
+    std::vector<float> gpu_result(N);
+    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    float cpu_result[N];
-    memset(cpu_result, 0, N*sizeof(float));
+    std::vector<double> cpu_result(N, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[i] += points[i + j*N];
@@ -88,12 +86,12 @@ void test_reduce_mean_col(int N, int M) {
     std::mt19937 eng; 
     eng.seed(time(NULL));
     std::normal_distribution<float> dist;  
-    float points[N * M];
+    std::vector<float> points(N * M);
     for (int i = 0; i < N * M; i++) points[i] = dist(eng);
 
     // Copy the matrix to the GPU
     thrust::device_vector<float> d_points(N*M);
-    thrust::copy(points, points+(N*M), d_points.begin());
+    thrust::copy(points.begin(), points.end(), d_points.begin());
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
@@ -103,12 +101,11 @@ void test_reduce_mean_col(int N, int M) {
     auto d_sums = tsnecuda::util::ReduceMean(handle, d_points, N, M, 0);
 
     // Copy the data back to the cpu
-    float gpu_result[M];
-    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result);
+    std::vector<float> gpu_result(M);
+    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    float cpu_result[M];
-    memset(cpu_result, 0, M*sizeof(float));
+    std::vector<double> cpu_result(M, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[j] += points[i + j*N];
@@ -126,12 +123,12 @@ void test_reduce_mean_row(int N, int M) {
     std::mt19937 eng; 
     eng.seed(time(NULL));
     std::normal_distribution<float> dist;  
-    float points[N * M];
+    std::vector<float> points(N * M);
     for (int i = 0; i < N * M; i++) points[i] = dist(eng);
 
     // Copy the matrix to the GPU
     thrust::device_vector<float> d_points(N*M);
-    thrust::copy(points, points+(N*M), d_points.begin());
+    thrust::copy(points.begin(), points.end(), d_points.begin());
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
@@ -141,12 +138,11 @@ void test_reduce_mean_row(int N, int M) {
     auto d_sums = tsnecuda::util::ReduceMean(handle, d_points, N, M, 1);
 
     // Copy the data back to the cpu
-    float gpu_result[N];
-    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result);
+    std::vector<float> gpu_result(N);
+    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    float cpu_result[N];
-    memset(cpu_result, 0, N*sizeof(float));
+    std::vector<double> cpu_result(N, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[i] += points[i + j*N];
@@ -164,12 +160,12 @@ void test_reduce_alpha_col(int N, int M, float alpha) {
     std::mt19937 eng; 
     eng.seed(time(NULL));
     std::normal_distribution<float> dist;  
-    float points[N * M];
+    std::vector<float> points(N * M);
     for (int i = 0; i < N * M; i++) points[i] = dist(eng);
 
     // Copy the matrix to the GPU
     thrust::device_vector<float> d_points(N*M);
-    thrust::copy(points, points+(N*M), d_points.begin());
+    thrust::copy(points.begin(), points.end(), d_points.begin());
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
@@ -179,12 +175,11 @@ void test_reduce_alpha_col(int N, int M, float alpha) {
     auto d_sums = tsnecuda::util::ReduceAlpha(handle, d_points, N, M, alpha, 0);
 
     // Copy the data back to the cpu
-    float gpu_result[M];
-    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result);
+    std::vector<float> gpu_result(M);
+    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    float cpu_result[M];
-    memset(cpu_result, 0, M*sizeof(float));
+    std::vector<double> cpu_result(M, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[j] += points[i + j*N];
@@ -202,12 +197,12 @@ void test_reduce_alpha_row(int N, int M, float alpha) {
     std::mt19937 eng; 
     eng.seed(time(NULL));
     std::normal_distribution<float> dist;  
-    float points[N * M];
+    std::vector<float> points(N * M);
     for (int i = 0; i < N * M; i++) points[i] = dist(eng);
 
     // Copy the matrix to the GPU
     thrust::device_vector<float> d_points(N*M);
-    thrust::copy(points, points+(N*M), d_points.begin());
+    thrust::copy(points.begin(), points.end(), d_points.begin());
 
     // Construct CUBLAS handle
     cublasHandle_t handle;
@@ -217,12 +212,11 @@ void test_reduce_alpha_row(int N, int M, float alpha) {
     auto d_sums = tsnecuda::util::ReduceAlpha(handle, d_points, N, M, alpha, 1);
 
     // Copy the data back to the cpu
-    float gpu_result[N];
-    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result);
+    std::vector<float> gpu_result(N);
+    thrust::copy(d_sums.begin(), d_sums.end(), gpu_result.begin());
 
     // Compute the reduction on the cpu
-    float cpu_result[N];
-    memset(cpu_result, 0, N*sizeof(float));
+    std::vector<double> cpu_result(N, 0.0);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < M; j++) {
             cpu_result[i] += points[i + j*N];
