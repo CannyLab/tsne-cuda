@@ -80,10 +80,12 @@ def _small_clusters_metrics(n_samples, n_features, num_neighbors):
                            n_features=n_features, random_state=0)
     Y = TSNE(num_neighbors=num_neighbors, random_seed=0).fit_transform(
         X.astype(np.float32))
+    if not np.isfinite(Y).all():
+        return {"finite": False, "ari": None}
     with threadpool_limits(limits=8):
         predicted = KMeans(n_clusters=3, n_init=10,
                            random_state=0).fit_predict(Y)
-    return {"finite": bool(np.isfinite(Y).all()),
+    return {"finite": True,
             "ari": float(adjusted_rand_score(labels, predicted))}
 
 
