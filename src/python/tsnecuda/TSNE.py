@@ -13,7 +13,28 @@ import numpy as N
 import ctypes
 from ctypes import c_int, c_float, c_bool, POINTER
 import os
+import sys
 from collections import namedtuple
+
+
+_dll_directories = []
+
+
+def _add_dll_directories(package_dir):
+    # Since Python 3.8, Windows does not search PATH for the DLLs that
+    # libtsnecuda.dll depends on (FAISS, cuBLAS, cuFFT, ...). Add the places
+    # they are installed: this package, a conda environment's Library\bin, and
+    # a CUDA toolkit named by CUDA_PATH.
+    if os.name != 'nt' or not hasattr(os, 'add_dll_directory') or _dll_directories:
+        return
+    candidates = [package_dir, os.path.join(sys.prefix, 'Library', 'bin')]
+    cuda_path = os.environ.get('CUDA_PATH')
+    if cuda_path:
+        candidates += [os.path.join(cuda_path, 'bin'),
+                       os.path.join(cuda_path, 'bin', 'x64')]
+    for directory in candidates:
+        if os.path.isdir(directory):
+            _dll_directories.append(os.add_dll_directory(directory))
 
 
 def ord_string(s):
@@ -136,6 +157,7 @@ class TSNE(object):
 
         # Build the hooks for the BH T-SNE library
         self._path = os.path.dirname(__file__)
+        _add_dll_directories(self._path)
         self._lib = N.ctypeslib.load_library(
             'libtsnecuda', self._path)  # Load the ctypes library
 

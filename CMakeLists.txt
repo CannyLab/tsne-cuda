@@ -171,17 +171,28 @@ else()
 endif()
 
 
-set(CUDA_OPTS
-    -O3
-    -Xptxas '-dlcm=cg'
-    -Xcompiler '-O3'
-    -Xcompiler '-fPIC'
-    -Xcompiler '-fopenmp'
-    -Xlinker 'muldefs'
-)
-# x86-only host tuning flags for nvcc's host compiler; omitted on other ISAs.
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86)$")
-    list(APPEND CUDA_OPTS -Xcompiler '-msse4' -Xcompiler '-m64' -Xcompiler '-mpopcnt')
+if(WIN32)
+    # On Windows nvcc's host compiler is MSVC (cl.exe), which takes none of the
+    # GNU options below, and no shell strips the quotes around them. /bigobj
+    # lifts MSVC's section limit, which Thrust-heavy objects can exceed.
+    set(CUDA_OPTS
+        -O3
+        -Xptxas -dlcm=cg
+        -Xcompiler /bigobj
+    )
+else()
+    set(CUDA_OPTS
+        -O3
+        -Xptxas '-dlcm=cg'
+        -Xcompiler '-O3'
+        -Xcompiler '-fPIC'
+        -Xcompiler '-fopenmp'
+        -Xlinker 'muldefs'
+    )
+    # x86-only host tuning flags for nvcc's host compiler; omitted on other ISAs.
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86)$")
+        list(APPEND CUDA_OPTS -Xcompiler '-msse4' -Xcompiler '-m64' -Xcompiler '-mpopcnt')
+    endif()
 endif()
 string (REPLACE ";" " " NVCC_FLAGS_STR "${CUDA_ARCH} ${CUDA_OPTS}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${NVCC_FLAGS_STR}")
@@ -299,11 +310,15 @@ else()
         CUDA::cufft
         CUDA::cufftw
         CUDA::cusparse
-        OpenMP::OpenMP_CXX
-        pthread
-        -Wl,--allow-multiple-definition
-        ${FAISS_LIBRARIES}
     )
+    if(NOT WIN32)
+        target_link_libraries(tsnecuda PRIVATE
+            OpenMP::OpenMP_CXX
+            pthread
+            -Wl,--allow-multiple-definition
+        )
+    endif()
+    target_link_libraries(tsnecuda PRIVATE ${FAISS_LIBRARIES})
 endif()
 
 # No CPU BLAS/LAPACK is linked: the library's only GEMM is GPU cuBLAS

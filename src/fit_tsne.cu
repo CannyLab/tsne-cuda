@@ -243,7 +243,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     }
 
     // FIT-TNSE Parameters
-    int n_interpolation_points = 3;
+    const int n_interpolation_points = 3;
     // float intervals_per_integer = 1;
     int min_num_intervals = 125;
     int N = num_points;
