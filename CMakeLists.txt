@@ -142,8 +142,10 @@ else()
             -gencode=arch=compute_89,code=sm_89
             -gencode=arch=compute_90,code=sm_90
         )
-        # Blackwell (sm_100 / sm_120) requires CUDA >= 12.8.
-        if(CUDAToolkit_VERSION_MINOR GREATER_EQUAL "8")
+        # Blackwell (sm_100 / sm_120) requires CUDA >= 12.8. On Windows, CUDA
+        # 12's CCCL headers don't compile for it in C++20 (inline asm passes a
+        # 32-bit long to a 64-bit operand), so Blackwell runs the sm_90 PTX there.
+        if(CUDAToolkit_VERSION_MINOR GREATER_EQUAL "8" AND NOT WIN32)
             list(APPEND CUDA_ARCH
                 -gencode=arch=compute_100,code=sm_100
                 -gencode=arch=compute_120,code=sm_120
