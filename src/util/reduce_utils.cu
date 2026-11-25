@@ -46,7 +46,9 @@ thrust::device_vector<float> tsnecuda::util::ReduceMean(cublasHandle_t &handle,
         const int N,
         const int M,
         const int axis) {
-    float alpha = 1.f / N;
+    // axis 0 averages each column over its N rows, axis 1 each row over its M
+    // columns.
+    float alpha = 1.f / (axis == 0 ? N : M);
     return tsnecuda::util::ReduceAlpha(handle, d_matrix, N, M, alpha, axis);
 }
 
