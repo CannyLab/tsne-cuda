@@ -19,7 +19,18 @@ option(BUILD_TESTS "Build the GPU unit tests (uses GoogleTest)" OFF)
 if(USE_HIP)
     enable_language(HIP)
 else()
+    # enable_language(CUDA) fills CMAKE_CUDA_ARCHITECTURES with nvcc's default
+    # (sm_52 on CUDA 12) when nobody set it, which would hide the per-toolkit
+    # list below. Note whether the user or packager chose architectures, and if
+    # not, store OFF so this configure and later ones use the list.
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES AND NOT DEFINED ENV{CUDAARCHS})
+        set(TSNECUDA_DEFAULT_CUDA_ARCHS ON)
+    endif()
     enable_language(CUDA)
+    if(TSNECUDA_DEFAULT_CUDA_ARCHS)
+        set(CMAKE_CUDA_ARCHITECTURES OFF CACHE STRING
+            "CUDA architectures (OFF: tsnecuda's list for the detected toolkit)" FORCE)
+    endif()
 endif()
 
 # Build Number Generation
