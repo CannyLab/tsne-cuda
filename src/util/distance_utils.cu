@@ -118,9 +118,44 @@ void tsnecuda::util::KNearestNeighbors(tsnecuda::GpuOptions &gpu_opt,
         cpu_index.search(num_points, points, num_near_neighbors,
                          distances, indices);
     }
+
+    // The probed cells can hold fewer than num_near_neighbors points (for
+    // example when a cluster is smaller than k). FAISS then pads the end of
+    // the row with index -1 and distance FLT_MAX, which would later index
+    // before the start of the neighbor arrays. Redo those rows with an exact
+    // search. RunTsne clamps num_near_neighbors to num_points, so the exact
+    // search fills every row.
+    std::vector<int64_t> short_rows;
+    for (int64_t i = 0; i < num_points; i++)
+        if (indices[(i + 1) * num_near_neighbors - 1] < 0)
+            short_rows.push_back(i);
+    if (!short_rows.empty())
+    {
+        const int64_t num_short = static_cast<int64_t>(short_rows.size());
+        std::vector<float> queries(num_short * num_dims);
+        for (int64_t r = 0; r < num_short; r++)
+            std::copy(points + short_rows[r] * num_dims,
+                      points + (short_rows[r] + 1) * num_dims,
+                      queries.begin() + r * num_dims);
+        std::vector<float> exact_distances(num_short * num_near_neighbors);
+        std::vector<int64_t> exact_indices(num_short * num_near_neighbors);
+        faiss::IndexFlatL2 exact_index(num_dims);
+        exact_index.add(num_points, points);
+        exact_index.search(num_short, queries.data(), num_near_neighbors,
+                           exact_distances.data(), exact_indices.data());
+        for (int64_t r = 0; r < num_short; r++)
+        {
+            std::copy(exact_distances.begin() + r * num_near_neighbors,
+                      exact_distances.begin() + (r + 1) * num_near_neighbors,
+                      distances + short_rows[r] * num_near_neighbors);
+            std::copy(exact_indices.begin() + r * num_near_neighbors,
+                      exact_indices.begin() + (r + 1) * num_near_neighbors,
+                      indices + short_rows[r] * num_near_neighbors);
+        }
+    }
 }
 
-// TODO: Add -1 notification here... and how to deal with it if it happens
+// KNearestNeighbors never returns -1 indices (short rows are redone exactly).
 // TODO: Maybe think about getting FAISS to return integers (long-term todo)
 __global__ void tsnecuda::util::PostprocessNeighborIndicesKernel(
     volatile int *__restrict__ indices,

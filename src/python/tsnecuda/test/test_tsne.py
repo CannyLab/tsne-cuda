@@ -74,21 +74,43 @@ def _blobs_ari(n_samples, num_neighbors=32):
     return adjusted_rand_score(labels, predicted)
 
 
-def _digits_in_subprocess(env_overrides):
-    # Kernel synchronization is read once per process, so environment
-    # variants run in a fresh interpreter. pytest may have put the package on
+def _small_clusters_metrics(n_samples, n_features, num_neighbors):
+    # Three blobs, each holding fewer points than num_neighbors.
+    X, labels = make_blobs(n_samples=n_samples, centers=3,
+                           n_features=n_features, random_state=0)
+    Y = TSNE(num_neighbors=num_neighbors, random_seed=0).fit_transform(
+        X.astype(np.float32))
+    if not np.isfinite(Y).all():
+        return {"finite": False, "ari": None}
+    with threadpool_limits(limits=8):
+        predicted = KMeans(n_clusters=3, n_init=10,
+                           random_state=0).fit_predict(Y)
+    return {"finite": True,
+            "ari": float(adjusted_rand_score(labels, predicted))}
+
+
+def _json_in_subprocess(expression, env_overrides=None):
+    # Runs `expression` (using `t` for this module) in a fresh interpreter and
+    # returns its JSON-encoded value. pytest may have put the package on
     # sys.path itself, so pass its parent directory to the child explicitly.
-    env = dict(os.environ, **env_overrides)
+    env = dict(os.environ, **(env_overrides or {}))
     package_parent = os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))))
     env["PYTHONPATH"] = os.pathsep.join(
         filter(None, [package_parent, env.get("PYTHONPATH")]))
     code = ("import json; from tsnecuda.test import test_tsne as t; "
-            "print(json.dumps(t._digits_metrics(t._embed_digits())))")
+            "print(json.dumps(%s))" % expression)
     result = subprocess.run([sys.executable, "-c", code], env=env,
                             capture_output=True, text=True, timeout=600)
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def _digits_in_subprocess(env_overrides):
+    # Kernel synchronization is read once per process, so environment
+    # variants run in a fresh interpreter.
+    return _json_in_subprocess("t._digits_metrics(t._embed_digits())",
+                               env_overrides)
 
 
 def test_random_points_finite():
@@ -134,3 +156,18 @@ def test_blobs_clusters_cpu_neighbors():
     # points the probed cells can hold fewer than 1024 points, and FAISS then
     # pads the neighbor list with -1.
     assert _blobs_ari(10000, num_neighbors=1024) >= 0.9
+
+
+@pytest.mark.parametrize("n_samples,n_features,num_neighbors", [
+    (3000, 50, 1024),  # CPU FAISS search path
+    (2000, 10, 1000),  # GPU FAISS search path
+])
+def test_clusters_smaller_than_num_neighbors(n_samples, n_features,
+                                             num_neighbors):
+    # The probed IVF cells hold fewer than num_neighbors points, so FAISS pads
+    # the neighbor lists with -1. That used to fault the process (#143), so
+    # run it in a subprocess.
+    metrics = _json_in_subprocess("t._small_clusters_metrics(%d, %d, %d)" % (
+        n_samples, n_features, num_neighbors))
+    assert metrics["finite"], metrics
+    assert metrics["ari"] >= 0.99, metrics
