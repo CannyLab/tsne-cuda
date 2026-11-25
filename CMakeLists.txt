@@ -89,7 +89,14 @@ if(USE_HIP)
 else()
 find_package(CUDAToolkit REQUIRED)
 if(NOT DEFINED CMAKE_CUDA_STANDARD)
-    set(CMAKE_CUDA_STANDARD 17)
+    # Recent FAISS headers (faiss/impl/Panorama.h) use C++20 lambda template
+    # parameters. nvcc accepts them in C++17 mode as a GNU extension, but not
+    # when it emulates MSVC, so Windows builds need C++20.
+    if(WIN32)
+        set(CMAKE_CUDA_STANDARD 20)
+    else()
+        set(CMAKE_CUDA_STANDARD 17)
+    endif()
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
@@ -175,10 +182,12 @@ if(WIN32)
     # On Windows nvcc's host compiler is MSVC (cl.exe), which takes none of the
     # GNU options below, and no shell strips the quotes around them. /bigobj
     # lifts MSVC's section limit, which Thrust-heavy objects can exceed.
+    # CCCL (CUDA 13) refuses to build with MSVC's traditional preprocessor.
     set(CUDA_OPTS
         -O3
         -Xptxas -dlcm=cg
         -Xcompiler /bigobj
+        -Xcompiler /Zc:preprocessor
     )
 else()
     set(CUDA_OPTS
