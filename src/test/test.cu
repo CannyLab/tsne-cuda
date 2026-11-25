@@ -25,6 +25,13 @@ namespace {
     TEST(Reductions, ReduceSum_Row_512x512){test_reduce_sum_row(512,512);}
     TEST(Reductions, ReduceMean_Col_512x512){test_reduce_mean_col(512,512);}
     TEST(Reductions, ReduceMean_Row_512x512){test_reduce_mean_row(512,512);}
+    // Non-square shapes, so dividing by the wrong dimension fails (#144).
+    TEST(Reductions, ReduceSum_Col_384x512){test_reduce_sum_col(384,512);}
+    TEST(Reductions, ReduceSum_Row_384x512){test_reduce_sum_row(384,512);}
+    TEST(Reductions, ReduceMean_Col_384x512){test_reduce_mean_col(384,512);}
+    TEST(Reductions, ReduceMean_Row_384x512){test_reduce_mean_row(384,512);}
+    TEST(Reductions, ReduceMean_Col_512x384){test_reduce_mean_col(512,384);}
+    TEST(Reductions, ReduceMean_Row_512x384){test_reduce_mean_row(512,384);}
     TEST(Reductions, ReduceAlpha_Col_512x512_pos){test_reduce_alpha_col(512,512,0.1);}
     TEST(Reductions, ReduceAlpha_Row_512x512_pos){test_reduce_alpha_row(512,512,0.1);}
     TEST(Reductions, ReduceAlpha_Col_512x512_neg){test_reduce_alpha_col(512,512,-0.1);}
