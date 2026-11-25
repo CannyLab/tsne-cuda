@@ -6,33 +6,29 @@ Conda binaries are available through conda-forge! To install tsne-cuda with cond
 
 ## Pip installation
 
-Pip binaries are available for Python >=3.6 and CUDA 10.1, 10.2, 11.0, 11.1, 11.2, 11.3, 11.8 and 12.2 and FAISS version 1.7.4 and Intel MKL 2018.
+Prebuilt wheels for Linux (x86_64) are attached to each [GitHub release](https://github.com/CannyLab/tsne-cuda/releases) and listed at https://tsnecuda.isx.ai/tsnecuda_stable.html. One wheel works with every Python 3 version. Wheels don't include FAISS or the CUDA libraries, so install those first. Install the FAISS version the wheel was built against: FAISS's C++ ABI changes between releases, and a wheel won't load against a different version.
 
-To install tsne-cuda with pip, run `pip3 install tsnecuda`. This installs tsnecuda with a CUDA version of 10.2. For this to work, you MUST have both FAISS version 1.6.5
-and intel MKL installed already on your machine - see installation instructions for FAISS: [here](https://github.com/facebookresearch/faiss/blob/v1.6.5/INSTALL.md).
-and installation instructions for MKL on Ubuntu/debian [here](https://github.com/eddelbuettel/mkl4deb)
+| Wheel | Native code for | Runtime libraries from conda-forge |
+|---|---|---|
+| `4.1.0+cu118` | sm_52 to sm_86 (Maxwell to Ampere) | `"libfaiss=1.9.0=*cuda118*"` |
+| `4.1.0+cu124` | sm_70 to sm_90 (Volta to Hopper) | `"libfaiss=1.9.0=*cuda126*" libcufft libcusparse` |
+| `4.1.0+cu126` | sm_70 to sm_90 (Volta to Hopper) | `"libfaiss=1.9.0=*cuda126*" libcufft libcusparse` |
+| `4.1.0+cu129` | sm_70 to sm_120 (Volta to Blackwell) | `"libfaiss=1.9.0=*cuda126*" libcufft libcusparse` |
+| `4.1.0+cu130` | sm_75 to sm_120 (Turing to Blackwell) | `"libfaiss=1.14.3=*cuda130*" libcufft libcusparse` |
 
-When installing FAISS from source, it is necessary to build and install both the C++ and the python requirements.
+Each wheel also carries PTX (compute_80 in cu118, compute_90 in cu124 and cu126, compute_120 in cu129 and cu130), so GPUs newer than the list compile the kernels on first use. Maxwell and Pascal GPUs need the cu118 wheel or a source build.
 
-If you do not want to use 10.2, you can download using pip from our hosted sources:
+For example, with the CUDA 12.9 wheel:
 ```
-# CUDA 12.2 (FAISS 1.7.4)
-pip3 install tsnecuda==3.0.1+cu122 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.8 (FAISS 1.7.4)
-pip3 install tsnecuda==3.0.1+cu118 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.3 (FAISS 1.6.5)
-pip3 install tsnecuda==3.0.1+cu113 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.2 (FAISS 1.6.5)
-pip3 install tsnecuda==3.0.1+cu112 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.1 (FAISS 1.6.5)
-pip3 install tsnecuda==3.0.1+cu111 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 11.0 (FAISS 1.6.5)
-pip3 install tsnecuda==3.0.1+cu110 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 10.1 (FAISS 1.6.5)
-pip3 install tsnecuda==3.0.1+cu101 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
-# CUDA 10.0 (FAISS 1.6.5)
-pip3 install tsnecuda==3.0.1+cu100 -f https://tsnecuda.isx.ai/tsnecuda_stable.html
+conda create -n tsnecuda -c conda-forge python=3.12 "libfaiss=1.9.0=*cuda126*" libcufft libcusparse
+conda activate tsnecuda
+pip install https://github.com/CannyLab/tsne-cuda/releases/download/4.1.0/tsnecuda-4.1.0+cu129-py3-none-any.whl
+conda env config vars set LD_LIBRARY_PATH=$CONDA_PREFIX/lib
+conda activate tsnecuda
 ```
+The library looks for FAISS and the CUDA libraries on `LD_LIBRARY_PATH`. The `conda env config vars` line sets it each time the environment is activated. Without it, using `TSNE` fails with an error naming `libtsnecuda.so`.
+
+`conda install -c conda-forge tsnecuda` installs all of this for you, for CUDA 12.9 and 13.x.
 
 
 ## From source

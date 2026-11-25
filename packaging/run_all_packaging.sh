@@ -13,6 +13,10 @@ OUT="$(pwd)/wheelhouse"
 mkdir -p "$OUT"
 
 # Each row: CUDA_VERSION  CUDA_TAG  UBUNTU        FAISS_TAG  FAISS_ARCHS
+# The wheels do not bundle FAISS, so FAISS_TAG must match a GPU libfaiss that
+# users can install from conda-forge for that CUDA version (FAISS's C++ ABI
+# changes between releases): 1.9.0 has cuda118 and cuda126 builds, and 1.14.3
+# has cuda129 and cuda130 builds. Keep INSTALL.md's pip table in sync.
 # FAISS is built for Turing..Hopper; the trailing plain "90" also emits PTX so
 # FAISS JITs onto Blackwell (sm_100/sm_120), while tsne-cuda's own kernels get
 # native Blackwell cubins from its CUDA>=12.8 gencode ladder.
@@ -21,7 +25,7 @@ MATRIX=(
   "12.4.1  cu124  ubuntu22.04  v1.9.0  75;80;86;89;90"
   "12.6.3  cu126  ubuntu22.04  v1.9.0  75;80;86;89;90"
   "12.9.1  cu129  ubuntu22.04  v1.9.0  75;80;86;89;90"
-  "13.0.1  cu130  ubuntu24.04  v1.11.0 75;80;86;89;90"
+  "13.0.1  cu130  ubuntu24.04  v1.14.3 75;80;86;89;90"
 )
 
 build_one() {
