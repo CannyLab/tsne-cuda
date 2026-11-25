@@ -1,7 +1,14 @@
 #ifndef PYMODULE_EXT_H
 #define PYMODULE_EXT_H
 
+#ifdef _WIN32
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#define TSNECUDA_EXPORT __declspec(dllexport)
+#else
 #include <sys/types.h>
+#define TSNECUDA_EXPORT
+#endif
 #include "common.h"
 #include "options.h"
 #include "util/distance_utils.h"
@@ -9,7 +16,7 @@
 
 extern "C"
 {
-    void pymodule_tsne(float *result,
+    TSNECUDA_EXPORT void pymodule_tsne(float *result,
                        float *points,
                        ssize_t *dims,
                        float perplexity,

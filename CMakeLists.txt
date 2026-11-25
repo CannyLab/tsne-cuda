@@ -8,12 +8,19 @@ set (CMAKE_PROJECT_VERSION_PATH 0)
 set (CMAKE_SKIP_RULE_DEPENDENCY TRUE)
 set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
-enable_language(CUDA)
 
 # Options
 #-------------------------------------------------------------------------------
 option(BUILD_PYTHON "Build python if ON" ON)
+option(USE_HIP "Build for AMD GPUs with HIP (ROCm) instead of CUDA" OFF)
+option(BUILD_TESTS "Build the GPU unit tests (uses GoogleTest)" OFF)
 #-------------------------------------------------------------------------------
+
+if(USE_HIP)
+    enable_language(HIP)
+else()
+    enable_language(CUDA)
+endif()
 
 # Build Number Generation
 #-------------------------------------------------------------------------------
@@ -32,26 +39,43 @@ ADD_DEFINITIONS(-DVERSION_PATCH=${CMAKE_PROJECT_VERSION_PATCH})
 #-------------------------------------------------------------------------------
 set(OPT_FLAGS
     -std=c++17
-    -fopenmp
-    -fPIC
     -Wno-sign-compare
     -O3
     -Wall
     -Wextra
     -DFINTEGER=int
 )
+# Windows has no -fPIC, and the sources do not use OpenMP.
+if(NOT WIN32)
+    list(APPEND OPT_FLAGS -fopenmp -fPIC)
+endif()
 # x86-only tuning flags; omitted on aarch64 (e.g. Grace/GB200) and other ISAs.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86)$")
     list(APPEND OPT_FLAGS -m64 -mpopcnt -msse4)
 endif()
-string(REPLACE ";" " " CXX_FLAGS_STR "${CMAKE_CXX_FLAGS} ${OPT_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CXX_FLAGS_STR}")
+# These are GNU-driver flags; clang-cl (MSVC) rejects them, and the library
+# sources are HIP, which does not use CMAKE_CXX_FLAGS.
+if(NOT MSVC)
+    string(REPLACE ";" " " CXX_FLAGS_STR "${CMAKE_CXX_FLAGS} ${OPT_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CXX_FLAGS_STR}")
+endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 #-------------------------------------------------------------------------------
 
 # CUDA Configuration
 #-------------------------------------------------------------------------------
+if(USE_HIP)
+    if(NOT DEFINED CMAKE_HIP_STANDARD)
+        set(CMAKE_HIP_STANDARD 17)
+        set(CMAKE_HIP_STANDARD_REQUIRED ON)
+    endif()
+    find_package(hip REQUIRED)
+    find_package(hipblas REQUIRED)
+    find_package(hipfft REQUIRED)
+    find_package(hipsparse REQUIRED)
+    find_package(rocthrust REQUIRED)
+else()
 find_package(CUDAToolkit REQUIRED)
 if(NOT DEFINED CMAKE_CUDA_STANDARD)
     set(CMAKE_CUDA_STANDARD 17)
@@ -151,11 +175,14 @@ endif()
 string (REPLACE ";" " " NVCC_FLAGS_STR "${CUDA_ARCH} ${CUDA_OPTS}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${NVCC_FLAGS_STR}")
 # list(APPEND CUDA_NVCC_FLAGS "--compiler-options -fPIC")
+endif()
 #-------------------------------------------------------------------------------
 
 # OpenMP configuration
 #-------------------------------------------------------------------------------
-find_package(OpenMP REQUIRED)
+if(NOT WIN32)
+    find_package(OpenMP REQUIRED)
+endif()
 #-------------------------------------------------------------------------------
 
 # Interactive-visualization (ZMQ) support is intentionally disabled: the ZMQ
@@ -219,23 +246,54 @@ set(PYTHON_SOURCES
         src/python/tsnecuda/__init__.py
         src/python/tsnecuda/TSNE.py
         src/python/tsnecuda/test/__init__.py
+        src/python/tsnecuda/test/test_tsne.py
         src/python/docs/FAQ.txt
     )
 
+if(USE_HIP)
+    set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE HIP)
+endif()
+
 add_library(tsnecuda SHARED ${SOURCES})
 # set_property(TARGET tsnecuda PROPERTY POSITION_INDEPENDENT_CODE TRUE)
-target_link_libraries(tsnecuda PRIVATE
-    CUDA::cudart
-    CUDA::cublas
-    # CUDA::cublasLt
-    CUDA::cufft
-    CUDA::cufftw
-    CUDA::cusparse
-    OpenMP::OpenMP_CXX
-    pthread
-    -Wl,--allow-multiple-definition
-    ${FAISS_LIBRARIES}
-)
+if(WIN32)
+    # The Python wrapper loads the library as libtsnecuda on every platform.
+    set_target_properties(tsnecuda PROPERTIES PREFIX "lib")
+endif()
+if(USE_HIP)
+    # hip_compat/ provides the CUDA headers the sources include, mapped to HIP.
+    target_include_directories(tsnecuda BEFORE PRIVATE ${PROJECT_SOURCE_DIR}/hip_compat)
+    # clang rejects the 'register' storage class in C++17; nvcc ignores it.
+    target_compile_options(tsnecuda PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-Wno-register>)
+    target_link_libraries(tsnecuda PRIVATE
+        hip::host
+        roc::hipblas
+        hip::hipfft
+        roc::hipsparse
+        roc::rocthrust
+        ${FAISS_LIBRARIES}
+    )
+    if(NOT WIN32)
+        target_link_libraries(tsnecuda PRIVATE
+            OpenMP::OpenMP_CXX
+            pthread
+            -Wl,--allow-multiple-definition
+        )
+    endif()
+else()
+    target_link_libraries(tsnecuda PRIVATE
+        CUDA::cudart
+        CUDA::cublas
+        # CUDA::cublasLt
+        CUDA::cufft
+        CUDA::cufftw
+        CUDA::cusparse
+        OpenMP::OpenMP_CXX
+        pthread
+        -Wl,--allow-multiple-definition
+        ${FAISS_LIBRARIES}
+    )
+endif()
 
 # No CPU BLAS/LAPACK is linked: the library's only GEMM is GPU cuBLAS
 # (cublasSgemm), and FAISS carries its own BLAS transitively. Dropping the
@@ -247,6 +305,42 @@ target_link_libraries(tsnecuda PRIVATE
 # The standalone C++ CLI (src/exe/main.cu, which pulls in the cxxopts submodule)
 # is intentionally not built: the Python module is the supported entry point.
 #-------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------
+# GPU unit tests
+#-------------------------------------------------------------------------------
+if(BUILD_TESTS)
+    find_package(GTest QUIET)
+    if(NOT GTest_FOUND)
+        include(FetchContent)
+        FetchContent_Declare(googletest
+            URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz)
+        set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(googletest)
+    endif()
+    enable_testing()
+
+    # The tests call library internals, so compile them in rather than linking
+    # the shared library, which exports only the Python entry point on Windows.
+    set(TEST_SOURCES
+        src/test/test.cu
+        src/util/cuda_utils.cu
+        src/util/reduce_utils.cu
+    )
+    add_executable(tsnecuda_test ${TEST_SOURCES})
+    if(USE_HIP)
+        set_source_files_properties(src/test/test.cu PROPERTIES LANGUAGE HIP)
+        target_include_directories(tsnecuda_test BEFORE PRIVATE ${PROJECT_SOURCE_DIR}/hip_compat)
+        target_compile_options(tsnecuda_test PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-Wno-register>)
+        target_link_libraries(tsnecuda_test PRIVATE
+            hip::host roc::hipblas hip::hipfft roc::hipsparse roc::rocthrust)
+    else()
+        target_link_libraries(tsnecuda_test PRIVATE
+            CUDA::cudart CUDA::cublas CUDA::cufft CUDA::cusparse)
+    endif()
+    target_link_libraries(tsnecuda_test PRIVATE GTest::gtest_main)
+    add_test(NAME tsnecuda_test COMMAND tsnecuda_test)
+endif()
 
 #-------------------------------------------------------------------------------
 # Python library copy and build

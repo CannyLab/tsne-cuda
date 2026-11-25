@@ -36,6 +36,8 @@ Left: MULTICORE-4 (501s), Middle: BH-TSNE (1156s), Right: t-SNE-CUDA (Ours, 6.98
 
 To install our library, follow the [installation instructions](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md).
 
+AMD GPUs are supported through a HIP build from source with ROCm; see [Building for AMD GPUs (ROCm)](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md#building-for-amd-gpus-rocm).
+
 ### Run
 
 Like many of the libraries available, the python wrappers subscribe to the same API as [sklearn.manifold.TSNE](http://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html).
