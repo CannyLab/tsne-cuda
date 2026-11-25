@@ -2,12 +2,12 @@
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/CannyLab/tsne-cuda)
 ![Conda](https://img.shields.io/conda/pn/CannyLab/tsnecuda)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/tsnecuda)
-![CUDA versions](https://img.shields.io/badge/cuda-10.1%20%7C%2010.2%20%7C%2011.0%20%7C%2011.1%20%7C%2011.2%20%7C%2011.3%20%7C%2012.2-blue)
+![CUDA versions](https://img.shields.io/badge/cuda-11.8%20%7C%2012.4%20%7C%2012.6%20%7C%2012.9%20%7C%2013.0-blue)
 ![Conda](https://img.shields.io/conda/dn/cannylab/tsnecuda)
 
 This repo is an optimized CUDA version of [FIt-SNE algorithm](https://github.com/KlugerLab/FIt-SNE) with associated python modules. We find that our implementation of t-SNE can be up to 1200x faster than Sklearn, or up to 50x faster than Multicore-TSNE when used with the right GPU. The paper describing our approach, as well as the results below, is available at [https://arxiv.org/abs/1807.11824](https://arxiv.org/abs/1807.11824).
 
-You can install binaries with anaconda for CUDA version 10.1 and 10.2 using `conda install tsnecuda -c conda-forge`. Tsnecuda supports CUDA versions 9.0 and later through source installation, check out the wiki for up to date installation instructions. [https://github.com/CannyLab/tsne-cuda/wiki/](https://github.com/CannyLab/tsne-cuda/wiki/)
+You can install binaries for Linux with `conda install -c conda-forge tsnecuda` (CUDA 12.9 and 13.0), or install a wheel for CUDA 11.8 to 13.0 from the [latest release](https://github.com/CannyLab/tsne-cuda/releases/latest). Other CUDA versions and AMD GPUs (ROCm) are supported through source builds; see the [installation instructions](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md).
 
 # Benchmarks
 ### Simulated Data
