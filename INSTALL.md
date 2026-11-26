@@ -90,6 +90,20 @@ make -j<num cores>
 ```
 Using multiple threads may throw errors in the compilation due to nonexistent files. To fix this, just run a single threaded `make` after compilation completes.
 
+### Building on Windows
+
+On Windows, nvcc uses MSVC (`cl.exe`) as its host compiler, so you need Visual Studio 2022 or the Build Tools for Visual Studio 2022 with the "Desktop development with C++" workload. The simplest way to get FAISS and the CUDA libraries is from conda-forge. Run these commands in an "x64 Native Tools Command Prompt for VS 2022" so that `cl.exe` is on `PATH`:
+```
+conda create -n tsnecuda-build -c conda-forge python=3.12 cmake ninja "libfaiss=*=*_cuda" cuda-nvcc cuda-cudart-dev libcublas-dev libcufft-dev libcusparse-dev
+conda activate tsnecuda-build
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ^
+  -DCMAKE_PREFIX_PATH="%CONDA_PREFIX%\Library" ^
+  -DCMAKE_CUDA_ARCHITECTURES=89
+cmake --build build
+pip install .\build\python
+```
+Replace `89` with your GPU's compute capability without the dot (for example 86 for an RTX 3090), or leave the option out to build for every architecture the toolkit supports, which takes much longer. Blackwell GPUs (100, 120) need CUDA 13 on Windows: CUDA 12's headers don't compile for them with MSVC. A CUDA 12 build still runs on Blackwell, because the default list includes sm_90 PTX, which the driver compiles on first use. The build produces `build\python\tsnecuda\libtsnecuda.dll`. Before it loads the DLL, `TSNE` adds the conda environment's `Library\bin` and the CUDA toolkit's `bin` directory (from `CUDA_PATH`) to the DLL search path, so `faiss.dll` and the CUDA DLLs load without changes to `PATH`.
+
 ### Building for AMD GPUs (ROCm)
 
 tsne-cuda can also be built with HIP for AMD GPUs. In addition to the requirements above (without the CUDA toolkit), this needs:

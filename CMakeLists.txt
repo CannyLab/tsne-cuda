@@ -89,7 +89,14 @@ if(USE_HIP)
 else()
 find_package(CUDAToolkit REQUIRED)
 if(NOT DEFINED CMAKE_CUDA_STANDARD)
-    set(CMAKE_CUDA_STANDARD 17)
+    # Recent FAISS headers (faiss/impl/Panorama.h) use C++20 lambda template
+    # parameters. nvcc accepts them in C++17 mode as a GNU extension, but not
+    # when it emulates MSVC, so Windows builds need C++20.
+    if(WIN32)
+        set(CMAKE_CUDA_STANDARD 20)
+    else()
+        set(CMAKE_CUDA_STANDARD 17)
+    endif()
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
@@ -135,8 +142,10 @@ else()
             -gencode=arch=compute_89,code=sm_89
             -gencode=arch=compute_90,code=sm_90
         )
-        # Blackwell (sm_100 / sm_120) requires CUDA >= 12.8.
-        if(CUDAToolkit_VERSION_MINOR GREATER_EQUAL "8")
+        # Blackwell (sm_100 / sm_120) requires CUDA >= 12.8. On Windows, CUDA
+        # 12's CCCL headers don't compile for it in C++20 (inline asm passes a
+        # 32-bit long to a 64-bit operand), so Blackwell runs the sm_90 PTX there.
+        if(CUDAToolkit_VERSION_MINOR GREATER_EQUAL "8" AND NOT WIN32)
             list(APPEND CUDA_ARCH
                 -gencode=arch=compute_100,code=sm_100
                 -gencode=arch=compute_120,code=sm_120
@@ -171,17 +180,30 @@ else()
 endif()
 
 
-set(CUDA_OPTS
-    -O3
-    -Xptxas '-dlcm=cg'
-    -Xcompiler '-O3'
-    -Xcompiler '-fPIC'
-    -Xcompiler '-fopenmp'
-    -Xlinker 'muldefs'
-)
-# x86-only host tuning flags for nvcc's host compiler; omitted on other ISAs.
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86)$")
-    list(APPEND CUDA_OPTS -Xcompiler '-msse4' -Xcompiler '-m64' -Xcompiler '-mpopcnt')
+if(WIN32)
+    # On Windows nvcc's host compiler is MSVC (cl.exe), which takes none of the
+    # GNU options below, and no shell strips the quotes around them. /bigobj
+    # lifts MSVC's section limit, which Thrust-heavy objects can exceed.
+    # CCCL (CUDA 13) refuses to build with MSVC's traditional preprocessor.
+    set(CUDA_OPTS
+        -O3
+        -Xptxas -dlcm=cg
+        -Xcompiler /bigobj
+        -Xcompiler /Zc:preprocessor
+    )
+else()
+    set(CUDA_OPTS
+        -O3
+        -Xptxas '-dlcm=cg'
+        -Xcompiler '-O3'
+        -Xcompiler '-fPIC'
+        -Xcompiler '-fopenmp'
+        -Xlinker 'muldefs'
+    )
+    # x86-only host tuning flags for nvcc's host compiler; omitted on other ISAs.
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86)$")
+        list(APPEND CUDA_OPTS -Xcompiler '-msse4' -Xcompiler '-m64' -Xcompiler '-mpopcnt')
+    endif()
 endif()
 string (REPLACE ";" " " NVCC_FLAGS_STR "${CUDA_ARCH} ${CUDA_OPTS}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${NVCC_FLAGS_STR}")
@@ -299,11 +321,15 @@ else()
         CUDA::cufft
         CUDA::cufftw
         CUDA::cusparse
-        OpenMP::OpenMP_CXX
-        pthread
-        -Wl,--allow-multiple-definition
-        ${FAISS_LIBRARIES}
     )
+    if(NOT WIN32)
+        target_link_libraries(tsnecuda PRIVATE
+            OpenMP::OpenMP_CXX
+            pthread
+            -Wl,--allow-multiple-definition
+        )
+    endif()
+    target_link_libraries(tsnecuda PRIVATE ${FAISS_LIBRARIES})
 endif()
 
 # No CPU BLAS/LAPACK is linked: the library's only GEMM is GPU cuBLAS
