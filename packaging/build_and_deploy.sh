@@ -8,7 +8,7 @@
 set -ex
 
 CUDA_TAG="${1:?usage: build_and_deploy.sh <cuda_tag> <version>}"
-TSNE_VERSION="${2:-4.1.0}"
+TSNE_VERSION="${2:-4.1.1}"
 
 # Configure + compile the shared library and stage the importable package.
 # The internal per-toolkit gencode ladder covers A100/H100/H200/B200; pass

@@ -7,7 +7,7 @@
 
 This repo is an optimized CUDA version of [FIt-SNE algorithm](https://github.com/KlugerLab/FIt-SNE) with associated python modules. We find that our implementation of t-SNE can be up to 1200x faster than Sklearn, or up to 50x faster than Multicore-TSNE when used with the right GPU. The paper describing our approach, as well as the results below, is available at [https://arxiv.org/abs/1807.11824](https://arxiv.org/abs/1807.11824).
 
-You can install binaries for Linux with `conda install -c conda-forge tsnecuda` (CUDA 12.9 and 13.0), or install a wheel for CUDA 11.8 to 13.0 from the [latest release](https://github.com/CannyLab/tsne-cuda/releases/latest). Other CUDA versions and AMD GPUs (ROCm) are supported through source builds; see the [installation instructions](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md).
+You can install binaries for Linux and Windows with `conda install -c conda-forge tsnecuda` (CUDA 12.9 and 13.x), or install a Linux wheel for CUDA 11.8 to 13.0; see [Pip installation](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md#pip-installation). Other CUDA versions and AMD GPUs (ROCm) are supported through source builds; see the [installation instructions](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md).
 
 # Benchmarks
 ### Simulated Data

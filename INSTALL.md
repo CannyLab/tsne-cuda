@@ -2,11 +2,11 @@
 
 ## Conda installation
 
-Conda binaries are available through conda-forge! To install tsne-cuda with conda, run `conda install tsnecuda -c conda-forge`.
+Conda binaries for Linux and Windows (x86_64) are available through conda-forge. To install tsne-cuda with conda, run `conda install tsnecuda -c conda-forge`.
 
 ## Pip installation
 
-Prebuilt wheels for Linux (x86_64) are attached to each [GitHub release](https://github.com/CannyLab/tsne-cuda/releases) and listed at https://tsnecuda.isx.ai/tsnecuda_stable.html. One wheel works with every Python 3 version. Wheels don't include FAISS or the CUDA libraries, so install those first. Install the FAISS version the wheel was built against: FAISS's C++ ABI changes between releases, and a wheel won't load against a different version.
+Prebuilt wheels for Linux (x86_64) are attached to the [4.1.0 release](https://github.com/CannyLab/tsne-cuda/releases/tag/4.1.0) and listed at https://tsnecuda.isx.ai/tsnecuda_stable.html. 4.1.1 changed only the Windows build, so it has no wheels of its own. One wheel works with every Python 3 version. Wheels don't include FAISS or the CUDA libraries, so install those first. Install the FAISS version the wheel was built against: FAISS's C++ ABI changes between releases, and a wheel won't load against a different version.
 
 | Wheel | Native code for | Runtime libraries from conda-forge |
 |---|---|---|
@@ -28,7 +28,7 @@ conda activate tsnecuda
 ```
 The library looks for FAISS and the CUDA libraries on `LD_LIBRARY_PATH`. The `conda env config vars` line sets it each time the environment is activated. Without it, using `TSNE` fails with an error naming `libtsnecuda.so`.
 
-`conda install -c conda-forge tsnecuda` installs all of this for you, for CUDA 12.9 and 13.x.
+`conda install -c conda-forge tsnecuda` installs all of this for you, for CUDA 12.9 and 13.x on Linux and Windows.
 
 
 ## From source
